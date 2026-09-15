@@ -528,6 +528,37 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   </div>
 </div>
 
+<!-- MODAL: update service ringkas (dipanggil dari tombol Update / Input Servis) -->
+<div class="modal-bg" id="updateServiceModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>Update Service Kendaraan</h3>
+        <p class="sub" id="usSub">-</p>
+      </div>
+      <button class="x-btn" onclick="closeUpdateServiceModal()">✕</button>
+    </div>
+    <input type="hidden" id="us_id">
+    <div class="form-grid">
+      <div><label>Tanggal Terakhir Service</label><input id="us_lastdate" type="date" oninput="liveCalcUpdate()"></div>
+      <div><label>KM Service (terakhir)</label><input id="us_lastkm" type="number" oninput="liveCalcUpdate()"></div>
+      <div><label>KM Aktual Saat Ini</label><input id="us_currentkm" type="number"></div>
+      <div><label>Interval Service (30–360 hari)</label><input id="us_interval" type="number" min="30" max="360" oninput="liveCalcUpdate()"></div>
+      <div class="full"><label>Estimasi Jarak KM Berikutnya (+KM)</label><input id="us_kmstep" type="number" oninput="liveCalcUpdate()"></div>
+      <div class="full"><label>Keterangan</label><textarea id="us_note"></textarea></div>
+      <div class="calc-box full">
+        <div>Tanggal Service Berikutnya<b id="usCalcDate">—</b></div>
+        <div>KM Service Berikutnya<b id="usCalcKm">—</b></div>
+        <div>Status Saat Ini<b id="usCalcStatus">—</b></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeUpdateServiceModal()">Batal</button>
+      <button class="btn-green" onclick="saveUpdateService()">Simpan Update Service</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="historyModalBg">
   <div class="modal">
     <div class="modal-head"><div><h3 id="hModalTitle">Histori Service</h3><p class="sub">Riwayat pembaruan service kendaraan ini.</p></div><button class="x-btn" onclick="closeHistoryModal()">✕</button></div>
@@ -740,7 +771,7 @@ function renderCritBanner(vs){
       <div class="cv-km">Odometer Aktual / Target<b>${(v.currentkm||0).toLocaleString('id-ID')} / ${(v.nextkm||0).toLocaleString('id-ID')} KM</b>${kmLebih>0? `<span style="color:var(--bad);">+${kmLebih.toLocaleString('id-ID')} KM Melebihi Batas</span>`:''}</div>
       <div class="cv-actions">
         <a class="wa-btn" href="${waLink(v)}" target="_blank">💬 WhatsApp</a>
-        <button class="update-btn" onclick="openVehicleModal('${v.id}')">🔧 Input Servis</button>
+        <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Input Servis</button>
       </div>
     </div>`;
   }).join('');
@@ -847,7 +878,7 @@ function renderTable(){
       <td><span class="status-badge ${s}">${statusLabel(s)}</span></td>
       <td><div class="aksi-cell">
         <a class="wa-btn" href="${waLink(v)}" target="_blank">💬 WA Reminder</a>
-        <button class="update-btn" onclick="openVehicleModal('${v.id}')">🔧 Update</button>
+        <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
         <button class="edit-icon-btn" onclick="openVehicleModal('${v.id}')" title="Edit">✎</button>
       </div></td>
     </tr>`;
@@ -958,6 +989,49 @@ async function recordHistory(v){
     interval:v.interval, note:v.note, by: currentUser?.username||'-', inputAt: new Date().toLocaleString('id-ID') };
   const rows = await sbInsert('service_history', toDbHistory(h));
   DB.history.unshift(fromDbHistory(rows[0]));
+}
+
+/* ================= MODAL UPDATE SERVICE (RINGKAS) ================= */
+function openUpdateServiceModal(id){
+  const v = DB.vehicles.find(x=>x.id===id);
+  if(!v) return;
+  document.getElementById('us_id').value = id;
+  document.getElementById('usSub').textContent = `${v.nopol||'-'} • ${v.type||'-'} • ${v.pt||'-'} • ${v.user||'-'}`;
+  document.getElementById('us_lastdate').value = v.lastdate||'';
+  document.getElementById('us_lastkm').value = v.lastkm||0;
+  document.getElementById('us_currentkm').value = v.currentkm||0;
+  document.getElementById('us_interval').value = v.interval||180;
+  document.getElementById('us_kmstep').value = v.kmstep||10000;
+  document.getElementById('us_note').value = v.note||'';
+  liveCalcUpdate();
+  document.getElementById('updateServiceModalBg').classList.add('show');
+}
+function closeUpdateServiceModal(){ document.getElementById('updateServiceModalBg').classList.remove('show'); }
+function liveCalcUpdate(){
+  const lastdate=document.getElementById('us_lastdate').value, interval=document.getElementById('us_interval').value,
+        lastkm=document.getElementById('us_lastkm').value, kmstep=document.getElementById('us_kmstep').value;
+  if(!lastdate){ document.getElementById('usCalcDate').textContent='—'; document.getElementById('usCalcKm').textContent='—'; document.getElementById('usCalcStatus').textContent='—'; return; }
+  const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
+  document.getElementById('usCalcDate').textContent = fmtDate(nextdate);
+  document.getElementById('usCalcKm').textContent = nextkm.toLocaleString('id-ID')+' KM';
+  document.getElementById('usCalcStatus').textContent = statusLabel(statusOf({nextdate}));
+}
+async function saveUpdateService(){
+  const idVal = document.getElementById('us_id').value;
+  const existing = DB.vehicles.find(x=>x.id===idVal);
+  if(!existing) return;
+  const get = k=>document.getElementById(k).value.trim();
+  const lastdate=get('us_lastdate'), interval=Number(get('us_interval'))||180, lastkm=Number(get('us_lastkm'))||0, kmstep=Number(get('us_kmstep'))||10000;
+  const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
+  const v = { ...existing, lastdate, lastkm, currentkm:Number(get('us_currentkm'))||0, interval, kmstep, nextdate, nextkm, note:get('us_note') };
+  try{
+    await sbUpdate('vehicles', idVal, toDbVehicle(v));
+    const idx = DB.vehicles.findIndex(x=>x.id===idVal);
+    DB.vehicles[idx] = v;
+    await recordHistory(v);
+    closeUpdateServiceModal(); renderTable(); renderDashboard(); renderHistory();
+    showToast('Update service tersimpan & dicatat ke histori.');
+  }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
 }
 
 /* ================= HISTORI ================= */
