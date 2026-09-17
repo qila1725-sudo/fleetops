@@ -585,9 +585,10 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 <div class="modal-bg" id="bengkelInModalBg">
   <div class="modal">
     <div class="modal-head">
-      <div><h3>Tambahkan Kendaraan ke Bengkel</h3><p class="sub">Catat kendaraan yang masuk bengkel repair (tidak perlu terdaftar di menu Data Kendaraan).</p></div>
+      <div><h3 id="bgInModalTitle">Tambahkan Kendaraan ke Bengkel</h3><p class="sub">Catat kendaraan yang masuk bengkel repair (tidak perlu terdaftar di menu Data Kendaraan).</p></div>
       <button class="x-btn" onclick="closeBengkelInModal()">✕</button>
     </div>
+    <input type="hidden" id="bg_id">
     <div class="form-grid">
       <div><label>Nomor Polisi</label><input id="bg_vehicle" list="bgVehicleList" placeholder="Ketik nomor polisi..." style="text-transform:uppercase"></div>
       <div><label>Nama PT</label><input id="bg_pt" list="bgPtList" placeholder="Ketik nama PT..."></div>
@@ -601,11 +602,12 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         </datalist>
       </div>
       <div><label>Tanggal Masuk</label><input id="bg_in_date" type="date"></div>
+      <div><label>Tanggal Keluar (kosongkan jika masih di bengkel)</label><input id="bg_in_outdate" type="date"></div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeBengkelInModal()">Batal</button>
-      <button class="btn btn-primary small" onclick="saveBengkelIn()">Simpan</button>
+      <button class="btn btn-primary small" onclick="saveBengkelIn()" id="bgInSaveBtn">Simpan</button>
     </div>
   </div>
 </div>
@@ -1216,7 +1218,13 @@ function renderBengkel(){
       <td>${lama}</td>
       <td><span class="status-badge ${status==='in'?'warn':'ok'}">${status==='in'?'Masih di Bengkel':'Sudah Keluar'}</span></td>
       <td class="row-note">${b.note||'-'}</td>
-      <td>${status==='in' ? `<button class="update-btn" onclick="openBengkelOutModal('${b.id}')">✅ Catat Keluar</button>` : ''}</td>
+      <td>
+        <div class="aksi-cell">
+          ${status==='in' ? `<button class="update-btn" onclick="openBengkelOutModal('${b.id}')">✅ Catat Keluar</button>` : ''}
+          <button class="edit-icon-btn" onclick="openBengkelEditModal('${b.id}')" title="Edit">✎</button>
+          <button class="edit-icon-btn" onclick="deleteBengkelEntry('${b.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -1231,30 +1239,77 @@ function openBengkelInModal(){
   const customNames = [...new Set(DB.bengkel.map(b=>b.bengkel).filter(Boolean))]
     .filter(n=>!['Padimas','IRM','Lido','Kita','Layanan'].includes(n));
   bdl.innerHTML = ['Padimas','IRM','Lido','Kita','Layanan', ...customNames].map(n=>`<option value="${n}">`).join('');
+  document.getElementById('bg_id').value = '';
+  document.getElementById('bgInModalTitle').textContent = 'Tambahkan Kendaraan ke Bengkel';
+  document.getElementById('bgInSaveBtn').textContent = 'Simpan';
   document.getElementById('bg_vehicle').value = '';
   document.getElementById('bg_pt').value = '';
   document.getElementById('bg_in_bengkel').value = 'Padimas';
   document.getElementById('bg_in_date').value = today();
+  document.getElementById('bg_in_outdate').value = '';
   document.getElementById('bg_in_note').value = '';
+  document.getElementById('bengkelInModalBg').classList.add('show');
+}
+function openBengkelEditModal(id){
+  const b = DB.bengkel.find(x=>x.id===id);
+  if(!b) return;
+  const dl = document.getElementById('bgVehicleList');
+  dl.innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${n}">`).join('');
+  const ptdl = document.getElementById('bgPtList');
+  ptdl.innerHTML = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort().map(n=>`<option value="${n}">`).join('');
+  const bdl = document.getElementById('bgBengkelList');
+  const customNames = [...new Set(DB.bengkel.map(x=>x.bengkel).filter(Boolean))].filter(n=>!['Padimas','IRM','Lido','Kita','Layanan'].includes(n));
+  bdl.innerHTML = ['Padimas','IRM','Lido','Kita','Layanan', ...customNames].map(n=>`<option value="${n}">`).join('');
+  document.getElementById('bg_id').value = b.id;
+  document.getElementById('bgInModalTitle').textContent = 'Edit Data Bengkel';
+  document.getElementById('bgInSaveBtn').textContent = 'Simpan Perubahan';
+  document.getElementById('bg_vehicle').value = b.nopol||'';
+  document.getElementById('bg_pt').value = b.pt||'';
+  document.getElementById('bg_in_bengkel').value = b.bengkel||'';
+  document.getElementById('bg_in_date').value = b.tglMasuk||'';
+  document.getElementById('bg_in_outdate').value = b.tglKeluar||'';
+  document.getElementById('bg_in_note').value = b.note||'';
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
 function closeBengkelInModal(){ document.getElementById('bengkelInModalBg').classList.remove('show'); }
 async function saveBengkelIn(){
+  const id = document.getElementById('bg_id').value;
   const nopol = document.getElementById('bg_vehicle').value.trim().toUpperCase();
   const pt = document.getElementById('bg_pt').value.trim();
   if(!nopol){ showToast('Isi nomor polisi terlebih dahulu.'); return; }
   const bengkelName = document.getElementById('bg_in_bengkel').value.trim();
   if(!bengkelName){ showToast('Isi nama bengkel terlebih dahulu.'); return; }
-  // Jika kebetulan nopol ini juga ada di data kendaraan utama, tautkan vehicle_id (opsional, tidak wajib)
-  const matched = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
-  const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', bengkel:bengkelName,
-    tglMasuk:document.getElementById('bg_in_date').value||today(), tglKeluar:null, note:document.getElementById('bg_in_note').value.trim() };
+  const tglMasuk = document.getElementById('bg_in_date').value||today();
+  const tglKeluar = document.getElementById('bg_in_outdate').value || null;
+  const note = document.getElementById('bg_in_note').value.trim();
   try{
-    const rows = await sbInsert('bengkel_log', toDbBengkel(b));
-    DB.bengkel.unshift(fromDbBengkel(rows[0]));
+    if(id){
+      const existing = DB.bengkel.find(x=>x.id===id);
+      const updated = { ...existing, nopol, pt, bengkel:bengkelName, tglMasuk, tglKeluar, note };
+      await sbUpdate('bengkel_log', id, toDbBengkel(updated));
+      const idx = DB.bengkel.findIndex(x=>x.id===id);
+      DB.bengkel[idx] = updated;
+      showToast(`${nopol} berhasil diperbarui.`);
+    } else {
+      const matched = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
+      const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', bengkel:bengkelName, tglMasuk, tglKeluar, note };
+      const rows = await sbInsert('bengkel_log', toDbBengkel(b));
+      DB.bengkel.unshift(fromDbBengkel(rows[0]));
+      showToast(`${nopol} tercatat masuk bengkel ${bengkelName}.`);
+    }
     closeBengkelInModal(); renderBengkel();
-    showToast(`${nopol} tercatat masuk bengkel ${b.bengkel}.`);
   }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel bengkel_log sudah dibuat di Supabase.', true); }
+}
+async function deleteBengkelEntry(id){
+  const b = DB.bengkel.find(x=>x.id===id);
+  if(!b) return;
+  if(!confirm(`Hapus catatan bengkel untuk ${b.nopol} (${b.bengkel})? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbDeleteIds('bengkel_log', [id]);
+    DB.bengkel = DB.bengkel.filter(x=>x.id!==id);
+    renderBengkel();
+    showToast('Data berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
 }
 function openBengkelOutModal(id){
   const b = DB.bengkel.find(x=>x.id===id);
