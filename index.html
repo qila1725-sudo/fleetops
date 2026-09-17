@@ -503,7 +503,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <table style="min-width:1200px">
               <thead><tr>
                 <th>NOPOL</th><th>NAMA PT</th><th>BENGKEL</th><th>TANGGAL MASUK</th><th>TANGGAL KELUAR</th>
-                <th>LAMA DI BENGKEL</th><th>STATUS</th><th>KETERANGAN</th><th>AKSI</th>
+                <th>LAMA DI BENGKEL</th><th>STATUS</th><th>HARGA OR</th><th>KWITANSI</th><th>PEMBAYARAN</th><th>KETERANGAN</th><th>AKSI</th>
               </tr></thead>
               <tbody id="bengkelBody"></tbody>
             </table>
@@ -576,7 +576,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeVehicleModal()">Batal</button>
       <button class="btn btn-primary small" onclick="saveVehicle(false)">Simpan Data</button>
-      <button class="btn-green" onclick="saveVehicle(true)">Simpan &amp; Catat sebagai Update Service</button>
     </div>
   </div>
 </div>
@@ -603,6 +602,15 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div><label>Tanggal Masuk</label><input id="bg_in_date" type="date"></div>
       <div><label>Tanggal Keluar (kosongkan jika masih di bengkel)</label><input id="bg_in_outdate" type="date"></div>
+      <div><label>Harga OR (Own Risk)</label><input id="bg_in_or" type="number" min="0" placeholder="0"></div>
+      <div>
+        <label>Kwitansi</label>
+        <select id="bg_in_kwitansi"><option>Belum</option><option>Sudah</option></select>
+      </div>
+      <div class="full">
+        <label>Status Pembayaran</label>
+        <select id="bg_in_bayar"><option>Belum Bayar</option><option>Sudah Bayar</option><option>PO</option></select>
+      </div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
     </div>
     <div class="modal-actions">
@@ -727,8 +735,8 @@ const toDbHistory = h => ({ vehicle_id:h.vehicleId, pt:h.pt, nopol:h.nopol, vehi
 const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active });
 const toDbAccount = a => ({ username:a.username, password:a.password, role:a.role, active:a.active });
 
-const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan });
-const toDbBengkel = b => ({ vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'' });
+const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar });
+const toDbBengkel = b => ({ vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' });
 
 /* ================= LOAD & PERSIST ================= */
 async function loadAll(){
@@ -1205,7 +1213,7 @@ function renderBengkel(){
   const list = filteredBengkel();
   const body = document.getElementById('bengkelBody');
   if(!body) return;
-  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="9">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
+  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="12">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
   body.innerHTML = list.map(b=>{
     const status = bengkelStatus(b);
     const lama = status==='in' ? `${daysBetween(b.tglMasuk, today())} hari (berjalan)` : `${daysBetween(b.tglMasuk, b.tglKeluar)} hari`;
@@ -1217,6 +1225,9 @@ function renderBengkel(){
       <td>${b.tglKeluar? fmtDate(b.tglKeluar) : '-'}</td>
       <td>${lama}</td>
       <td><span class="status-badge ${status==='in'?'warn':'ok'}">${status==='in'?'Masih di Bengkel':'Sudah Keluar'}</span></td>
+      <td>${b.hargaOR? 'Rp '+Number(b.hargaOR).toLocaleString('id-ID') : '-'}</td>
+      <td><span class="pill ${b.kwitansi==='Sudah'?'on':'off'}">${b.kwitansi||'Belum'}</span></td>
+      <td><span class="status-badge ${b.statusBayar==='Sudah Bayar'?'ok':(b.statusBayar==='PO'?'warn':'bad')}">${b.statusBayar||'Belum Bayar'}</span></td>
       <td class="row-note">${b.note||'-'}</td>
       <td>
         <div class="aksi-cell">
@@ -1247,6 +1258,9 @@ function openBengkelInModal(){
   document.getElementById('bg_in_bengkel').value = 'Padimas';
   document.getElementById('bg_in_date').value = today();
   document.getElementById('bg_in_outdate').value = '';
+  document.getElementById('bg_in_or').value = '';
+  document.getElementById('bg_in_kwitansi').value = 'Belum';
+  document.getElementById('bg_in_bayar').value = 'Belum Bayar';
   document.getElementById('bg_in_note').value = '';
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
@@ -1268,6 +1282,9 @@ function openBengkelEditModal(id){
   document.getElementById('bg_in_bengkel').value = b.bengkel||'';
   document.getElementById('bg_in_date').value = b.tglMasuk||'';
   document.getElementById('bg_in_outdate').value = b.tglKeluar||'';
+  document.getElementById('bg_in_or').value = b.hargaOR||'';
+  document.getElementById('bg_in_kwitansi').value = b.kwitansi||'Belum';
+  document.getElementById('bg_in_bayar').value = b.statusBayar||'Belum Bayar';
   document.getElementById('bg_in_note').value = b.note||'';
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
@@ -1281,18 +1298,21 @@ async function saveBengkelIn(){
   if(!bengkelName){ showToast('Isi nama bengkel terlebih dahulu.'); return; }
   const tglMasuk = document.getElementById('bg_in_date').value||today();
   const tglKeluar = document.getElementById('bg_in_outdate').value || null;
+  const hargaOR = Number(document.getElementById('bg_in_or').value)||0;
+  const kwitansi = document.getElementById('bg_in_kwitansi').value;
+  const statusBayar = document.getElementById('bg_in_bayar').value;
   const note = document.getElementById('bg_in_note').value.trim();
   try{
     if(id){
       const existing = DB.bengkel.find(x=>x.id===id);
-      const updated = { ...existing, nopol, pt, bengkel:bengkelName, tglMasuk, tglKeluar, note };
+      const updated = { ...existing, nopol, pt, bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
       await sbUpdate('bengkel_log', id, toDbBengkel(updated));
       const idx = DB.bengkel.findIndex(x=>x.id===id);
       DB.bengkel[idx] = updated;
       showToast(`${nopol} berhasil diperbarui.`);
     } else {
       const matched = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
-      const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', bengkel:bengkelName, tglMasuk, tglKeluar, note };
+      const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
       const rows = await sbInsert('bengkel_log', toDbBengkel(b));
       DB.bengkel.unshift(fromDbBengkel(rows[0]));
       showToast(`${nopol} tercatat masuk bengkel ${bengkelName}.`);
@@ -1339,7 +1359,8 @@ async function saveBengkelOut(){
 function exportBengkel(){
   const rows = filteredBengkel().map(b=>({
     'Nopol':b.nopol,'Nama PT':b.pt,'Bengkel':b.bengkel,'Tanggal Masuk':b.tglMasuk,'Tanggal Keluar':b.tglKeluar||'',
-    'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Keterangan':b.note||''
+    'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Harga OR':b.hargaOR||0,'Kwitansi':b.kwitansi||'Belum',
+    'Status Pembayaran':b.statusBayar||'Belum Bayar','Keterangan':b.note||''
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Keluar Masuk Bengkel'); XLSX.writeFile(wb, 'keluar-masuk-bengkel.xlsx');
