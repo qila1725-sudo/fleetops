@@ -563,7 +563,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Tahun</label><input id="v_year" type="number"></div>
       <div><label>Tanggal Terakhir Service</label><input id="v_lastdate" type="date" oninput="liveCalc()"></div>
       <div><label>KM Service (terakhir)</label><input id="v_lastkm" type="number" oninput="liveCalc()"></div>
-      <div><label>KM Aktual Saat Ini <span style="color:var(--bad);">*wajib untuk kendaraan baru</span></label><input id="v_currentkm" type="number"></div>
+      <div><label>KM Aktual Saat Ini</label><input id="v_currentkm" type="number"></div>
       <div><label>Interval Service (30–360 hari)</label><input id="v_interval" type="number" min="30" max="360" value="180" oninput="liveCalc()"></div>
       <div><label>Estimasi Jarak KM Berikutnya (+KM)</label><input id="v_kmstep" type="number" value="10000" oninput="liveCalc()"></div>
       <div class="full"><label>Keterangan</label><textarea id="v_note"></textarea></div>
@@ -1082,7 +1082,6 @@ async function saveVehicle(logHistory){
   const nopol = get('v_nopol').toUpperCase();
   if(isNew && DB.vehicles.some(x=>(x.nopol||'').toUpperCase()===nopol)){ showToast('Gagal: Nomor Polisi ini sudah terdaftar di sistem.'); return; }
   const currentkm = Number(get('v_currentkm'))||0;
-  if(isNew && currentkm<=0){ showToast('Gagal: KM Aktual Saat Ini wajib diisi (tidak boleh kosong/0) untuk kendaraan baru.'); return; }
   const lastdate=get('v_lastdate'), interval=Number(get('v_interval'))||180, lastkm=Number(get('v_lastkm'))||0, kmstep=Number(get('v_kmstep'))||10000;
   const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
   const pt = get('v_pt');
