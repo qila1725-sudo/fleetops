@@ -562,7 +562,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Warna</label><input id="v_color"></div>
       <div><label>Tahun</label><input id="v_year" type="number"></div>
       <div><label>Tanggal Terakhir Service</label><input id="v_lastdate" type="date" oninput="liveCalc()"></div>
-      <div><label>KM Awal Masuk Armada <span class="cell-sub" style="font-weight:600;">(khusus mobil baru belum pernah service)</span></label><input id="v_kmawal" type="number" placeholder="Misal: 25 (KM di odometer saat mobil diterima)"></div>
       <div><label>KM Service (terakhir)</label><input id="v_lastkm" type="number" oninput="liveCalc()"></div>
       <div><label>KM Aktual Saat Ini <span style="color:var(--bad);">*wajib untuk kendaraan baru</span></label><input id="v_currentkm" type="number"></div>
       <div><label>Interval Service (30–360 hari)</label><input id="v_interval" type="number" min="30" max="360" value="180" oninput="liveCalc()"></div>
@@ -723,10 +722,10 @@ const sbDeleteIds = (table, ids) => sb(`${table}?id=in.(${ids.join(',')})`, {met
 /* ================= MAPPERS (kolom DB <-> objek JS) ================= */
 const fromDbVehicle = r => ({ id:r.id, code:r.code, pt:r.pt, area:r.area, user:r.driver_name, phone:r.phone, nopol:r.nopol,
   type:r.vehicle_type, color:r.color, year:r.year, lastdate:r.last_service_date, lastkm:r.last_service_km, currentkm:r.current_km,
-  interval:r.interval_days, kmstep:r.km_step, nextdate:r.next_service_date, nextkm:r.next_service_km, note:r.notes, kmAwal:r.km_awal });
+  interval:r.interval_days, kmstep:r.km_step, nextdate:r.next_service_date, nextkm:r.next_service_km, note:r.notes });
 const toDbVehicle = v => ({ code:v.code, pt:v.pt, area:v.area, driver_name:v.user, phone:v.phone, nopol:v.nopol, vehicle_type:v.type,
   color:v.color, year:v.year, last_service_date:v.lastdate||null, last_service_km:v.lastkm||0, current_km:v.currentkm||0,
-  interval_days:v.interval||180, km_step:v.kmstep||10000, next_service_date:v.nextdate||null, next_service_km:v.nextkm||0, notes:v.note||'', km_awal:v.kmAwal||null });
+  interval_days:v.interval||180, km_step:v.kmstep||10000, next_service_date:v.nextdate||null, next_service_km:v.nextkm||0, notes:v.note||'' });
 
 const fromDbHistory = r => ({ id:r.id, vehicleId:r.vehicle_id, pt:r.pt, nopol:r.nopol, type:r.vehicle_type, lastdate:r.service_date,
   lastkm:r.service_km, currentkm:r.current_km, interval:r.interval_days, note:r.notes, by:r.updated_by, inputAt:r.input_at });
@@ -994,7 +993,7 @@ function renderTable(){
       <td><button class="nopol-badge" onclick="openHistoryModal('${v.id}')">${v.nopol||'-'}</button></td>
       <td><div class="cell-primary">${v.type||'-'}</div><div class="cell-sub">${v.color||'-'} • ${v.year||'-'}</div></td>
       <td><span class="area-badge">${v.area||'-'}</span></td>
-      <td><div class="cell-primary">${v.lastdate? fmtDate(v.lastdate) : 'Belum service'}</div><div class="cell-sub">${v.lastdate ? (v.lastkm||0).toLocaleString('id-ID')+' KM' : (v.kmAwal!=null ? 'KM Awal: '+Number(v.kmAwal).toLocaleString('id-ID')+' KM' : '-')}</div></td>
+      <td><div class="cell-primary">${fmtDate(v.lastdate)}</div><div class="cell-sub">${(v.lastkm||0).toLocaleString('id-ID')} KM</div></td>
       <td><div class="cell-primary">${(v.currentkm||0).toLocaleString('id-ID')} KM</div><div class="cell-sub">${kmLeftTxt}</div></td>
       <td>${v.interval||'-'} Hari</td>
       <td><span class="status-badge ${s}">${statusLabel(s)}</span></td>
@@ -1059,7 +1058,7 @@ function openVehicleModal(id){
   const set=(k,val)=>document.getElementById(k).value = val||'';
   set('v_pt', v?.pt); set('v_area', v?.area); set('v_user', v?.user); set('v_phone', v?.phone);
   set('v_nopol', v?.nopol); set('v_type', v?.type); set('v_color', v?.color); set('v_year', v?.year);
-  set('v_lastdate', v?.lastdate); set('v_kmawal', v?.kmAwal); set('v_lastkm', v?.lastkm); set('v_currentkm', v?.currentkm);
+  set('v_lastdate', v?.lastdate); set('v_lastkm', v?.lastkm); set('v_currentkm', v?.currentkm);
   document.getElementById('v_interval').value = v?.interval || 180;
   document.getElementById('v_kmstep').value = v?.kmstep || 10000;
   set('v_note', v?.note);
@@ -1090,7 +1089,7 @@ async function saveVehicle(logHistory){
   const sameCount = DB.vehicles.filter(x=>x.pt===pt).length;
   const existing = isNew? null : DB.vehicles.find(x=>x.id===idVal);
   const v = { id:idVal, code: existing?.code || ptCode(pt, sameCount), pt, area:get('v_area'), user:get('v_user'), phone:get('v_phone'),
-    nopol, type:get('v_type'), color:get('v_color'), year:get('v_year'), lastdate, lastkm, currentkm, kmAwal:Number(get('v_kmawal'))||null,
+    nopol, type:get('v_type'), color:get('v_color'), year:get('v_year'), lastdate, lastkm, currentkm,
     interval, kmstep, nextdate, nextkm, note:get('v_note') };
   try{
     if(isNew){
@@ -1370,10 +1369,10 @@ function exportBengkel(){
 }
 
 /* ================= EXCEL ================= */
-const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Tipe Mobil','Warna','Tahun','Area','KM Awal Masuk Armada (kendaraan baru)','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
+const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Tipe Mobil','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
 function exportExcel(){
   const rows = filteredVehicles().map(v=>({'Nama PT':v.pt,'Nama User':v.user,'Nomor Telepon':v.phone,'Nomor Polisi':v.nopol,'Tipe Mobil':v.type,
-    'Warna':v.color,'Tahun':v.year,'Area':v.area,'KM Awal Masuk Armada':v.kmAwal??'','Tanggal Terakhir Service':v.lastdate,'KM Service':v.lastkm,'KM Aktual Saat Ini':v.currentkm,
+    'Warna':v.color,'Tahun':v.year,'Area':v.area,'Tanggal Terakhir Service':v.lastdate,'KM Service':v.lastkm,'KM Aktual Saat Ini':v.currentkm,
     'Interval (hari)':v.interval,'Tanggal Service Berikutnya':v.nextdate,'KM Service Berikutnya':v.nextkm,'Keterangan':v.note}));
   const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Data Kendaraan'); XLSX.writeFile(wb, 'data-kendaraan.xlsx');
@@ -1408,8 +1407,7 @@ async function importExcel(evt){
     const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, 10000);
     toInsert.push(toDbVehicle({ code:ptCode(pt, DB.vehicles.filter(x=>x.pt===pt).length), pt, area:r['Area']||'', user:r['Nama User']||'',
       phone:String(r['Nomor Telepon']||''), nopol, type:r['Tipe Mobil']||'', color:r['Warna']||'', year:r['Tahun']||'', lastdate, lastkm,
-      currentkm:Number(r['KM Aktual Saat Ini'])||0, kmAwal: r['KM Awal Masuk Armada (kendaraan baru)']!==undefined && r['KM Awal Masuk Armada (kendaraan baru)']!=='' ? Number(r['KM Awal Masuk Armada (kendaraan baru)']) : null,
-      interval, kmstep:10000, nextdate, nextkm, note:r['Keterangan']||'' }));
+      currentkm:Number(r['KM Aktual Saat Ini'])||0, interval, kmstep:10000, nextdate, nextkm, note:r['Keterangan']||'' }));
   });
   try{
     if(toInsert.length){ const rowsSaved = await sbInsert('vehicles', toInsert); DB.vehicles.push(...rowsSaved.map(fromDbVehicle)); }
