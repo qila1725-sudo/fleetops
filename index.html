@@ -630,7 +630,11 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Nama User / Driver</label><input id="v_user"></div>
       <div><label>Nomor Telepon (format 08xx / 62xx)</label><input id="v_phone"></div>
       <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase"></div>
-      <div><label>Tipe Mobil</label><input id="v_type"></div>
+      <input type="hidden" id="v_type">
+      <div><label>Brand</label><select id="v_brand" onchange="updateVehicleTypeCombined()"></select></div>
+      <div><label>Model</label><select id="v_model" onchange="updateVehicleTypeCombined()"></select></div>
+      <div><label>Type / Varian</label><select id="v_trim" onchange="updateVehicleTypeCombined()"></select></div>
+      <div><label>Tipe Mobil (gabungan, otomatis)</label><input id="v_type_preview" readonly style="background:#f4f5f7;color:var(--ink-soft);"></div>
       <div><label>Warna</label><input id="v_color"></div>
       <div><label>Tahun</label><input id="v_year" type="number"></div>
       <div><label>Tanggal Terakhir Service</label><input id="v_lastdate" type="date" oninput="liveCalc()"></div>
@@ -1203,14 +1207,53 @@ async function deleteSelected(){
 }
 
 /* ================= MODAL KENDARAAN ================= */
+function populateVehicleTypeSelects(){
+  const mk = (id, cat, placeholder) => {
+    const el = document.getElementById(id);
+    const opts = masterByCategory(cat);
+    el.innerHTML = `<option value="">${placeholder}</option>` + (opts.length
+      ? opts.map(m=>`<option value="${m.name}">${m.name}</option>`).join('')
+      : `<option value="" disabled>Belum ada data — tambahkan di Master Data</option>`);
+  };
+  mk('v_brand','brand','Pilih Brand');
+  mk('v_model','model','Pilih Model');
+  mk('v_trim','type','Pilih Type/Varian');
+}
+function updateVehicleTypeCombined(){
+  const combined = [document.getElementById('v_brand').value, document.getElementById('v_model').value, document.getElementById('v_trim').value]
+    .filter(Boolean).join(' ');
+  document.getElementById('v_type').value = combined;
+  document.getElementById('v_type_preview').value = combined;
+}
+function guessVehicleTypeSelects(tipeMobil){
+  tipeMobil = (tipeMobil||'').trim();
+  document.getElementById('v_brand').value = '';
+  document.getElementById('v_model').value = '';
+  document.getElementById('v_trim').value = '';
+  if(tipeMobil){
+    const brands = [...masterByCategory('brand')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
+    const mb = brands.find(b=> b.name && (tipeMobil.toLowerCase()===b.name.toLowerCase() || tipeMobil.toLowerCase().startsWith(b.name.toLowerCase()+' ')));
+    let rest = tipeMobil;
+    if(mb){ document.getElementById('v_brand').value = mb.name; rest = tipeMobil.slice(mb.name.length).trim(); }
+    const models = [...masterByCategory('model')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
+    const mm = models.find(m=> m.name && (rest.toLowerCase()===m.name.toLowerCase() || rest.toLowerCase().startsWith(m.name.toLowerCase()+' ')));
+    if(mm){ document.getElementById('v_model').value = mm.name; rest = rest.slice(mm.name.length).trim(); }
+    const types = [...masterByCategory('type')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
+    const mt = types.find(t=> t.name && rest.toLowerCase()===t.name.toLowerCase());
+    if(mt) document.getElementById('v_trim').value = mt.name;
+  }
+  updateVehicleTypeCombined();
+}
 function openVehicleModal(id){
   document.getElementById('vModalTitle').textContent = id? 'Edit / Update Kendaraan':'Tambah Kendaraan';
   const v = id? DB.vehicles.find(x=>x.id===id):null;
   document.getElementById('v_id').value = id||'';
   const set=(k,val)=>document.getElementById(k).value = val||'';
   set('v_pt', v?.pt); set('v_area', v?.area); set('v_user', v?.user); set('v_phone', v?.phone);
-  set('v_nopol', v?.nopol); set('v_type', v?.type); set('v_color', v?.color); set('v_year', v?.year);
+  set('v_nopol', v?.nopol); set('v_color', v?.color); set('v_year', v?.year);
   set('v_lastdate', v?.lastdate); set('v_lastkm', v?.lastkm); set('v_currentkm', v?.currentkm);
+  populateVehicleTypeSelects();
+  guessVehicleTypeSelects(v?.type);
   document.getElementById('v_interval').value = v?.interval || 180;
   document.getElementById('v_kmstep').value = v?.kmstep || 10000;
   set('v_note', v?.note);
