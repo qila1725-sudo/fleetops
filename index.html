@@ -732,12 +732,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Telp/Fax Bengkel</label><input id="spkl_workshop_phone" placeholder="Nomor telp/fax bengkel"></div>
       <div><label>Registration No. (Nopol)</label><input id="spkl_regno" list="bgVehicleList2" placeholder="Nomor polisi" style="text-transform:uppercase" oninput="spklAutofillFromVehicle()"></div>
       <datalist id="bgVehicleList2"></datalist>
-      <div><label>Model</label><input id="spkl_model" list="spklModelList" placeholder="Contoh: Innova"></div>
-      <datalist id="spklModelList"></datalist>
-      <div><label>Brand</label><input id="spkl_brand" list="spklBrandList" placeholder="Contoh: Toyota"></div>
-      <datalist id="spklBrandList"></datalist>
-      <div><label>Type</label><input id="spkl_type" list="spklTypeList" placeholder="Contoh: G AT Diesel"></div>
-      <datalist id="spklTypeList"></datalist>
+      <div><label>Model</label><input id="spkl_model" placeholder="Otomatis dari Nopol / isi manual"></div>
+      <div><label>Brand</label><input id="spkl_brand" placeholder="Otomatis dari Nopol / isi manual"></div>
+      <div><label>Type</label><input id="spkl_type" placeholder="Otomatis dari Nopol / isi manual"></div>
       <div><label>Customer</label><input id="spkl_customer" list="bgPtList2" placeholder="Pilih dari daftar Master Data" onchange="spklAutofillCustomer()"></div>
       <datalist id="bgPtList2"></datalist>
       <div class="full"><label>Alamat Customer</label><textarea id="spkl_customer_addr" placeholder="Alamat lengkap customer" style="min-height:44px;"></textarea></div>
@@ -1596,9 +1593,6 @@ function openSpklModal(id){
   const custNames = new Set([...masterByCategory('customer').map(m=>m.name), ...DB.vehicles.map(v=>v.pt)].filter(Boolean));
   document.getElementById('bgPtList2').innerHTML = [...custNames].sort().map(n=>`<option value="${n}">`).join('');
   document.getElementById('bgBengkelList2').innerHTML = masterByCategory('workshop').map(m=>`<option value="${m.kode?m.kode+' - ':''}${m.name}">`).join('');
-  document.getElementById('spklBrandList').innerHTML = masterByCategory('brand').map(m=>`<option value="${m.name}">`).join('');
-  document.getElementById('spklTypeList').innerHTML = masterByCategory('type').map(m=>`<option value="${m.name}">`).join('');
-  document.getElementById('spklModelList').innerHTML = masterByCategory('model').map(m=>`<option value="${m.name}">`).join('');
   const s = id ? DB.spkl.find(x=>x.id===id) : null;
   document.getElementById('spkl_id').value = id||'';
   document.getElementById('spklModalTitle').textContent = id ? 'Edit SPKL' : 'SPKL & Delivery Form';
@@ -1653,10 +1647,25 @@ function spklAutofillFromVehicle(){
   const v = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
   if(!v) return;
   if(!document.getElementById('spkl_customer').value) document.getElementById('spkl_customer').value = v.pt||'';
-  if(!document.getElementById('spkl_type').value) document.getElementById('spkl_type').value = v.type||'';
   if(!document.getElementById('spkl_km').value) document.getElementById('spkl_km').value = v.currentkm||'';
   if(!document.getElementById('spkl_pic').value) document.getElementById('spkl_pic').value = v.user||'';
   if(!document.getElementById('spkl_hp').value) document.getElementById('spkl_hp').value = v.phone||'';
+  // Data kendaraan (Tipe Mobil) di menu Reminder hanya 1 kolom gabungan (mis. "Toyota Avanza G").
+  // Di sini otomatis dipecah jadi Brand / Model / Type memakai daftar Brand di Master Data.
+  const tipeMobil = (v.type||'').trim();
+  if(tipeMobil){
+    const brands = [...masterByCategory('brand')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
+    const matched = brands.find(b => b.name && tipeMobil.toLowerCase().startsWith(b.name.toLowerCase()+' ') || tipeMobil.toLowerCase()===((b.name||'').toLowerCase()));
+    if(matched){
+      const rest = tipeMobil.slice(matched.name.length).trim();
+      const parts = rest.split(' ');
+      if(!document.getElementById('spkl_brand').value) document.getElementById('spkl_brand').value = matched.name;
+      if(!document.getElementById('spkl_model').value) document.getElementById('spkl_model').value = parts.shift() || '';
+      if(!document.getElementById('spkl_type').value) document.getElementById('spkl_type').value = parts.join(' ');
+    } else if(!document.getElementById('spkl_type').value){
+      document.getElementById('spkl_type').value = tipeMobil; // brand tidak dikenali, taruh apa adanya di Type
+    }
+  }
 }
 function closeSpklModal(){ document.getElementById('spklModalBg').classList.remove('show'); }
 async function saveSpkl(){
