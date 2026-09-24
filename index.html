@@ -1710,7 +1710,8 @@ async function deleteSpklEntry(id){
 let masterTab = 'workshop';
 let masterSelectedIds = new Set();
 const MASTER_LABELS = { workshop:'Workshop', customer:'Customer', brand:'Brand', type:'Type', model:'Model' };
-const MASTER_KODE_PREFIX = { workshop:'WS', brand:'BR', type:'TY', model:'MD' };
+const MASTER_KODE_PREFIX = { workshop:'WS', brand:'', type:'', model:'' };
+const MASTER_KODE_PAD = { workshop:4, brand:0, type:0, model:0 }; // 0 = tanpa angka nol di depan (1,2,3,...)
 // field yang dipakai tiap kategori: kode = kode internal, lokasi = kota, addr = alamat lengkap, phone = telepon
 const MASTER_FIELDS = {
   workshop: { kode:true,  lokasi:true,  addr:true,  phone:true  },
@@ -1734,13 +1735,15 @@ function naturalCompare(a,b){
   return ax.length-bx.length;
 }
 function nextMasterKode(cat){
-  const prefix = MASTER_KODE_PREFIX[cat] || 'KD';
+  const prefix = MASTER_KODE_PREFIX[cat] || '';
+  const pad = MASTER_KODE_PAD[cat] || 0;
   let maxSeq = 0;
   masterByCategory(cat).forEach(m=>{
     const match = (m.kode||'').match(new RegExp('^'+prefix+'(\\d+)$','i'));
     if(match){ const n=parseInt(match[1],10); if(n>maxSeq) maxSeq=n; }
   });
-  return `${prefix}${String(maxSeq+1).padStart(4,'0')}`;
+  const num = pad>0 ? String(maxSeq+1).padStart(pad,'0') : String(maxSeq+1);
+  return `${prefix}${num}`;
 }
 function setMasterTab(t){
   masterTab = t;
@@ -1962,7 +1965,8 @@ async function importMasterData(evt){
   const toInsert = []; let skippedDup=0, skippedNoAddr=0, skippedDupList=[], skippedNoAddrList=[];
   const seen = new Set(masterByCategory(masterTab).map(m=>(m.name||'').toLowerCase()));
   // untuk kode otomatis & berurutan pada baris yang kolom Kode-nya kosong
-  const prefix = MASTER_KODE_PREFIX[masterTab] || 'KD';
+  const prefix = MASTER_KODE_PREFIX[masterTab] || '';
+  const pad = MASTER_KODE_PAD[masterTab] || 0;
   let seq = 0;
   masterByCategory(masterTab).forEach(m=>{ const mt=(m.kode||'').match(new RegExp('^'+prefix+'(\\d+)$','i')); if(mt){ const n=parseInt(mt[1],10); if(n>seq) seq=n; } });
   for(let i=headerIdx+1;i<aoa.length;i++){
@@ -1975,7 +1979,7 @@ async function importMasterData(evt){
     if(f.addr && !address){ skippedNoAddr++; skippedNoAddrList.push(name); continue; } // data tanpa alamat tidak dimasukkan
     seen.add(key);
     let kode = kodeCol>=0 ? String(row[kodeCol]||'').trim() : '';
-    if(f.kode && !kode){ seq++; kode = `${prefix}${String(seq).padStart(4,'0')}`; }
+    if(f.kode && !kode){ seq++; kode = `${prefix}${pad>0 ? String(seq).padStart(pad,'0') : String(seq)}`; }
     toInsert.push(toDbMaster({
       category:masterTab, name, kode,
       lokasi: lokasiCol>=0 ? String(row[lokasiCol]||'').trim() : '',
