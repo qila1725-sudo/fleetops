@@ -1595,7 +1595,7 @@ function openSpklModal(id){
   dl1.innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${n}">`).join('');
   const custNames = new Set([...masterByCategory('customer').map(m=>m.name), ...DB.vehicles.map(v=>v.pt)].filter(Boolean));
   document.getElementById('bgPtList2').innerHTML = [...custNames].sort().map(n=>`<option value="${n}">`).join('');
-  document.getElementById('bgBengkelList2').innerHTML = masterByCategory('workshop').map(m=>`<option value="${m.name}">`).join('');
+  document.getElementById('bgBengkelList2').innerHTML = masterByCategory('workshop').map(m=>`<option value="${m.kode?m.kode+' - ':''}${m.name}">`).join('');
   document.getElementById('spklBrandList').innerHTML = masterByCategory('brand').map(m=>`<option value="${m.name}">`).join('');
   document.getElementById('spklTypeList').innerHTML = masterByCategory('type').map(m=>`<option value="${m.name}">`).join('');
   document.getElementById('spklModelList').innerHTML = masterByCategory('model').map(m=>`<option value="${m.name}">`).join('');
@@ -1629,9 +1629,13 @@ function openSpklModal(id){
   document.getElementById('spklModalBg').classList.add('show');
 }
 function spklAutofillWorkshop(){
-  const name = document.getElementById('spkl_workshop').value.trim();
-  const m = masterByCategory('workshop').find(x=>(x.name||'').toLowerCase()===name.toLowerCase());
+  const raw = document.getElementById('spkl_workshop').value.trim();
+  const list = masterByCategory('workshop');
+  // input bisa berupa "Nama" saja atau "Kode - Nama" (dari saran dropdown), cocokkan keduanya
+  let m = list.find(x=>(x.name||'').toLowerCase()===raw.toLowerCase());
+  if(!m) m = list.find(x=> raw.toLowerCase()===`${(x.kode||'').toLowerCase()} - ${(x.name||'').toLowerCase()}`);
   if(m){
+    document.getElementById('spkl_workshop').value = m.name; // simpan nama bersih (tanpa kode) sebagai nilai workshop
     document.getElementById('spkl_workshop_addr').value = m.address||'';
     document.getElementById('spkl_workshop_phone').value = m.phone||'';
   }
