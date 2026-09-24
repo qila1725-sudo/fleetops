@@ -542,6 +542,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <button class="btn-outline" onclick="downloadMasterTemplate()">⭳ Download Template Excel</button>
             <label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" id="masterImportFile" accept=".xlsx,.xls" onchange="importMasterData(event)"></label>
             <button class="btn-outline" onclick="exportMasterData()">🗂 Export Excel</button>
+            <button class="btn-outline" onclick="syncCustomerFromVehicles()">⟳ Sync Customer dari Data Kendaraan</button>
           </div>
           <div class="tabs-row">
             <div class="tab-pill active" data-mtab="workshop" onclick="setMasterTab('workshop')">Workshop <span class="cnt" id="mcnt_workshop">0</span></div>
@@ -631,9 +632,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Nomor Telepon (format 08xx / 62xx)</label><input id="v_phone"></div>
       <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase"></div>
       <input type="hidden" id="v_type">
-      <div><label>Brand</label><select id="v_brand" onchange="updateVehicleTypeCombined()"></select></div>
-      <div><label>Model</label><select id="v_model" onchange="updateVehicleTypeCombined()"></select></div>
-      <div><label>Type / Varian</label><select id="v_trim" onchange="updateVehicleTypeCombined()"></select></div>
+      <div><label>Brand</label><select id="v_brand" onchange="onVehicleTypeSelectChange('v_brand')"></select></div>
+      <div><label>Model</label><select id="v_model" onchange="onVehicleTypeSelectChange('v_model')"></select></div>
+      <div><label>Type / Varian</label><select id="v_trim" onchange="onVehicleTypeSelectChange('v_trim')"></select></div>
       <div><label>Tipe Mobil (gabungan, otomatis)</label><input id="v_type_preview" readonly style="background:#f4f5f7;color:var(--ink-soft);"></div>
       <div><label>Warna</label><input id="v_color"></div>
       <div><label>Tahun</label><input id="v_year" type="number"></div>
@@ -1207,17 +1208,36 @@ async function deleteSelected(){
 }
 
 /* ================= MODAL KENDARAAN ================= */
+const VEHICLE_TYPE_SELECT_CAT = { v_brand:'brand', v_model:'model', v_trim:'type' };
 function populateVehicleTypeSelects(){
   const mk = (id, cat, placeholder) => {
     const el = document.getElementById(id);
     const opts = masterByCategory(cat);
-    el.innerHTML = `<option value="">${placeholder}</option>` + (opts.length
-      ? opts.map(m=>`<option value="${m.name}">${m.name}</option>`).join('')
-      : `<option value="" disabled>Belum ada data — tambahkan di Master Data</option>`);
+    el.innerHTML = `<option value="">${placeholder}</option>`
+      + opts.map(m=>`<option value="${m.name}">${m.name}</option>`).join('')
+      + `<option value="__new__">+ Tambah ${MASTER_LABELS[cat]} baru...</option>`;
   };
   mk('v_brand','brand','Pilih Brand');
   mk('v_model','model','Pilih Model');
   mk('v_trim','type','Pilih Type/Varian');
+}
+async function onVehicleTypeSelectChange(selId){
+  const el = document.getElementById(selId);
+  if(el.value !== '__new__'){ updateVehicleTypeCombined(); return; }
+  const cat = VEHICLE_TYPE_SELECT_CAT[selId];
+  const name = (prompt(`Nama ${MASTER_LABELS[cat]} baru:`)||'').trim();
+  if(!name){ el.value=''; updateVehicleTypeCombined(); return; }
+  const dup = masterByCategory(cat).find(m=>(m.name||'').toLowerCase()===name.toLowerCase());
+  if(dup){ el.value = dup.name; updateVehicleTypeCombined(); return; }
+  try{
+    const kode = MASTER_FIELDS[cat].kode ? nextMasterKode(cat) : '';
+    const rows = await sbInsert('master_data', toDbMaster({category:cat, name, kode, lokasi:'', address:'', phone:''}));
+    DB.master.push(fromDbMaster(rows[0]));
+    populateVehicleTypeSelects();
+    el.value = name;
+    showToast(`${MASTER_LABELS[cat]} "${name}" ditambahkan ke Master Data.`);
+  }catch(e){ console.error(e); showToast('Gagal menambah ke Master Data.', true); el.value=''; }
+  updateVehicleTypeCombined();
 }
 function updateVehicleTypeCombined(){
   const combined = [document.getElementById('v_brand').value, document.getElementById('v_model').value, document.getElementById('v_trim').value]
@@ -1886,6 +1906,21 @@ async function deleteMasterSelected(){
     renderMasterData();
     showToast('Data terpilih berhasil dihapus.');
   }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
+}
+async function syncCustomerFromVehicles(){
+  if(masterTab!=='customer'){ showToast('Sync otomatis ini khusus kategori Customer. Untuk Brand/Model/Type, pilih "+ Tambah baru..." langsung di form Tambah Kendaraan — otomatis tersimpan ke Master Data.'); return; }
+  const existing = new Set(masterByCategory('customer').map(m=>(m.name||'').toLowerCase()));
+  const names = [...new Set(DB.vehicles.map(v=>(v.pt||'').trim()).filter(Boolean))];
+  const toAdd = names.filter(n=>!existing.has(n.toLowerCase()));
+  if(!toAdd.length){ showToast('Semua Nama PT di data kendaraan sudah ada di Master Data Customer.'); return; }
+  if(!confirm(`Tambahkan ${toAdd.length} customer baru dari Nama PT di data kendaraan? Alamat & telepon akan kosong dulu, bisa dilengkapi belakangan lewat ✎ Edit.`)) return;
+  try{
+    const rows = toAdd.map(name=>toDbMaster({category:'customer', name, kode:'', lokasi:'', address:'', phone:''}));
+    const saved = await sbInsert('master_data', rows);
+    DB.master.push(...saved.map(fromDbMaster));
+    renderMasterData();
+    showToast(`${toAdd.length} customer ditambahkan dari data kendaraan. Alamat masih kosong, lengkapi lewat ✎ Edit.`);
+  }catch(e){ console.error(e); showToast('Gagal sync data.', true); }
 }
 function editMasterItem(id){
   const m = DB.master.find(x=>x.id===id);
