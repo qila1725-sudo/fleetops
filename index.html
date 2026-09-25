@@ -408,7 +408,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div style="height:16px"></div>
           <div class="grid-2">
             <div class="panel"><h3>Sebaran per PT</h3><div id="chartPT"></div></div>
-            <div class="panel"><h3>Sebaran per Tipe Mobil</h3><div id="chartType"></div></div>
+            <div class="panel"><h3>Sebaran per Brand</h3><div id="chartType"></div></div>
           </div>
         </div>
 
@@ -631,11 +631,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Nama User / Driver</label><input id="v_user"></div>
       <div><label>Nomor Telepon (format 08xx / 62xx)</label><input id="v_phone"></div>
       <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase"></div>
-      <input type="hidden" id="v_type">
       <div><label>Brand</label><select id="v_brand" onchange="onVehicleTypeSelectChange('v_brand')"></select></div>
       <div><label>Model</label><select id="v_model" onchange="onVehicleTypeSelectChange('v_model')"></select></div>
-      <div><label>Type / Varian</label><select id="v_trim" onchange="onVehicleTypeSelectChange('v_trim')"></select></div>
-      <div><label>Tipe Mobil (gabungan, otomatis)</label><input id="v_type_preview" readonly style="background:#f4f5f7;color:var(--ink-soft);"></div>
+      <div><label>Type / Varian</label><select id="v_type" onchange="onVehicleTypeSelectChange('v_type')"></select></div>
       <div><label>Warna</label><input id="v_color"></div>
       <div><label>Tahun</label><input id="v_year" type="number"></div>
       <div><label>Tanggal Terakhir Service</label><input id="v_lastdate" type="date" oninput="liveCalc()"></div>
@@ -847,9 +845,9 @@ const sbDeleteIds = (table, ids) => sb(`${table}?id=in.(${ids.join(',')})`, {met
 
 /* ================= MAPPERS (kolom DB <-> objek JS) ================= */
 const fromDbVehicle = r => ({ id:r.id, code:r.code, pt:r.pt, area:r.area, user:r.driver_name, phone:r.phone, nopol:r.nopol,
-  type:r.vehicle_type, color:r.color, year:r.year, lastdate:r.last_service_date, lastkm:r.last_service_km, currentkm:r.current_km,
+  brand:r.brand||'', model:r.model||'', type:r.vehicle_type, color:r.color, year:r.year, lastdate:r.last_service_date, lastkm:r.last_service_km, currentkm:r.current_km,
   interval:r.interval_days, kmstep:r.km_step, nextdate:r.next_service_date, nextkm:r.next_service_km, note:r.notes });
-const toDbVehicle = v => ({ code:v.code, pt:v.pt, area:v.area, driver_name:v.user, phone:v.phone, nopol:v.nopol, vehicle_type:v.type,
+const toDbVehicle = v => ({ code:v.code, pt:v.pt, area:v.area, driver_name:v.user, phone:v.phone, nopol:v.nopol, brand:v.brand||'', model:v.model||'', vehicle_type:v.type,
   color:v.color, year:v.year, last_service_date:v.lastdate||null, last_service_km:v.lastkm||0, current_km:v.currentkm||0,
   interval_days:v.interval||180, km_step:v.kmstep||10000, next_service_date:v.nextdate||null, next_service_km:v.nextkm||0, notes:v.note||'' });
 
@@ -929,10 +927,12 @@ function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a
 function showToast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(isErr?' err':''); t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3200); }
 function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 function ptCode(pt, existingCount){ const letters = (pt||'PT').split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'PT'; return `PT-${letters}-${String(existingCount+1).padStart(3,'0')}`; }
+function vLabel(v){ return [v?.brand,v?.model,v?.type].filter(Boolean).join(' ') || '-'; }
 function waMessage(v){
+const tipeGabungan = vLabel(v);
 return `Halo Bpk/Ibu ${v.user||'-'} (PT. ${v.pt||'-'})
 Nopol ${v.nopol||'-'},
-Mengingatkan untuk jadwal service berkala kendaraan ${v.type||'-'} Anda:
+Mengingatkan untuk jadwal service berkala kendaraan ${tipeGabungan} Anda:
 
 Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
 Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM
@@ -1023,7 +1023,7 @@ function renderDashboard(){
   document.getElementById('kpiSafe').textContent = ok;
   renderBarChart('chartArea', groupCount(vs,'area'));
   renderBarChart('chartPT', groupCount(vs,'pt'));
-  renderBarChart('chartType', groupCount(vs,'type'));
+  renderBarChart('chartType', groupCount(vs,'brand'));
   renderCritBanner(vs);
   renderRecentActivity();
 }
@@ -1041,7 +1041,7 @@ function renderCritBanner(vs){
     return `<div class="crit-card">
       <div class="cv-ic">🚨</div>
       <div class="cv-main">
-        <div class="l1">${v.nopol||'-'} <span class="cell-sub" style="font-weight:600;">${v.type||'-'}</span> <span class="status-badge bad">Overdue ${hariLewat} Hari</span></div>
+        <div class="l1">${v.nopol||'-'} <span class="cell-sub" style="font-weight:600;">${vLabel(v)}</span> <span class="status-badge bad">Overdue ${hariLewat} Hari</span></div>
         <div class="l2">${v.pt||'-'} • ${v.user||'-'} (${v.phone||'-'})</div>
       </div>
       <div class="cv-km">Odometer Aktual / Target<b>${(v.currentkm||0).toLocaleString('id-ID')} / ${(v.nextkm||0).toLocaleString('id-ID')} KM</b>${kmLebih>0? `<span style="color:var(--bad);">+${kmLebih.toLocaleString('id-ID')} KM Melebihi Batas</span>`:''}</div>
@@ -1147,7 +1147,7 @@ function renderTable(){
       <td><div class="cell-primary">${isStandby(v) ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Standby</span>' : v.pt}</div><div class="cell-sub">ID: ${code}</div></td>
       <td><div class="cell-primary">${v.user||'-'}</div><div class="cell-phone-row"><span class="cell-sub">${v.phone||'-'}</span><button class="note-btn" title="Keterangan: ${(v.note||'-').replace(/"/g,'&quot;')}">💬</button></div></td>
       <td><button class="nopol-badge" onclick="openHistoryModal('${v.id}')">${v.nopol||'-'}</button></td>
-      <td><div class="cell-primary">${v.type||'-'}</div><div class="cell-sub">${v.color||'-'} • ${v.year||'-'}</div></td>
+      <td><div class="cell-primary">${[v.brand,v.model].filter(Boolean).join(' ')||v.type||'-'}</div><div class="cell-sub">${v.type?v.type+' • ':''}${v.color||'-'} • ${v.year||'-'}</div></td>
       <td><span class="area-badge">${v.area||'-'}</span></td>
       <td><div class="cell-primary">${fmtDate(v.lastdate)}</div><div class="cell-sub">${(v.lastkm||0).toLocaleString('id-ID')} KM</div></td>
       <td><div class="cell-primary">${(v.currentkm||0).toLocaleString('id-ID')} KM</div><div class="cell-sub">${kmLeftTxt}</div></td>
@@ -1208,7 +1208,7 @@ async function deleteSelected(){
 }
 
 /* ================= MODAL KENDARAAN ================= */
-const VEHICLE_TYPE_SELECT_CAT = { v_brand:'brand', v_model:'model', v_trim:'type' };
+const VEHICLE_TYPE_SELECT_CAT = { v_brand:'brand', v_model:'model', v_type:'type' };
 function populateVehicleTypeSelects(){
   const mk = (id, cat, placeholder) => {
     const el = document.getElementById(id);
@@ -1219,16 +1219,16 @@ function populateVehicleTypeSelects(){
   };
   mk('v_brand','brand','Pilih Brand');
   mk('v_model','model','Pilih Model');
-  mk('v_trim','type','Pilih Type/Varian');
+  mk('v_type','type','Pilih Type/Varian');
 }
 async function onVehicleTypeSelectChange(selId){
   const el = document.getElementById(selId);
-  if(el.value !== '__new__'){ updateVehicleTypeCombined(); return; }
+  if(el.value !== '__new__') return;
   const cat = VEHICLE_TYPE_SELECT_CAT[selId];
   const name = (prompt(`Nama ${MASTER_LABELS[cat]} baru:`)||'').trim();
-  if(!name){ el.value=''; updateVehicleTypeCombined(); return; }
+  if(!name){ el.value=''; return; }
   const dup = masterByCategory(cat).find(m=>(m.name||'').toLowerCase()===name.toLowerCase());
-  if(dup){ el.value = dup.name; updateVehicleTypeCombined(); return; }
+  if(dup){ el.value = dup.name; return; }
   try{
     const kode = MASTER_FIELDS[cat].kode ? nextMasterKode(cat) : '';
     const rows = await sbInsert('master_data', toDbMaster({category:cat, name, kode, lokasi:'', address:'', phone:''}));
@@ -1237,32 +1237,26 @@ async function onVehicleTypeSelectChange(selId){
     el.value = name;
     showToast(`${MASTER_LABELS[cat]} "${name}" ditambahkan ke Master Data.`);
   }catch(e){ console.error(e); showToast('Gagal menambah ke Master Data.', true); el.value=''; }
-  updateVehicleTypeCombined();
 }
-function updateVehicleTypeCombined(){
-  const combined = [document.getElementById('v_brand').value, document.getElementById('v_model').value, document.getElementById('v_trim').value]
-    .filter(Boolean).join(' ');
-  document.getElementById('v_type').value = combined;
-  document.getElementById('v_type_preview').value = combined;
-}
-function guessVehicleTypeSelects(tipeMobil){
-  tipeMobil = (tipeMobil||'').trim();
-  document.getElementById('v_brand').value = '';
-  document.getElementById('v_model').value = '';
-  document.getElementById('v_trim').value = '';
-  if(tipeMobil){
+// Kalau kendaraan lama masih punya data lama (Tipe Mobil gabungan seperti "Toyota Avanza G"),
+// coba tebak pecahannya ke Brand/Model/Type supaya tidak kosong pas dibuka untuk diedit.
+// Brand & Model & Type tetap disimpan sebagai 3 kolom TERPISAH (tidak digabung lagi).
+function guessVehicleTypeSelects(v){
+  document.getElementById('v_brand').value = v?.brand || '';
+  document.getElementById('v_model').value = v?.model || '';
+  document.getElementById('v_type').value = v?.type || '';
+  if(v && !v.brand && !v.model && v.type){
+    // fallback untuk data lama sebelum Brand/Model dipisah
+    const legacy = v.type.trim();
     const brands = [...masterByCategory('brand')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
-    const mb = brands.find(b=> b.name && (tipeMobil.toLowerCase()===b.name.toLowerCase() || tipeMobil.toLowerCase().startsWith(b.name.toLowerCase()+' ')));
-    let rest = tipeMobil;
-    if(mb){ document.getElementById('v_brand').value = mb.name; rest = tipeMobil.slice(mb.name.length).trim(); }
+    const mb = brands.find(b=> b.name && (legacy.toLowerCase()===b.name.toLowerCase() || legacy.toLowerCase().startsWith(b.name.toLowerCase()+' ')));
+    let rest = legacy;
+    if(mb){ document.getElementById('v_brand').value = mb.name; rest = legacy.slice(mb.name.length).trim(); }
     const models = [...masterByCategory('model')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
     const mm = models.find(m=> m.name && (rest.toLowerCase()===m.name.toLowerCase() || rest.toLowerCase().startsWith(m.name.toLowerCase()+' ')));
     if(mm){ document.getElementById('v_model').value = mm.name; rest = rest.slice(mm.name.length).trim(); }
-    const types = [...masterByCategory('type')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
-    const mt = types.find(t=> t.name && rest.toLowerCase()===t.name.toLowerCase());
-    if(mt) document.getElementById('v_trim').value = mt.name;
+    document.getElementById('v_type').value = rest || legacy;
   }
-  updateVehicleTypeCombined();
 }
 function openVehicleModal(id){
   document.getElementById('vModalTitle').textContent = id? 'Edit / Update Kendaraan':'Tambah Kendaraan';
@@ -1273,7 +1267,7 @@ function openVehicleModal(id){
   set('v_nopol', v?.nopol); set('v_color', v?.color); set('v_year', v?.year);
   set('v_lastdate', v?.lastdate); set('v_lastkm', v?.lastkm); set('v_currentkm', v?.currentkm);
   populateVehicleTypeSelects();
-  guessVehicleTypeSelects(v?.type);
+  guessVehicleTypeSelects(v);
   document.getElementById('v_interval').value = v?.interval || 180;
   document.getElementById('v_kmstep').value = v?.kmstep || 10000;
   set('v_note', v?.note);
@@ -1303,7 +1297,7 @@ async function saveVehicle(logHistory){
   const sameCount = DB.vehicles.filter(x=>x.pt===pt).length;
   const existing = isNew? null : DB.vehicles.find(x=>x.id===idVal);
   const v = { id:idVal, code: existing?.code || ptCode(pt, sameCount), pt, area:get('v_area'), user:get('v_user'), phone:get('v_phone'),
-    nopol, type:get('v_type'), color:get('v_color'), year:get('v_year'), lastdate, lastkm, currentkm,
+    nopol, brand:get('v_brand'), model:get('v_model'), type:get('v_type'), color:get('v_color'), year:get('v_year'), lastdate, lastkm, currentkm,
     interval, kmstep, nextdate, nextkm, note:get('v_note') };
   try{
     if(isNew){
@@ -1333,7 +1327,7 @@ function openUpdateServiceModal(id){
   const v = DB.vehicles.find(x=>x.id===id);
   if(!v) return;
   document.getElementById('us_id').value = id;
-  document.getElementById('usSub').textContent = `${v.nopol||'-'} • ${v.type||'-'} • ${v.pt||'-'} • ${v.user||'-'}`;
+  document.getElementById('usSub').textContent = `${v.nopol||'-'} • ${vLabel(v)} • ${v.pt||'-'} • ${v.user||'-'}`;
   document.getElementById('us_lastdate').value = v.lastdate||'';
   document.getElementById('us_lastkm').value = v.lastkm||0;
   document.getElementById('us_currentkm').value = v.currentkm||0;
@@ -1392,7 +1386,7 @@ function renderHistory(){
 function openHistoryModal(vehicleId){
   const v = DB.vehicles.find(x=>x.id===vehicleId);
   document.getElementById('hModalTitle').textContent = `Histori Service — ${v?.nopol||''}`;
-  document.querySelector('#historyModalBg .modal p.sub').textContent = v ? `${v.type||'-'} • ${v.pt||'-'}` : 'Riwayat pembaruan service kendaraan ini.';
+  document.querySelector('#historyModalBg .modal p.sub').textContent = v ? `${vLabel(v)} • ${v.pt||'-'}` : 'Riwayat pembaruan service kendaraan ini.';
   const items = DB.history.filter(h=>h.vehicleId===vehicleId);
   const el = document.getElementById('historyTimeline');
   el.innerHTML = items.length? items.map(h=>`<div class="h-item"><div class="d">${fmtDate(h.lastdate)} — ${(h.lastkm||0).toLocaleString('id-ID')} KM</div>
@@ -1713,23 +1707,12 @@ function spklAutofillFromVehicle(){
   if(!document.getElementById('spkl_km').value) document.getElementById('spkl_km').value = v.currentkm||'';
   if(!document.getElementById('spkl_pic').value) document.getElementById('spkl_pic').value = v.user||'';
   if(!document.getElementById('spkl_hp').value) document.getElementById('spkl_hp').value = v.phone||'';
-  // Data kendaraan (Tipe Mobil) di menu Reminder hanya 1 kolom gabungan (mis. "Toyota Avanza G").
-  // Di sini otomatis dipecah jadi Brand / Model / Type memakai daftar Brand di Master Data.
-  const tipeMobil = (v.type||'').trim();
-  if(tipeMobil){
-    const brands = [...masterByCategory('brand')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
-    const matched = brands.find(b => b.name && tipeMobil.toLowerCase().startsWith(b.name.toLowerCase()+' ') || tipeMobil.toLowerCase()===((b.name||'').toLowerCase()));
-    if(matched){
-      const rest = tipeMobil.slice(matched.name.length).trim();
-      const parts = rest.split(' ');
-      if(!document.getElementById('spkl_brand').value) document.getElementById('spkl_brand').value = matched.name;
-      if(!document.getElementById('spkl_model').value) document.getElementById('spkl_model').value = parts.shift() || '';
-      if(!document.getElementById('spkl_type').value) document.getElementById('spkl_type').value = parts.join(' ');
-    } else if(!document.getElementById('spkl_type').value){
-      document.getElementById('spkl_type').value = tipeMobil; // brand tidak dikenali, taruh apa adanya di Type
-    }
-  }
+  // Brand / Model / Type kendaraan sudah tersimpan terpisah di data kendaraan (Reminder), langsung dipakai apa adanya.
+  if(!document.getElementById('spkl_brand').value) document.getElementById('spkl_brand').value = v.brand||'';
+  if(!document.getElementById('spkl_model').value) document.getElementById('spkl_model').value = v.model||'';
+  if(!document.getElementById('spkl_type').value) document.getElementById('spkl_type').value = v.type||'';
 }
+
 function closeSpklModal(){ document.getElementById('spklModalBg').classList.remove('show'); }
 async function saveSpkl(){
   const id = document.getElementById('spkl_id').value;
@@ -2220,9 +2203,9 @@ function printSPKL(id){
 }
 
 /* ================= EXCEL ================= */
-const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Tipe Mobil','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
+const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Brand','Model','Type','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
 function exportExcel(){
-  const rows = filteredVehicles().map(v=>({'Nama PT':v.pt,'Nama User':v.user,'Nomor Telepon':v.phone,'Nomor Polisi':v.nopol,'Tipe Mobil':v.type,
+  const rows = filteredVehicles().map(v=>({'Nama PT':v.pt,'Nama User':v.user,'Nomor Telepon':v.phone,'Nomor Polisi':v.nopol,'Brand':v.brand||'','Model':v.model||'','Type':v.type||'',
     'Warna':v.color,'Tahun':v.year,'Area':v.area,'Tanggal Terakhir Service':v.lastdate,'KM Service':v.lastkm,'KM Aktual Saat Ini':v.currentkm,
     'Interval (hari)':v.interval,'Tanggal Service Berikutnya':v.nextdate,'KM Service Berikutnya':v.nextkm,'Keterangan':v.note}));
   const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
@@ -2255,9 +2238,11 @@ async function importExcel(evt){
     const interval = Number(r['Interval (hari)'])||180;
     const lastkm = Number(r['KM Service'])||0;
     const pt = r['Nama PT']||'';
+    // dukung file lama yang masih pakai kolom "Tipe Mobil" gabungan
+    const brand = r['Brand']||''; const model = r['Model']||''; const type = r['Type']||r['Tipe Mobil']||'';
     const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, 10000);
     toInsert.push(toDbVehicle({ code:ptCode(pt, DB.vehicles.filter(x=>x.pt===pt).length), pt, area:r['Area']||'', user:r['Nama User']||'',
-      phone:String(r['Nomor Telepon']||''), nopol, type:r['Tipe Mobil']||'', color:r['Warna']||'', year:r['Tahun']||'', lastdate, lastkm,
+      phone:String(r['Nomor Telepon']||''), nopol, brand, model, type, color:r['Warna']||'', year:r['Tahun']||'', lastdate, lastkm,
       currentkm:Number(r['KM Aktual Saat Ini'])||0, interval, kmstep:10000, nextdate, nextkm, note:r['Keterangan']||'' }));
   });
   try{
