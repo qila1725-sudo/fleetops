@@ -1147,7 +1147,7 @@ function renderTable(){
       <td><div class="cell-primary">${isStandby(v) ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Standby</span>' : v.pt}</div><div class="cell-sub">ID: ${code}</div></td>
       <td><div class="cell-primary">${v.user||'-'}</div><div class="cell-phone-row"><span class="cell-sub">${v.phone||'-'}</span><button class="note-btn" title="Keterangan: ${(v.note||'-').replace(/"/g,'&quot;')}">💬</button></div></td>
       <td><button class="nopol-badge" onclick="openHistoryModal('${v.id}')">${v.nopol||'-'}</button></td>
-      <td><div class="cell-primary">${[v.brand,v.model].filter(Boolean).join(' ')||v.type||'-'}</div><div class="cell-sub">${v.type?v.type+' • ':''}${v.color||'-'} • ${v.year||'-'}</div></td>
+      <td><div class="cell-primary">${v.type||vLabel(v)}</div><div class="cell-sub">${v.color||'-'} • ${v.year||'-'}</div></td>
       <td><span class="area-badge">${v.area||'-'}</span></td>
       <td><div class="cell-primary">${fmtDate(v.lastdate)}</div><div class="cell-sub">${(v.lastkm||0).toLocaleString('id-ID')} KM</div></td>
       <td><div class="cell-primary">${(v.currentkm||0).toLocaleString('id-ID')} KM</div><div class="cell-sub">${kmLeftTxt}</div></td>
