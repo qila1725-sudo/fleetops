@@ -1257,7 +1257,7 @@ async function onVehicleTypeSelectChange(selId){
   const cat = VEHICLE_TYPE_SELECT_CAT[selId];
   const name = (prompt(`Nama ${MASTER_LABELS[cat]} baru:`)||'').trim();
   if(!name){ el.value=''; return; }
-  const dup = masterByCategory(cat).find(m=>(m.name||'').toLowerCase()===name.toLowerCase());
+  const dup = masterByCategory(cat).find(m=>normMasterName(m.name)===normMasterName(name));
   if(dup){ el.value = dup.name; return; }
   try{
     const kode = MASTER_FIELDS[cat].kode ? nextMasterKode(cat) : '';
@@ -1342,8 +1342,21 @@ async function saveVehicle(logHistory){
       if(logHistory) await recordHistory(v);
     }
     closeVehicleModal(); populateFilterOptions(); renderTable(); renderDashboard(); renderHistory();
+    autoSyncCustomerFromPt(pt);
     showToast(logHistory? 'Data tersimpan & dicatat sebagai update service.':'Data kendaraan tersimpan.');
   }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
+}
+// Setiap kendaraan disimpan, Nama PT-nya otomatis dicatat juga ke Master Data > Customer (kalau belum ada).
+async function autoSyncCustomerFromPt(pt){
+  pt = (pt||'').trim();
+  if(!pt) return;
+  const already = masterByCategory('customer').some(m=>normMasterName(m.name)===normMasterName(pt));
+  if(already) return;
+  try{
+    const rows = await sbInsert('master_data', toDbMaster({category:'customer', name:pt, kode:'', lokasi:'', address:'', phone:''}));
+    DB.master.push(fromDbMaster(rows[0]));
+    if(masterTab==='customer') renderMasterData();
+  }catch(e){ console.error('Gagal auto-sync customer:', e); }
 }
 async function recordHistory(v){
   const h = { vehicleId:v.id, pt:v.pt, nopol:v.nopol, type:v.type, lastdate:v.lastdate, lastkm:v.lastkm, currentkm:v.currentkm,
@@ -1805,6 +1818,7 @@ const MASTER_FIELDS = {
   type:     { kode:true,  lokasi:false, addr:false, phone:false },
   model:    { kode:true,  lokasi:false, addr:false, phone:false }
 };
+function normMasterName(s){ return String(s||'').trim().replace(/\s+/g,' ').toLowerCase(); }
 function masterByCategory(cat){ return DB.master.filter(m=>m.category===cat); }
 // urutkan kode secara "natural" (WS2 sebelum WS10, bukan urut huruf biasa)
 function naturalCompare(a,b){
@@ -1922,9 +1936,9 @@ async function deleteMasterSelected(){
 }
 async function syncCustomerFromVehicles(){
   if(masterTab!=='customer'){ showToast('Sync otomatis ini khusus kategori Customer. Untuk Brand/Model/Type, pilih "+ Tambah baru..." langsung di form Tambah Kendaraan — otomatis tersimpan ke Master Data.'); return; }
-  const existing = new Set(masterByCategory('customer').map(m=>(m.name||'').toLowerCase()));
+  const existing = new Set(masterByCategory('customer').map(m=>normMasterName(m.name)));
   const names = [...new Set(DB.vehicles.map(v=>(v.pt||'').trim()).filter(Boolean))];
-  const toAdd = names.filter(n=>!existing.has(n.toLowerCase()));
+  const toAdd = names.filter(n=>!existing.has(normMasterName(n)));
   if(!toAdd.length){ showToast('Semua Nama PT di data kendaraan sudah ada di Master Data Customer.'); return; }
   if(!confirm(`Tambahkan ${toAdd.length} customer baru dari Nama PT di data kendaraan? Alamat & telepon akan kosong dulu, bisa dilengkapi belakangan lewat ✎ Edit.`)) return;
   try{
@@ -1967,7 +1981,7 @@ async function saveMasterItem(){
   if(!name){ showToast(`Isi nama ${MASTER_LABELS[masterTab]} terlebih dahulu.`); return; }
   const address = document.getElementById('m_address').value.trim();
   if(f.addr && !address){ showToast(`Alamat ${MASTER_LABELS[masterTab]} wajib diisi.`); return; }
-  const dup = DB.master.some(m=>m.category===masterTab && m.id!==id && (m.name||'').toLowerCase()===name.toLowerCase());
+  const dup = DB.master.some(m=>m.category===masterTab && m.id!==id && normMasterName(m.name)===normMasterName(name));
   if(dup){ showToast(`${MASTER_LABELS[masterTab]} "${name}" sudah ada di daftar.`); return; }
   let kode = document.getElementById('m_kode').value.trim();
   if(f.kode && !kode) kode = nextMasterKode(masterTab);
@@ -2063,7 +2077,7 @@ async function importMasterData(evt){
   const addrCol = colIdx(['alamat lengkap','alamat']);
   const phoneCol = colIdx(['telepon','telp','telp/fax','telepon / fax']);
   const toInsert = []; let skippedDup=0, skippedNoAddr=0, skippedDupList=[], skippedNoAddrList=[];
-  const seen = new Set(masterByCategory(masterTab).map(m=>(m.name||'').toLowerCase()));
+  const seen = new Set(masterByCategory(masterTab).map(m=>normMasterName(m.name)));
   // untuk kode otomatis & berurutan pada baris yang kolom Kode-nya kosong
   const prefix = MASTER_KODE_PREFIX[masterTab] || '';
   const pad = MASTER_KODE_PAD[masterTab] || 0;
@@ -2073,7 +2087,7 @@ async function importMasterData(evt){
     const row = aoa[i]||[];
     const name = String(nameCol>=0 ? (row[nameCol]||'') : '').trim();
     if(!name) continue; // baris kosong / baris judul kategori (misal "ACCU","TOKO BAN") otomatis dilewati
-    const key = name.toLowerCase();
+    const key = normMasterName(name);
     if(seen.has(key)){ skippedDup++; skippedDupList.push(name); continue; }
     const address = addrCol>=0 ? String(row[addrCol]||'').trim() : '';
     if(f.addr && !address){ skippedNoAddr++; skippedNoAddrList.push(name); continue; } // data tanpa alamat tidak dimasukkan
