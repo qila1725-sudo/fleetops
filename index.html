@@ -1257,8 +1257,12 @@ async function onVehicleTypeSelectChange(selId){
   const cat = VEHICLE_TYPE_SELECT_CAT[selId];
   const name = (prompt(`Nama ${MASTER_LABELS[cat]} baru:`)||'').trim();
   if(!name){ el.value=''; return; }
-  const dup = masterByCategory(cat).find(m=>normMasterName(m.name)===normMasterName(name));
-  if(dup){ el.value = dup.name; return; }
+  const dup = masterByCategory(cat).find(m=>normMasterNameLoose(m.name)===normMasterNameLoose(name));
+  if(dup){
+    el.value = dup.name;
+    showToast(`⚠️ "${name}" sudah ada di Master Data (tersimpan sebagai "${dup.name}") — dipilih yang sudah ada, tidak dibuat baru.`, true);
+    return;
+  }
   try{
     const kode = MASTER_FIELDS[cat].kode ? nextMasterKode(cat) : '';
     const rows = await sbInsert('master_data', toDbMaster({category:cat, name, kode, lokasi:'', address:'', phone:''}));
@@ -1819,6 +1823,8 @@ const MASTER_FIELDS = {
   model:    { kode:true,  lokasi:false, addr:false, phone:false }
 };
 function normMasterName(s){ return String(s||'').trim().replace(/\s+/g,' ').toLowerCase(); }
+// Versi "longgar": kata-katanya diurutkan dulu, jadi "Granmax BV 1.3" dan "Granmax 1.3 BV" dianggap sama persis.
+function normMasterNameLoose(s){ return normMasterName(s).split(' ').filter(Boolean).sort().join(' '); }
 function masterByCategory(cat){ return DB.master.filter(m=>m.category===cat); }
 // urutkan kode secara "natural" (WS2 sebelum WS10, bukan urut huruf biasa)
 function naturalCompare(a,b){
@@ -1981,8 +1987,9 @@ async function saveMasterItem(){
   if(!name){ showToast(`Isi nama ${MASTER_LABELS[masterTab]} terlebih dahulu.`); return; }
   const address = document.getElementById('m_address').value.trim();
   if(f.addr && !address){ showToast(`Alamat ${MASTER_LABELS[masterTab]} wajib diisi.`); return; }
-  const dup = DB.master.some(m=>m.category===masterTab && m.id!==id && normMasterName(m.name)===normMasterName(name));
-  if(dup){ showToast(`${MASTER_LABELS[masterTab]} "${name}" sudah ada di daftar.`); return; }
+  const useLoose = ['brand','type','model'].includes(masterTab);
+  const dup = DB.master.find(m=>m.category===masterTab && m.id!==id && (useLoose ? normMasterNameLoose(m.name)===normMasterNameLoose(name) : normMasterName(m.name)===normMasterName(name)));
+  if(dup){ showToast(`${MASTER_LABELS[masterTab]} "${name}" sudah ada di daftar (tersimpan sebagai "${dup.name}").`); return; }
   let kode = document.getElementById('m_kode').value.trim();
   if(f.kode && !kode) kode = nextMasterKode(masterTab);
   const item = {
