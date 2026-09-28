@@ -446,7 +446,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 
         <div class="page" id="page-reminder">
           <div class="filter-row">
-            <div class="search-box">🔍 <input id="q_search" oninput="renderTable()" placeholder="Cari Nopol, Nama Driver, atau PT..."></div>
+            <div class="search-box">🔍 <input id="q_search" oninput="debTable()" placeholder="Cari Nopol, Nama Driver, atau PT..."></div>
             <select class="filter-select" id="q_pt" onchange="renderTable()"><option value="">Semua PT (Semua Tenant)</option></select>
             <select class="filter-select" id="q_area" onchange="renderTable()"><option value="">Semua Area</option></select>
             <button class="reset-btn" onclick="resetFilters()" title="Reset filter">⟲</button>
@@ -492,9 +492,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 
         <div class="page" id="page-histori">
           <div class="filter-row">
-            <input oninput="renderHistory()" id="h_nopol" placeholder="Cari nopol" class="filter-select" style="min-width:150px;">
-            <input oninput="renderHistory()" id="h_pt" placeholder="Cari PT" class="filter-select" style="min-width:150px;">
-            <input oninput="renderHistory()" id="h_area" placeholder="Cari area" class="filter-select" style="min-width:150px;">
+            <input oninput="debHistory()" id="h_nopol" placeholder="Cari nopol" class="filter-select" style="min-width:150px;">
+            <input oninput="debHistory()" id="h_pt" placeholder="Cari PT" class="filter-select" style="min-width:150px;">
+            <input oninput="debHistory()" id="h_area" placeholder="Cari area" class="filter-select" style="min-width:150px;">
             <input oninput="renderHistory()" id="h_from" type="date" class="filter-select">
             <input oninput="renderHistory()" id="h_to" type="date" class="filter-select">
             <div class="spacer"></div>
@@ -519,7 +519,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <button class="btn-outline" onclick="exportBengkel()">⭳ Export Excel</button>
           </div>
           <div class="filter-row">
-            <div class="search-box">🔍 <input id="bg_search" oninput="renderBengkel()" placeholder="Cari Nopol atau PT..."></div>
+            <div class="search-box">🔍 <input id="bg_search" oninput="debBengkel()" placeholder="Cari Nopol atau PT..."></div>
             <select class="filter-select" id="bg_bengkel" onchange="renderBengkel()">
               <option value="">Semua Bengkel</option>
               <option>Padimas</option><option>IRM</option><option>Lido</option><option>Kita</option><option>Layanan</option>
@@ -553,7 +553,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <button class="btn-outline" onclick="exportSpkl()">⭳ Export Excel</button>
           </div>
           <div class="filter-row">
-            <div class="search-box">🔍 <input id="spkl_search" oninput="renderSpkl()" placeholder="Cari Nopol, Workshop, atau Customer..."></div>
+            <div class="search-box">🔍 <input id="spkl_search" oninput="debSpkl()" placeholder="Cari Nopol, Workshop, atau Customer..."></div>
             <select class="filter-select" id="spkl_jenis" onchange="renderSpkl()">
               <option value="">Semua Jenis</option>
               <option>Bengkel</option><option>Kerja Luar</option><option>Kerja Luar Kota</option>
@@ -600,7 +600,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             </div>
           </div>
           <div class="filter-row">
-            <div class="search-box">🔍 <input id="m_search" oninput="renderMasterData()" placeholder="Cari nama atau kode..."></div>
+            <div class="search-box">🔍 <input id="m_search" oninput="debMaster()" placeholder="Cari nama atau kode..."></div>
           </div>
           <div id="mBulkBar" class="bulk-bar">
             <span id="mBulkCount">0</span> data terpilih
@@ -930,6 +930,7 @@ const toDbSpkl = s => ({ spklk_no:s.spklNo||'', jenis:s.jenis||'Bengkel', worksh
 
 /* ================= LOAD & PERSIST ================= */
 async function loadAll(){
+  invalidateWaIdx();
   try{
     const [vRows, hRows, aRows, sRows, lRows] = await Promise.all([
       sbGet('vehicles','select=*&order=created_at.desc'),
@@ -978,7 +979,8 @@ async function loadAll(){
 function uid(){ return 'tmp'+Date.now()+Math.random().toString(16).slice(2,7); }
 function fmtDate(d){ if(!d) return '-'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}); }
 function addDays(dateStr, days){ const dt=new Date(dateStr+'T00:00:00'); dt.setDate(dt.getDate()+Number(days)); return dt.toISOString().slice(0,10); }
-function today(){ return new Date().toISOString().slice(0,10); }
+let _tdCache={t:0,v:''};
+function today(){ const n=Date.now(); if(n-_tdCache.t>30000){ _tdCache={t:n,v:new Date().toISOString().slice(0,10)}; } return _tdCache.v; }
 function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
 function showToast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(isErr?' err':''); t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3200); }
 function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
@@ -988,20 +990,36 @@ function waPhoneKey(v){ let ph=(v.phone||'').replace(/\D/g,''); if(ph.startsWith
 function waPtKey(v){ return (v.pt||'').trim().toLowerCase(); }
 function waGroupKey(v){ return waPtKey(v)+'|'+waPhoneKey(v); }
 // Preferensi cara kirim per PT: 'group' (1 pesan semua unit) atau 'single' (per unit). Diingat di browser ini.
-function waPrefs(){ try{ return JSON.parse(localStorage.getItem('fleetops_wa_prefs')||'{}'); }catch(e){ return {}; } }
+let _waPrefsCache=null, _waIdx=null;
+function waPrefs(){ if(_waPrefsCache) return _waPrefsCache; try{ _waPrefsCache=JSON.parse(localStorage.getItem('fleetops_wa_prefs')||'{}'); }catch(e){ _waPrefsCache={}; } return _waPrefsCache; }
 function waPrefFor(v){ return waPrefs()[waPtKey(v)] || 'group'; }
-function saveWaPrefs(map){ try{ const cur=waPrefs(); Object.assign(cur,map); localStorage.setItem('fleetops_wa_prefs', JSON.stringify(cur)); }catch(e){} }
+function saveWaPrefs(map){ try{ const cur=Object.assign({},waPrefs(),map); _waPrefsCache=cur; localStorage.setItem('fleetops_wa_prefs', JSON.stringify(cur)); }catch(e){} _waIdx=null; }
+function invalidateWaIdx(){ _waIdx=null; }
 // kendaraan yang sedang masuk bengkel (belum keluar) tidak perlu diingatkan lagi
 function inWorkshopNow(v){
-  return (DB.bengkel||[]).some(b=>!b.tglKeluar && ((b.vehicleId && b.vehicleId===v.id) || (b.nopol||'').trim().toUpperCase()===(v.nopol||'').trim().toUpperCase()));
+  const w = waIndex().ws;
+  return (v.id && w.ids.has(v.id)) || w.nopols.has((v.nopol||'').trim().toUpperCase());
+}
+// Indeks sekali bangun (murni O(n)) supaya tabel besar tetap ringan
+function waIndex(){
+  if(_waIdx) return _waIdx;
+  const ws = { ids:new Set(), nopols:new Set() };
+  (DB.bengkel||[]).forEach(b=>{ if(!b.tglKeluar){ if(b.vehicleId) ws.ids.add(b.vehicleId); ws.nopols.add((b.nopol||'').trim().toUpperCase()); } });
+  const groups = new Map();
+  DB.vehicles.forEach(x=>{
+    if(isStandby(x) || !waPhoneKey(x) || statusOf(x)==='ok') return;
+    if((x.id&&ws.ids.has(x.id)) || ws.nopols.has((x.nopol||'').trim().toUpperCase())) return;
+    const k=waGroupKey(x); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(x);
+  });
+  groups.forEach(arr=>arr.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||'')));
+  _waIdx = { ws, groups };
+  return _waIdx;
 }
 // Semua kendaraan dari PT yang sama + nomor WA yang sama yang memang perlu diingatkan (overdue / mendekati),
 // kecuali yang sudah aman atau sedang masuk service di bengkel. Kendaraan yang diklik selalu ikut.
 function waGroup(v){
   if(isStandby(v) || !waPhoneKey(v) || waPrefFor(v)==='single') return [v];
-  const key = waGroupKey(v);
-  const others = DB.vehicles.filter(x=> x.id!==v.id && !isStandby(x) && waGroupKey(x)===key && statusOf(x)!=='ok' && !inWorkshopNow(x));
-  others.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||''));
+  const others = (waIndex().groups.get(waGroupKey(v))||[]).filter(x=>x.id!==v.id);
   return [v, ...others];
 }
 // Pesan-pesan berikut ini menerima daftar kendaraan eksplisit (list[0] jadi acuan nama penerima)
@@ -1038,6 +1056,7 @@ Terima kasih!`;
 function waMessage(v){ return waMessageFor(waGroup(v)); }
 function waLinkFor(list){ return `https://wa.me/${waPhoneKey(list[0])}?text=${encodeURIComponent(waMessageFor(list))}`; }
 function waLink(v){ return waLinkFor(waGroup(v)); }
+function openWaVehicle(id){ const v=DB.vehicles.find(x=>x.id===id); if(v) window.open(waLink(v),'_blank'); }
 function waBtnLabel(v, base){ const n=waGroup(v).length; return n>1 ? `${base} (${n} unit)` : base; }
 // untuk kirim massal dari dashboard: 1 chat per PT+nomor WA (tidak dobel), kecuali PT yang diatur "per unit"
 function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ const k=(waPhoneKey(v)&&waPrefFor(v)!=='single')?waGroupKey(v):'id:'+v.id; if(seen.has(k)) return false; seen.add(k); return true; }); }
@@ -1216,7 +1235,14 @@ function executeBulkWa(){
   showToast(`Membuka ${plan.length} chat WhatsApp reminder secara berurutan...`);
 }
 function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastdate? addDays(lastdate, interval||180):''; const nextkm=(Number(lastkm)||0)+(Number(kmstep)||10000); return {nextdate,nextkm}; }
-function statusOf(v){ if(!v.nextdate) return 'ok'; const d=daysBetween(today(), v.nextdate); if(d<0) return 'bad'; if(d<=(DB.settings.reminderDays||14)) return 'warn'; return 'ok'; }
+function statusOf(v){
+  if(!v.nextdate) return 'ok';
+  const rd = DB.settings.reminderDays||14, key = v.nextdate+'|'+rd+'|'+today();
+  if(v._stk===key) return v._st;
+  const d=daysBetween(today(), v.nextdate);
+  const st = d<0 ? 'bad' : (d<=rd ? 'warn' : 'ok');
+  v._stk=key; v._st=st; return st;
+}
 function statusLabel(s){ return s==='bad'?'Overdue':(s==='warn'?'Mendekati':'Aman'); }
 function isStandby(v){ const pt=(v.pt||'').trim().toLowerCase(); return pt==='' || pt==='standby' || pt==='stanby'; }
 
@@ -1283,6 +1309,7 @@ function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable();
 
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
+  invalidateWaIdx();
   const vs = DB.vehicles;
   document.getElementById('kpiTotal').textContent = vs.length;
   document.getElementById('navReminderCount').textContent = vs.length;
@@ -1319,7 +1346,7 @@ function renderCritBanner(vs){
       </div>
       <div class="cv-km">Odometer Aktual / Target<b>${(v.currentkm||0).toLocaleString('id-ID')} / ${(v.nextkm||0).toLocaleString('id-ID')} KM</b>${kmLebih>0? `<span style="color:var(--bad);">+${kmLebih.toLocaleString('id-ID')} KM Melebihi Batas</span>`:''}</div>
       <div class="cv-actions">
-        <a class="wa-btn" href="${waLink(v)}" target="_blank">${waBtnLabel(v,'💬 WhatsApp')}</a>
+        <a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WhatsApp')}</a>
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Input Servis</button>
       </div>
     </div>`;
@@ -1350,6 +1377,7 @@ function renderRecentActivity(){
 function groupCount(list, field){ const m={}; list.forEach(v=>{ const k=v[field]||'(kosong)'; m[k]=(m[k]||0)+1; }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8); }
 
 function renderNotifPanel(){
+  invalidateWaIdx();
   const urgent = DB.vehicles.filter(v=>{ const s=statusOf(v); return s==='bad'||s==='warn'; })
     .sort((a,b)=> (a.nextdate||'').localeCompare(b.nextdate||''));
   document.getElementById('notifCountLabel').textContent = `${urgent.length} unit`;
@@ -1407,6 +1435,7 @@ function filteredVehicles(){
   });
 }
 function renderTable(){
+  invalidateWaIdx();
   populateTabCounts();
   const list = filteredVehicles();
   const body = document.getElementById('vehicleBody');
@@ -1428,7 +1457,7 @@ function renderTable(){
       <td>${v.interval||'-'} Hari</td>
       <td><span class="status-badge ${s}">${statusLabel(s)}</span></td>
       <td><div class="aksi-cell">
-        <a class="wa-btn" href="${waLink(v)}" target="_blank">${waBtnLabel(v,'💬 WA Reminder')}</a>
+        <a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WA Reminder')}</a>
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
         <button class="edit-icon-btn" onclick="openVehicleModal('${v.id}')" title="Edit">✎</button>
       </div></td>
@@ -2645,6 +2674,14 @@ async function toggleAccount(i){
     new MutationObserver(()=>{ if(!bg.classList.contains('show')) reset(bg); }).observe(bg,{attributes:true,attributeFilter:['class']});
   });
 })();
+
+/* Tunda render sesaat saat mengetik di kolom cari, supaya tidak berat di setiap huruf */
+function deb(fn, ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn, ms||180); }; }
+const debTable = deb(()=>renderTable());
+const debBengkel = deb(()=>renderBengkel());
+const debSpkl = deb(()=>renderSpkl());
+const debMaster = deb(()=>renderMasterData());
+const debHistory = deb(()=>renderHistory());
 
 /* ================= INIT ================= */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
