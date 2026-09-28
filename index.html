@@ -829,6 +829,22 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   </div>
 </div>
 
+<div class="modal-bg" id="waBulkModalBg">
+  <div class="modal">
+    <div class="modal-head"><div><h3>Kirim Bulk WA Reminder</h3><p class="sub">Atur cara kirim untuk tiap PT. Ada PT yang cukup 1 pesan berisi semua unit, ada yang harus dikirim per unit.</p></div><button class="x-btn" onclick="closeWaBulkModal()">✕</button></div>
+    <div class="wa-quick" style="display:flex;gap:8px;margin:6px 0 12px;flex-wrap:wrap;">
+      <button class="btn-outline" onclick="setAllWaMode('group')">Semua: Gabung per PT</button>
+      <button class="btn-outline" onclick="setAllWaMode('single')">Semua: Per unit</button>
+    </div>
+    <div id="waBulkList"></div>
+    <div class="small-note" id="waBulkSummary" style="margin-top:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWaBulkModal()">Batal</button>
+      <button class="btn-green" onclick="executeBulkWa()">💬 Buka WhatsApp</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -959,7 +975,12 @@ function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).sli
 function ptCode(pt, existingCount){ const letters = (pt||'PT').split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'PT'; return `PT-${letters}-${String(existingCount+1).padStart(3,'0')}`; }
 function vLabel(v){ return [v?.brand,v?.model,v?.type].filter(Boolean).join(' ') || '-'; }
 function waPhoneKey(v){ let ph=(v.phone||'').replace(/\D/g,''); if(ph.startsWith('0')) ph='62'+ph.slice(1); return ph; }
-function waGroupKey(v){ return (v.pt||'').trim().toLowerCase()+'|'+waPhoneKey(v); }
+function waPtKey(v){ return (v.pt||'').trim().toLowerCase(); }
+function waGroupKey(v){ return waPtKey(v)+'|'+waPhoneKey(v); }
+// Preferensi cara kirim per PT: 'group' (1 pesan semua unit) atau 'single' (per unit). Diingat di browser ini.
+function waPrefs(){ try{ return JSON.parse(localStorage.getItem('fleetops_wa_prefs')||'{}'); }catch(e){ return {}; } }
+function waPrefFor(v){ return waPrefs()[waPtKey(v)] || 'group'; }
+function saveWaPrefs(map){ try{ const cur=waPrefs(); Object.assign(cur,map); localStorage.setItem('fleetops_wa_prefs', JSON.stringify(cur)); }catch(e){} }
 // kendaraan yang sedang masuk bengkel (belum keluar) tidak perlu diingatkan lagi
 function inWorkshopNow(v){
   return (DB.bengkel||[]).some(b=>!b.tglKeluar && ((b.vehicleId && b.vehicleId===v.id) || (b.nopol||'').trim().toUpperCase()===(v.nopol||'').trim().toUpperCase()));
@@ -967,23 +988,25 @@ function inWorkshopNow(v){
 // Semua kendaraan dari PT yang sama + nomor WA yang sama yang memang perlu diingatkan (overdue / mendekati),
 // kecuali yang sudah aman atau sedang masuk service di bengkel. Kendaraan yang diklik selalu ikut.
 function waGroup(v){
-  if(isStandby(v) || !waPhoneKey(v)) return [v];
+  if(isStandby(v) || !waPhoneKey(v) || waPrefFor(v)==='single') return [v];
   const key = waGroupKey(v);
   const others = DB.vehicles.filter(x=> x.id!==v.id && !isStandby(x) && waGroupKey(x)===key && statusOf(x)!=='ok' && !inWorkshopNow(x));
   others.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||''));
   return [v, ...others];
 }
+// Pesan-pesan berikut ini menerima daftar kendaraan eksplisit (list[0] jadi acuan nama penerima)
+function waPtName(pt){ pt=(pt||'-').trim(); return /^(PT|CV|UD|PD)\b\.?/i.test(pt) ? pt : 'PT. '+pt; }
 function waVehicleBlock(v){
   return `Nopol ${v.nopol||'-'} (${vLabel(v)})
 Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
 Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM`;
 }
-function waMessage(v){
-  const group = waGroup(v);
-  if(group.length>1){
-    const blocks = group.map((x,i)=>`${i+1}. ${waVehicleBlock(x)}`).join('\n\n');
-    return `Halo Bpk/Ibu ${v.user||'-'} (PT. ${v.pt||'-'})
-Mengingatkan untuk jadwal service berkala ${group.length} kendaraan Anda:
+function waMessageFor(list){
+  const v = list[0];
+  if(list.length>1){
+    const blocks = list.map((x,i)=>`${i+1}) ${waVehicleBlock(x)}`).join('\n\n');
+    return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
+Mengingatkan untuk jadwal service berkala ${list.length} kendaraan Anda:
 
 ${blocks}
 
@@ -991,7 +1014,7 @@ Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Repl
 
 Terima kasih!`;
   }
-  return `Halo Bpk/Ibu ${v.user||'-'} (PT. ${v.pt||'-'})
+  return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
 Nopol ${v.nopol||'-'},
 Mengingatkan untuk jadwal service berkala kendaraan ${vLabel(v)} Anda:
 
@@ -1002,10 +1025,71 @@ Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Repl
 
 Terima kasih!`;
 }
-function waLink(v){ const phone=waPhoneKey(v); return `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(v))}`; }
+function waMessage(v){ return waMessageFor(waGroup(v)); }
+function waLinkFor(list){ return `https://wa.me/${waPhoneKey(list[0])}?text=${encodeURIComponent(waMessageFor(list))}`; }
+function waLink(v){ return waLinkFor(waGroup(v)); }
 function waBtnLabel(v, base){ const n=waGroup(v).length; return n>1 ? `${base} (${n} unit)` : base; }
-// untuk kirim massal: 1 chat per PT+nomor WA (tidak dobel)
-function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ const k=waPhoneKey(v)?waGroupKey(v):'id:'+v.id; if(seen.has(k)) return false; seen.add(k); return true; }); }
+// untuk kirim massal dari dashboard: 1 chat per PT+nomor WA (tidak dobel), kecuali PT yang diatur "per unit"
+function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ const k=(waPhoneKey(v)&&waPrefFor(v)!=='single')?waGroupKey(v):'id:'+v.id; if(seen.has(k)) return false; seen.add(k); return true; }); }
+
+/* ===== Bulk WA: pilih cara kirim per PT ===== */
+let waBulkModes = {};
+function bulkWaReminder(){
+  const list = DB.vehicles.filter(v=>selectedIds.has(v.id));
+  if(list.length===0) return;
+  const byPt = {};
+  list.forEach(v=>{ const k=waPtKey(v)||('id:'+v.id); (byPt[k]=byPt[k]||[]).push(v); });
+  waBulkModes = {};
+  Object.entries(byPt).forEach(([k,arr])=>{ waBulkModes[k] = waPrefFor(arr[0]); });
+  window._waBulkGroups = byPt;
+  renderWaBulkModal();
+  document.getElementById('waBulkModalBg').classList.add('show');
+}
+function closeWaBulkModal(){ document.getElementById('waBulkModalBg').classList.remove('show'); }
+function setWaMode(k, mode){ waBulkModes[k]=mode; renderWaBulkModal(); }
+function setAllWaMode(mode){ Object.keys(waBulkModes).forEach(k=>waBulkModes[k]=mode); renderWaBulkModal(); }
+// susun rencana chat: array of list kendaraan (1 list = 1 chat WA)
+function buildWaBulkPlan(){
+  const plan = [];
+  Object.entries(window._waBulkGroups||{}).forEach(([k,arr])=>{
+    if(waBulkModes[k]==='single' || arr.length===1){ arr.forEach(v=>plan.push([v])); return; }
+    const byPhone = {};
+    arr.forEach(v=>{ const ph=waPhoneKey(v); if(!ph){ plan.push([v]); return; } (byPhone[ph]=byPhone[ph]||[]).push(v); });
+    Object.values(byPhone).forEach(g=>plan.push(g));
+  });
+  return plan;
+}
+function renderWaBulkModal(){
+  const box = document.getElementById('waBulkList');
+  const groups = window._waBulkGroups||{};
+  box.innerHTML = Object.entries(groups).map(([k,arr])=>{
+    const mode = waBulkModes[k];
+    const phones = [...new Set(arr.map(v=>v.user?`${v.user}`:'-'))].join(', ');
+    const choice = arr.length>1 ? `
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="tab-pill ${mode==='group'?'active':''}" style="padding:6px 12px;" onclick="setWaMode(decodeURIComponent('${encodeURIComponent(k)}'),'group')">Gabung: 1 pesan semua unit</button>
+        <button class="tab-pill ${mode==='single'?'active':''}" style="padding:6px 12px;" onclick="setWaMode(decodeURIComponent('${encodeURIComponent(k)}'),'single')">Per unit: 1 pesan tiap kendaraan</button>
+      </div>` : '';
+    return `<div class="panel" style="margin-bottom:10px;padding:14px 16px;">
+      <div style="font-weight:800;">${arr[0].pt||'(Tanpa PT)'} <span class="cell-sub">• ${arr.length} unit • ${phones}</span></div>
+      <div class="cell-sub" style="margin-top:4px;">${arr.map(v=>v.nopol).join(', ')}</div>
+      ${choice}
+    </div>`;
+  }).join('');
+  const n = buildWaBulkPlan().length;
+  document.getElementById('waBulkSummary').textContent = `Akan membuka ${n} chat WhatsApp. Pilihan cara kirim tiap PT akan diingat untuk pengiriman berikutnya.`;
+}
+function executeBulkWa(){
+  const plan = buildWaBulkPlan();
+  if(plan.length===0){ closeWaBulkModal(); return; }
+  const prefs = {};
+  Object.entries(window._waBulkGroups||{}).forEach(([k,arr])=>{ if(arr.length>1 && !k.startsWith('id:')) prefs[k]=waBulkModes[k]; });
+  saveWaPrefs(prefs);
+  plan.forEach((list,i)=>{ setTimeout(()=>window.open(waLinkFor(list),'_blank'), i*350); });
+  closeWaBulkModal();
+  renderTable();
+  showToast(`Membuka ${plan.length} chat WhatsApp reminder secara berurutan...`);
+}
 function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastdate? addDays(lastdate, interval||180):''; const nextkm=(Number(lastkm)||0)+(Number(kmstep)||10000); return {nextdate,nextkm}; }
 function statusOf(v){ if(!v.nextdate) return 'ok'; const d=daysBetween(today(), v.nextdate); if(d<0) return 'bad'; if(d<=(DB.settings.reminderDays||14)) return 'warn'; return 'ok'; }
 function statusLabel(s){ return s==='bad'?'Overdue':(s==='warn'?'Mendekati':'Aman'); }
@@ -1253,12 +1337,6 @@ function renderBulkBar(){
   document.getElementById('bulkCount').textContent=selectedIds.size;
   const names=DB.vehicles.filter(v=>selectedIds.has(v.id)).map(v=>v.nopol).slice(0,4);
   document.getElementById('bulkNames').textContent=`• (${names.join(', ')}${selectedIds.size>4?', ...':''})`;
-}
-function bulkWaReminder(){
-  const list=dedupeWaTargets(DB.vehicles.filter(v=>selectedIds.has(v.id)));
-  if(list.length===0) return;
-  list.forEach((v,i)=>{ setTimeout(()=>window.open(waLink(v),'_blank'), i*350); });
-  showToast(`Membuka ${list.length} chat WhatsApp reminder secara berurutan...`);
 }
 async function deleteSelected(){
   if(selectedIds.size===0){ showToast('Pilih minimal satu data untuk dihapus.'); return; }
