@@ -958,11 +958,42 @@ function showToast(msg, isErr){ const t=document.getElementById('toast'); t.text
 function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
 function ptCode(pt, existingCount){ const letters = (pt||'PT').split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'PT'; return `PT-${letters}-${String(existingCount+1).padStart(3,'0')}`; }
 function vLabel(v){ return [v?.brand,v?.model,v?.type].filter(Boolean).join(' ') || '-'; }
+function waPhoneKey(v){ let ph=(v.phone||'').replace(/\D/g,''); if(ph.startsWith('0')) ph='62'+ph.slice(1); return ph; }
+function waGroupKey(v){ return (v.pt||'').trim().toLowerCase()+'|'+waPhoneKey(v); }
+// kendaraan yang sedang masuk bengkel (belum keluar) tidak perlu diingatkan lagi
+function inWorkshopNow(v){
+  return (DB.bengkel||[]).some(b=>!b.tglKeluar && ((b.vehicleId && b.vehicleId===v.id) || (b.nopol||'').trim().toUpperCase()===(v.nopol||'').trim().toUpperCase()));
+}
+// Semua kendaraan dari PT yang sama + nomor WA yang sama yang memang perlu diingatkan (overdue / mendekati),
+// kecuali yang sudah aman atau sedang masuk service di bengkel. Kendaraan yang diklik selalu ikut.
+function waGroup(v){
+  if(isStandby(v) || !waPhoneKey(v)) return [v];
+  const key = waGroupKey(v);
+  const others = DB.vehicles.filter(x=> x.id!==v.id && !isStandby(x) && waGroupKey(x)===key && statusOf(x)!=='ok' && !inWorkshopNow(x));
+  others.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||''));
+  return [v, ...others];
+}
+function waVehicleBlock(v){
+  return `Nopol ${v.nopol||'-'} (${vLabel(v)})
+Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
+Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM`;
+}
 function waMessage(v){
-const tipeGabungan = vLabel(v);
-return `Halo Bpk/Ibu ${v.user||'-'} (PT. ${v.pt||'-'})
+  const group = waGroup(v);
+  if(group.length>1){
+    const blocks = group.map((x,i)=>`${i+1}. ${waVehicleBlock(x)}`).join('\n\n');
+    return `Halo Bpk/Ibu ${v.user||'-'} (PT. ${v.pt||'-'})
+Mengingatkan untuk jadwal service berkala ${group.length} kendaraan Anda:
+
+${blocks}
+
+Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
+
+Terima kasih!`;
+  }
+  return `Halo Bpk/Ibu ${v.user||'-'} (PT. ${v.pt||'-'})
 Nopol ${v.nopol||'-'},
-Mengingatkan untuk jadwal service berkala kendaraan ${tipeGabungan} Anda:
+Mengingatkan untuk jadwal service berkala kendaraan ${vLabel(v)} Anda:
 
 Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
 Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM
@@ -971,7 +1002,10 @@ Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Repl
 
 Terima kasih!`;
 }
-function waLink(v){ let phone=(v.phone||'').replace(/\D/g,''); if(phone.startsWith('0')) phone='62'+phone.slice(1); return `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(v))}`; }
+function waLink(v){ const phone=waPhoneKey(v); return `https://wa.me/${phone}?text=${encodeURIComponent(waMessage(v))}`; }
+function waBtnLabel(v, base){ const n=waGroup(v).length; return n>1 ? `${base} (${n} unit)` : base; }
+// untuk kirim massal: 1 chat per PT+nomor WA (tidak dobel)
+function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ const k=waPhoneKey(v)?waGroupKey(v):'id:'+v.id; if(seen.has(k)) return false; seen.add(k); return true; }); }
 function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastdate? addDays(lastdate, interval||180):''; const nextkm=(Number(lastkm)||0)+(Number(kmstep)||10000); return {nextdate,nextkm}; }
 function statusOf(v){ if(!v.nextdate) return 'ok'; const d=daysBetween(today(), v.nextdate); if(d<0) return 'bad'; if(d<=(DB.settings.reminderDays||14)) return 'warn'; return 'ok'; }
 function statusLabel(s){ return s==='bad'?'Overdue':(s==='warn'?'Mendekati':'Aman'); }
@@ -1076,7 +1110,7 @@ function renderCritBanner(vs){
       </div>
       <div class="cv-km">Odometer Aktual / Target<b>${(v.currentkm||0).toLocaleString('id-ID')} / ${(v.nextkm||0).toLocaleString('id-ID')} KM</b>${kmLebih>0? `<span style="color:var(--bad);">+${kmLebih.toLocaleString('id-ID')} KM Melebihi Batas</span>`:''}</div>
       <div class="cv-actions">
-        <a class="wa-btn" href="${waLink(v)}" target="_blank">💬 WhatsApp</a>
+        <a class="wa-btn" href="${waLink(v)}" target="_blank">${waBtnLabel(v,'💬 WhatsApp')}</a>
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Input Servis</button>
       </div>
     </div>`;
@@ -1084,10 +1118,11 @@ function renderCritBanner(vs){
   if(overdue.length>5){ list.innerHTML += `<div class="small-note" style="margin-top:10px;">+${overdue.length-5} unit overdue lainnya — klik "Lihat Semua Unit Kritis" di atas.</div>`; }
 }
 function broadcastCriticalWa(){
-  const overdue = DB.vehicles.filter(v=>statusOf(v)==='bad');
-  if(overdue.length===0){ showToast('Tidak ada unit overdue saat ini.'); return; }
+  const overdueAll = DB.vehicles.filter(v=>statusOf(v)==='bad');
+  if(overdueAll.length===0){ showToast('Tidak ada unit overdue saat ini.'); return; }
+  const overdue = dedupeWaTargets(overdueAll);
   overdue.forEach((v,i)=>{ setTimeout(()=>window.open(waLink(v),'_blank'), i*350); });
-  showToast(`Membuka ${overdue.length} chat WhatsApp reminder untuk unit overdue...`);
+  showToast(`Membuka ${overdue.length} chat WhatsApp reminder (unit dari PT & nomor yang sama digabung jadi 1 pesan)...`);
 }
 function renderRecentActivity(){
   const el = document.getElementById('recentActivity');
@@ -1184,7 +1219,7 @@ function renderTable(){
       <td>${v.interval||'-'} Hari</td>
       <td><span class="status-badge ${s}">${statusLabel(s)}</span></td>
       <td><div class="aksi-cell">
-        <a class="wa-btn" href="${waLink(v)}" target="_blank">💬 WA Reminder</a>
+        <a class="wa-btn" href="${waLink(v)}" target="_blank">${waBtnLabel(v,'💬 WA Reminder')}</a>
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
         <button class="edit-icon-btn" onclick="openVehicleModal('${v.id}')" title="Edit">✎</button>
       </div></td>
@@ -1220,7 +1255,7 @@ function renderBulkBar(){
   document.getElementById('bulkNames').textContent=`• (${names.join(', ')}${selectedIds.size>4?', ...':''})`;
 }
 function bulkWaReminder(){
-  const list=DB.vehicles.filter(v=>selectedIds.has(v.id));
+  const list=dedupeWaTargets(DB.vehicles.filter(v=>selectedIds.has(v.id)));
   if(list.length===0) return;
   list.forEach((v,i)=>{ setTimeout(()=>window.open(waLink(v),'_blank'), i*350); });
   showToast(`Membuka ${list.length} chat WhatsApp reminder secara berurutan...`);
