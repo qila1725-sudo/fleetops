@@ -289,7 +289,9 @@
   .calc-box{grid-column:1/-1;background:var(--brand-soft);border:1px solid #c7dced;border-radius:11px;padding:13px 15px;display:flex;gap:26px;flex-wrap:wrap;font-size:12.5px;}
   .calc-box b{display:block;font-size:14.5px;color:var(--brand-deep);margin-top:2px;}
   .modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;flex-wrap:wrap;}
-  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;}
+  .modal-head{display:flex;justify-content:space-between;align-items:flex-start;cursor:move;touch-action:none;user-select:none;}
+  .modal-head .x-btn,.modal-head button{cursor:pointer;}
+  .modal.dragging{opacity:.96;box-shadow:0 18px 50px rgba(15,25,35,.35);}
   .x-btn{border:none;background:none;font-size:18px;color:var(--ink-soft);line-height:1;padding:2px;}
 
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:100;display:none;max-width:88vw;}
@@ -2609,6 +2611,40 @@ async function toggleAccount(i){
   try{ await sbUpdate('accounts', DB.accounts[i].id, {active:newActive}); DB.accounts[i].active = newActive; renderAccountPage(); }
   catch(e){ console.error(e); showToast('Gagal memperbarui status akun.', true); }
 }
+
+/* ===== Semua jendela (modal) bisa digeser: tarik bagian judul ===== */
+(function enableModalDrag(){
+  let drag=null;
+  document.addEventListener('pointerdown', e=>{
+    const head = e.target.closest('.modal-head');
+    if(!head || e.target.closest('button,input,select,textarea,a')) return;
+    const modal = head.closest('.modal'); if(!modal) return;
+    drag = { modal, sx:e.clientX, sy:e.clientY, tx:parseFloat(modal.dataset.tx||0), ty:parseFloat(modal.dataset.ty||0) };
+    modal.classList.add('dragging');
+    try{ head.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag) return;
+    let nx = drag.tx + (e.clientX-drag.sx), ny = drag.ty + (e.clientY-drag.sy);
+    const m = drag.modal, r = m.getBoundingClientRect();
+    // jaga supaya bagian judul tidak keluar layar
+    const dx = nx - parseFloat(m.dataset.tx||0), dy = ny - parseFloat(m.dataset.ty||0);
+    if(r.left+dx > innerWidth-80) nx -= (r.left+dx) - (innerWidth-80);
+    if(r.right+dx < 80) nx += 80 - (r.right+dx);
+    if(r.top+dy < 0) ny -= (r.top+dy);
+    if(r.top+dy > innerHeight-50) ny -= (r.top+dy) - (innerHeight-50);
+    m.dataset.tx=nx; m.dataset.ty=ny;
+    m.style.transform = `translate(${nx}px,${ny}px)`;
+  });
+  const end = ()=>{ if(drag){ drag.modal.classList.remove('dragging'); drag=null; } };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+  // kembalikan ke tengah setiap kali jendela dibuka lagi
+  const reset = bg=>{ const m=bg.querySelector('.modal'); if(m){ m.dataset.tx=0; m.dataset.ty=0; m.style.transform=''; } };
+  document.querySelectorAll('.modal-bg').forEach(bg=>{
+    new MutationObserver(()=>{ if(!bg.classList.contains('show')) reset(bg); }).observe(bg,{attributes:true,attributeFilter:['class']});
+  });
+})();
 
 /* ================= INIT ================= */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
