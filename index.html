@@ -469,6 +469,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="bulk-count" id="bulkCount">0</div>
             <div class="txt">Kendaraan Terpilih <span id="bulkNames"></span></div>
             <div class="spacer"></div>
+            <button class="btn-outline" onclick="openDataImageModal()">🖼 Foto Data Unit (per PT)</button>
             <button class="btn-green" onclick="bulkWaReminder()">💬 Kirim Bulk WA Reminder</button>
             <button class="btn-danger" onclick="deleteSelected()">🗑 Hapus Data Terpilih</button>
             <button class="bulk-x" onclick="clearSelection()">✕</button>
@@ -829,6 +830,13 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   </div>
 </div>
 
+<div class="modal-bg" id="dataImgModalBg">
+  <div class="modal" style="max-width:860px;">
+    <div class="modal-head"><div><h3>Foto Data Unit per PT</h3><p class="sub">Gambar tabel data unit untuk dikirim lewat WhatsApp. Klik <b>Salin Gambar</b>, lalu buka chat dan tekan <b>Ctrl+V</b> (atau simpan dulu lalu lampirkan).</p></div><button class="x-btn" onclick="closeDataImageModal()">✕</button></div>
+    <div id="dataImgList"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="waBulkModalBg">
   <div class="modal">
     <div class="modal-head"><div><h3>Kirim Bulk WA Reminder</h3><p class="sub">Atur cara kirim untuk tiap PT. Ada PT yang cukup 1 pesan berisi semua unit, ada yang harus dikirim per unit.</p></div><button class="x-btn" onclick="closeWaBulkModal()">✕</button></div>
@@ -1074,11 +1082,126 @@ function renderWaBulkModal(){
       <div style="font-weight:800;">${arr[0].pt||'(Tanpa PT)'} <span class="cell-sub">• ${arr.length} unit • ${phones}</span></div>
       <div class="cell-sub" style="margin-top:4px;">${arr.map(v=>v.nopol).join(', ')}</div>
       ${choice}
+      ${arr.length>1 ? `<div style="margin-top:8px;"><button class="btn-outline" style="padding:6px 12px;" onclick="openDataImageModal(decodeURIComponent('${encodeURIComponent(k)}'))">🖼 Foto data ${arr.length} unit</button></div>` : ''}
     </div>`;
   }).join('');
   const n = buildWaBulkPlan().length;
   document.getElementById('waBulkSummary').textContent = `Akan membuka ${n} chat WhatsApp. Pilihan cara kirim tiap PT akan diingat untuk pengiriman berikutnya.`;
 }
+/* ===== Foto Data Unit per PT (gambar tabel untuk dikirim via WA) ===== */
+function dataImgGroups(onlyKey){
+  const list = DB.vehicles.filter(v=>selectedIds.has(v.id));
+  const byPt = {};
+  list.forEach(v=>{ const k=waPtKey(v)||('id:'+v.id); (byPt[k]=byPt[k]||[]).push(v); });
+  if(onlyKey && byPt[onlyKey]) return {[onlyKey]:byPt[onlyKey]};
+  return byPt;
+}
+function drawDataImage(pt, arr){
+  const S = 2, W = 1040, rowH = 46, headH = 96, colHead = 44, footH = 56;
+  const H = headH + colHead + rowH*arr.length + footH;
+  const c = document.createElement('canvas'); c.width=W*S; c.height=H*S;
+  const x = c.getContext('2d'); x.scale(S,S);
+  const font = 'Segoe UI, Arial, sans-serif';
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  // header
+  x.fillStyle='#1f5fe0'; x.fillRect(0,0,W,headH);
+  x.fillStyle='#fff'; x.font=`800 24px ${font}`; x.fillText(pt||'-', 28, 44);
+  x.font=`600 14px ${font}`; x.fillStyle='rgba(255,255,255,.85)';
+  x.fillText(`Jadwal Service Berkala • ${arr.length} unit • per ${fmtDate(today())}`, 28, 72);
+  // columns
+  const cols = [
+    {t:'No',w:44,f:(v,i)=>String(i+1)},
+    {t:'Nopol',w:130,f:v=>v.nopol||'-',b:true},
+    {t:'Kendaraan',w:290,f:v=>vLabel(v)},
+    {t:'Terakhir Service',w:170,f:v=>`${fmtDate(v.lastdate)}`, sub:v=>`${(v.lastkm||0).toLocaleString('id-ID')} KM`},
+    {t:'Estimasi Berikutnya',w:190,f:v=>fmtDate(v.nextdate), sub:v=>`${(v.nextkm||0).toLocaleString('id-ID')} KM`},
+    {t:'Status',w:0,f:v=>statusLabel(statusOf(v)),status:true}
+  ];
+  const used = cols.reduce((a,c)=>a+c.w,0); cols[cols.length-1].w = W-56-used;
+  let y = headH;
+  x.fillStyle='#f3f5f9'; x.fillRect(0,y,W,colHead);
+  x.fillStyle='#5b6472'; x.font=`800 12px ${font}`;
+  let cx=28; cols.forEach(cl=>{ x.fillText(cl.t.toUpperCase(), cx, y+27); cx+=cl.w; });
+  y += colHead;
+  const colors = {bad:['#fdecec','#c62828'],warn:['#fff4e0','#b26a00'],ok:['#e6f6ec','#1b7a3e']};
+  arr.forEach((v,i)=>{
+    if(i%2===1){ x.fillStyle='#fafbfd'; x.fillRect(0,y,W,rowH); }
+    x.strokeStyle='#e8ebf1'; x.beginPath(); x.moveTo(0,y+rowH); x.lineTo(W,y+rowH); x.stroke();
+    let cx=28;
+    cols.forEach(cl=>{
+      const txt = cl.f(v,i);
+      if(cl.status){
+        const st = statusOf(v); const [bg,fg]=colors[st];
+        x.font=`800 12px ${font}`; const tw=x.measureText(txt).width+22;
+        x.fillStyle=bg; x.beginPath(); if(x.roundRect) x.roundRect(cx, y+12, tw, 22, 11); else x.rect(cx, y+12, tw, 22); x.fill();
+        x.fillStyle=fg; x.fillText(txt, cx+11, y+27);
+      } else {
+        x.fillStyle='#111'; x.font=`${cl.b?'800':'600'} 14px ${font}`;
+        let t=String(txt); while(x.measureText(t).width>cl.w-12 && t.length>3) t=t.slice(0,-2);
+        if(t!==String(txt)) t+='…';
+        if(cl.sub){ x.fillText(t, cx, y+20); x.fillStyle='#7a8494'; x.font=`600 12px ${font}`; x.fillText(cl.sub(v), cx, y+37); }
+        else x.fillText(t, cx, y+28);
+      }
+      cx+=cl.w;
+    });
+    y+=rowH;
+  });
+  x.fillStyle='#5b6472'; x.font=`600 13px ${font}`;
+  x.fillText('Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply. Terima kasih!', 28, y+34);
+  return c;
+}
+function openDataImageModal(onlyKey){
+  const groups = dataImgGroups(onlyKey);
+  const keys = Object.keys(groups);
+  if(keys.length===0){ showToast('Pilih kendaraan dulu (centang di tabel).'); return; }
+  window._dataImgCanvases = {};
+  const box = document.getElementById('dataImgList');
+  box.innerHTML = '';
+  keys.forEach((k,idx)=>{
+    const arr = groups[k];
+    arr.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||''));
+    const cv = drawDataImage(arr[0].pt||'(Tanpa PT)', arr);
+    window._dataImgCanvases[idx] = {cv, name:`data-unit-${(arr[0].pt||'pt').replace(/[^a-z0-9]+/gi,'-')}.png`, list:arr};
+    const wrap = document.createElement('div'); wrap.className='panel'; wrap.style.cssText='margin-bottom:14px;padding:14px;';
+    cv.style.cssText='width:100%;height:auto;border:1px solid #e3e7ee;border-radius:8px;';
+    wrap.appendChild(cv);
+    const bar = document.createElement('div'); bar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;';
+    bar.innerHTML = `<button class="btn-primary small" onclick="copyDataImage(${idx})">📋 Salin Gambar</button>
+      <button class="btn-outline" onclick="downloadDataImage(${idx})">⭳ Simpan PNG</button>
+      <button class="btn-green" onclick="openWaForDataImage(${idx})">💬 Buka Chat WA</button>`;
+    wrap.appendChild(bar);
+    box.appendChild(wrap);
+  });
+  document.getElementById('dataImgModalBg').classList.add('show');
+}
+function closeDataImageModal(){ document.getElementById('dataImgModalBg').classList.remove('show'); }
+function canvasBlob(cv){ return new Promise(res=>cv.toBlob(res,'image/png')); }
+async function copyDataImage(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  try{
+    const blob = await canvasBlob(it.cv);
+    await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+    showToast('Gambar disalin. Buka chat WhatsApp lalu tekan Ctrl+V.');
+  }catch(e){ console.error(e); showToast('Browser tidak mengizinkan salin gambar. Pakai "Simpan PNG" lalu lampirkan manual.', true); }
+}
+async function downloadDataImage(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  const blob = await canvasBlob(it.cv);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = it.name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+function openWaForDataImage(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  const v = it.list[0];
+  const msg = `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
+Berikut kami kirimkan data jadwal service berkala ${it.list.length} kendaraan Anda (lihat gambar).
+
+Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
+
+Terima kasih!`;
+  window.open(`https://wa.me/${waPhoneKey(v)}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
 function executeBulkWa(){
   const plan = buildWaBulkPlan();
   if(plan.length===0){ closeWaBulkModal(); return; }
