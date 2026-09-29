@@ -1428,7 +1428,7 @@ function filteredVehicles(){
   const q=document.getElementById('q_search').value.trim().toLowerCase();
   const pt=document.getElementById('q_pt').value, area=document.getElementById('q_area').value;
   return DB.vehicles.filter(v=>{
-    if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''}`.toLowerCase().includes(q))) return false;
+    if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''} ${vLabel(v)}`.toLowerCase().includes(q))) return false;
     if(pt && v.pt!==pt) return false;
     if(area && v.area!==area) return false;
     if(quickTab==='standby'){ if(!isStandby(v)) return false; }
@@ -1471,7 +1471,7 @@ function populateTabCounts(){
   const base = DB.vehicles.filter(v=>{
     const q=document.getElementById('q_search').value.trim().toLowerCase();
     const pt=document.getElementById('q_pt').value, area=document.getElementById('q_area').value;
-    if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''}`.toLowerCase().includes(q))) return false;
+    if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''} ${vLabel(v)}`.toLowerCase().includes(q))) return false;
     if(pt && v.pt!==pt) return false;
     if(area && v.area!==area) return false;
     return true;
