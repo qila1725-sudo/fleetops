@@ -133,6 +133,7 @@
   .sync-chip.err{background:var(--bad-bg);color:var(--bad);}
   .quickjump{display:flex;align-items:center;gap:7px;background:#f5f6f9;border:1px solid var(--line);padding:8px 13px;border-radius:9px;font-size:12.5px;color:var(--ink-faint);min-width:200px;}
   .bell{position:relative;background:#f5f6f9;border:1px solid var(--line);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;}
+  #desktopNotifBtn.active{background:#e6f6ec;border-color:#bfe8cd;color:#1b7a3e;}
   .bell:hover{border-color:var(--brand);}
   .notif-panel{position:absolute;top:52px;right:26px;width:340px;max-height:420px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.18);z-index:60;display:none;}
   .notif-panel.show{display:block;}
@@ -390,6 +391,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         <div class="top-right">
           <div class="sync-chip" id="syncChip">☁️ Tersinkronisasi Cloud DB <span id="syncTime"></span></div>
           <div class="quickjump">🔍 <span>Cari nopol, driver, atau PT…</span></div>
+          <div class="bell" id="desktopNotifBtn" onclick="toggleDesktopNotif()" title="Notifikasi desktop" style="font-size:15px;">🖥️</div>
           <div class="bell" onclick="toggleNotifPanel(event)">🔔<span class="badge" id="bellCount">0</span>
             <div class="notif-panel" id="notifPanel" onclick="event.stopPropagation()">
               <div class="notif-head">Notifikasi Reminder <span id="notifCountLabel">0 unit</span></div>
@@ -633,6 +635,11 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <h3>Pengaturan Notifikasi Reminder</h3>
               <div class="form-grid"><div class="full"><label>Tandai "mendekati jatuh tempo" (hari sebelum tanggal service berikutnya)</label><input id="acc_reminderdays" type="number" min="1" max="90"></div></div>
               <div class="modal-actions" style="justify-content:flex-start;margin-top:16px;"><button class="btn btn-primary small" onclick="saveReminderSetting()">Simpan Pengaturan</button></div>
+              <div class="hr"></div>
+              <h3>Notifikasi Desktop</h3>
+              <p class="small-note" style="margin:0 0 10px;">Munculkan notifikasi di komputer (pojok layar Windows/Mac) begitu ada kendaraan yang masuk waktunya service, meski Anda sedang buka aplikasi/tab lain. Aplikasi harus tetap terbuka (boleh di-minimize) agar bisa mendeteksi.</p>
+              <div id="desktopNotifStatus" class="small-note" style="margin-bottom:10px;"></div>
+              <div class="modal-actions" style="justify-content:flex-start;"><button class="btn-outline" id="desktopNotifBtn" onclick="toggleDesktopNotif()">🔔 Aktifkan Notifikasi Desktop</button></div>
             </div>
             <div class="panel">
               <h3>Manajemen Akun</h3>
@@ -1383,6 +1390,7 @@ function renderNotifPanel(){
   const urgent = DB.vehicles.filter(v=>{ const s=statusOf(v); return s==='bad'||s==='warn'; })
     .sort((a,b)=> (a.nextdate||'').localeCompare(b.nextdate||''));
   document.getElementById('notifCountLabel').textContent = `${urgent.length} unit`;
+  maybeFireDesktopNotif(urgent);
   const list = document.getElementById('notifList');
   if(urgent.length===0){ list.innerHTML = '<div class="notif-empty">Tidak ada kendaraan yang overdue atau mendekati jatuh tempo. 👍</div>'; return; }
   list.innerHTML = urgent.map(v=>{
@@ -2685,6 +2693,53 @@ const debSpkl = deb(()=>renderSpkl());
 const debMaster = deb(()=>renderMasterData());
 const debHistory = deb(()=>renderHistory());
 
+/* ================= NOTIFIKASI DESKTOP ================= */
+function desktopNotifSupported(){ return 'Notification' in window; }
+function desktopNotifEnabled(){ return desktopNotifSupported() && Notification.permission==='granted' && localStorage.getItem('fleetops_desktop_notif')==='on'; }
+function updateDesktopNotifBtnUI(){
+  const btn = document.getElementById('desktopNotifBtn'); if(!btn) return;
+  if(!desktopNotifSupported()){ btn.style.display='none'; return; }
+  btn.classList.toggle('active', desktopNotifEnabled());
+  btn.title = desktopNotifEnabled() ? 'Notifikasi desktop: AKTIF (klik untuk matikan)' : 'Klik untuk aktifkan notifikasi desktop';
+}
+async function toggleDesktopNotif(){
+  if(!desktopNotifSupported()){ showToast('Browser ini tidak mendukung notifikasi desktop.', true); return; }
+  if(desktopNotifEnabled()){
+    localStorage.setItem('fleetops_desktop_notif','off');
+    updateDesktopNotifBtnUI();
+    showToast('Notifikasi desktop dimatikan.');
+    return;
+  }
+  const perm = Notification.permission==='granted' ? 'granted' : await Notification.requestPermission();
+  if(perm!=='granted'){ showToast('Izin notifikasi ditolak. Aktifkan lewat pengaturan browser kalau berubah pikiran.', true); updateDesktopNotifBtnUI(); return; }
+  localStorage.setItem('fleetops_desktop_notif','on');
+  updateDesktopNotifBtnUI();
+  new Notification('FleetOps', { body:'Notifikasi desktop aktif. Anda akan diingatkan kalau ada kendaraan yang jatuh tempo service.', icon:'icon-192.png' });
+  showToast('Notifikasi desktop diaktifkan.');
+}
+// Kirim notifikasi desktop kalau ada unit overdue/mendekati BARU dibanding pengecekan terakhir,
+// dan paling sering sekali per jam supaya tidak spam.
+function maybeFireDesktopNotif(urgent){
+  if(!desktopNotifEnabled()) return;
+  const now = Date.now();
+  const last = Number(localStorage.getItem('fleetops_notif_last_ts')||0);
+  const lastIds = (localStorage.getItem('fleetops_notif_last_ids')||'').split(',').filter(Boolean);
+  const curIds = urgent.map(v=>v.id);
+  const isNew = curIds.some(id=>!lastIds.includes(id));
+  if(urgent.length>0 && (isNew || now-last>60*60*1000)){
+    const overdueCount = urgent.filter(v=>statusOf(v)==='bad').length;
+    const soonCount = urgent.length-overdueCount;
+    const n = new Notification('FleetOps — Pengingat Service', {
+      body:`${urgent.length} unit perlu perhatian (${overdueCount} overdue, ${soonCount} mendekati jatuh tempo).`,
+      icon:'icon-192.png', tag:'fleetops-reminder'
+    });
+    n.onclick = ()=>{ window.focus(); goPage('reminder'); setQuickTab('bad'); n.close(); };
+    localStorage.setItem('fleetops_notif_last_ts', String(now));
+    localStorage.setItem('fleetops_notif_last_ids', curIds.join(','));
+  }
+}
+setInterval(()=>{ if(DB.vehicles && DB.vehicles.length) renderNotifPanel(); }, 15*60*1000); // cek ulang tiap 15 menit selagi app terbuka
+
 /* ================= INIT ================= */
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 function hideSplash(){
@@ -2699,6 +2754,7 @@ function hideSplash(){
   updateDbStatusUI();
   document.getElementById('loginUser').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
   document.getElementById('loginPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  updateDesktopNotifBtnUI();
   setTimeout(hideSplash, 900);
 })();
 </script>
