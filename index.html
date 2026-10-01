@@ -639,7 +639,19 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <h3>Notifikasi Desktop</h3>
               <p class="small-note" style="margin:0 0 10px;">Munculkan notifikasi di komputer (pojok layar Windows/Mac) begitu ada kendaraan yang masuk waktunya service, meski Anda sedang buka aplikasi/tab lain. Aplikasi harus tetap terbuka (boleh di-minimize) agar bisa mendeteksi.</p>
               <div id="desktopNotifStatus" class="small-note" style="margin-bottom:10px;"></div>
-              <div class="modal-actions" style="justify-content:flex-start;"><button class="btn-outline" id="desktopNotifBtn" onclick="toggleDesktopNotif()">🔔 Aktifkan Notifikasi Desktop</button></div>
+              <div class="modal-actions" style="justify-content:flex-start;"><button class="btn-outline" id="desktopNotifBtnSettings" onclick="toggleDesktopNotif()">🔔 Aktifkan Notifikasi Desktop</button></div>
+              <div class="hr"></div>
+              <h3>Template Pesan WA Reminder</h3>
+              <p class="small-note" style="margin:0 0 10px;">Ubah kalimat pengingat yang dikirim lewat tombol WA Reminder. Pakai kode di bawah ini, nanti otomatis diganti sistem sesuai data kendaraan. Khusus untuk pesan yang digabung banyak unit sekaligus (lebih dari 1 kendaraan dari PT yang sama), hanya baris pembuka & penutup yang ikut dipakai — daftar unitnya tetap format baku dari sistem.</p>
+              <div class="form-grid">
+                <div class="full"><label>Baris Pembuka (setelah salam)</label><textarea id="wa_opening" rows="2" placeholder="Mengingatkan untuk jadwal service berkala kendaraan {kendaraan} Anda:"></textarea></div>
+                <div class="full"><label>Baris Penutup</label><textarea id="wa_closing" rows="3" placeholder="Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.&#10;&#10;Terima kasih!"></textarea></div>
+              </div>
+              <p class="small-note" style="margin:10px 0;">Kode yang bisa dipakai: <code>{nama}</code> nama user/driver, <code>{pt}</code> nama PT, <code>{nopol}</code> nomor polisi, <code>{kendaraan}</code> Brand/Model/Type, <code>{tgl_terakhir}</code> & <code>{km_terakhir}</code> service terakhir, <code>{tgl_berikutnya}</code> & <code>{km_berikutnya}</code> estimasi berikutnya. Kode <code>{kendaraan}</code>/<code>{nopol}</code>/<code>{tgl_terakhir}</code>/dst hanya berlaku di pesan 1 unit, pada pesan gabungan baris pembuka cukup pakai <code>{nama}</code> & <code>{pt}</code> saja.</p>
+              <div class="modal-actions" style="justify-content:flex-start;">
+                <button class="btn btn-primary small" onclick="saveWaTemplate()">Simpan Template</button>
+                <button class="btn-outline" onclick="resetWaTemplate()">Pakai Default</button>
+              </div>
             </div>
             <div class="panel">
               <h3>Manajemen Akun</h3>
@@ -952,6 +964,8 @@ async function loadAll(){
     DB.history = (hRows||[]).map(fromDbHistory);
     DB.accounts = (aRows||[]).map(fromDbAccount);
     DB.settings.reminderDays = (sRows && sRows[0]) ? sRows[0].reminder_days : 14;
+    DB.settings.waOpening = (sRows && sRows[0]) ? (sRows[0].wa_opening||'') : '';
+    DB.settings.waClosing = (sRows && sRows[0]) ? (sRows[0].wa_closing||'') : '';
     DB.loginlog = (lRows||[]).map(r=>({user:r.username, time:new Date(r.logged_at).toLocaleString('id-ID')}));
     dbOnline = true;
     try{
@@ -1038,29 +1052,42 @@ function waVehicleBlock(v){
 Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
 Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM`;
 }
+const WA_DEFAULT_OPENING = 'Mengingatkan untuk jadwal service berkala kendaraan {kendaraan} Anda:';
+const WA_DEFAULT_CLOSING = 'Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.\n\nTerima kasih!';
+function waFillTokens(tpl, v){
+  return String(tpl||'')
+    .replace(/\{nama\}/g, v?.user||'-')
+    .replace(/\{pt\}/g, waPtName(v?.pt))
+    .replace(/\{nopol\}/g, v?.nopol||'-')
+    .replace(/\{kendaraan\}/g, vLabel(v))
+    .replace(/\{tgl_terakhir\}/g, fmtDate(v?.lastdate))
+    .replace(/\{km_terakhir\}/g, (v?.lastkm||0).toLocaleString('id-ID'))
+    .replace(/\{tgl_berikutnya\}/g, fmtDate(v?.nextdate))
+    .replace(/\{km_berikutnya\}/g, (v?.nextkm||0).toLocaleString('id-ID'));
+}
 function waMessageFor(list){
   const v = list[0];
+  const opening = waFillTokens(DB.settings.waOpening || WA_DEFAULT_OPENING, v);
+  const closing = waFillTokens(DB.settings.waClosing || WA_DEFAULT_CLOSING, v);
   if(list.length>1){
     const blocks = list.map((x,i)=>`${i+1}) ${waVehicleBlock(x)}`).join('\n\n');
+    // baris pembuka untuk pesan gabungan: pakai kalimat custom tapi ganti sebutan ke jamak
+    const openingMulti = opening.replace(/kendaraan\s*\{kendaraan\}\s*anda/i, `${list.length} kendaraan Anda`).replace(/\{kendaraan\}/gi, `${list.length} unit`);
     return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
-Mengingatkan untuk jadwal service berkala ${list.length} kendaraan Anda:
+${openingMulti}
 
 ${blocks}
 
-Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
-
-Terima kasih!`;
+${closing}`;
   }
   return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
 Nopol ${v.nopol||'-'},
-Mengingatkan untuk jadwal service berkala kendaraan ${vLabel(v)} Anda:
+${opening}
 
 Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
 Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM
 
-Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
-
-Terima kasih!`;
+${closing}`;
 }
 function waMessage(v){ return waMessageFor(waGroup(v)); }
 function waLinkFor(list){ return `https://wa.me/${waPhoneKey(list[0])}?text=${encodeURIComponent(waMessageFor(list))}`; }
@@ -2595,6 +2622,9 @@ function normalizeDate(v){
 function renderAccountPage(){
   document.getElementById('acc_username').value = currentUser?.username||'';
   document.getElementById('acc_reminderdays').value = DB.settings.reminderDays||14;
+  document.getElementById('wa_opening').value = DB.settings.waOpening || WA_DEFAULT_OPENING;
+  document.getElementById('wa_closing').value = DB.settings.waClosing || WA_DEFAULT_CLOSING;
+  updateDesktopNotifBtnUI();
   const list = document.getElementById('acctList');
   list.innerHTML = DB.accounts.map((a,i)=>`<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${a.role||'Staff'}</div></div>
     <div style="display:flex;align-items:center;gap:8px;"><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
@@ -2631,6 +2661,20 @@ async function saveReminderSetting(){
   const days = Number(document.getElementById('acc_reminderdays').value)||14;
   try{ await sbUpdate('settings', 1, {reminder_days:days}); DB.settings.reminderDays = days; renderTable(); renderDashboard(); showToast('Pengaturan reminder disimpan.'); }
   catch(e){ console.error(e); showToast('Gagal menyimpan pengaturan.', true); }
+}
+async function saveWaTemplate(){
+  const opening = document.getElementById('wa_opening').value.trim();
+  const closing = document.getElementById('wa_closing').value.trim();
+  try{
+    await sbUpdate('settings', 1, {wa_opening:opening, wa_closing:closing});
+    DB.settings.waOpening = opening; DB.settings.waClosing = closing;
+    showToast('Template pesan WA Reminder disimpan.');
+  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan kolom wa_opening/wa_closing sudah ditambahkan di tabel settings.', true); }
+}
+function resetWaTemplate(){
+  document.getElementById('wa_opening').value = WA_DEFAULT_OPENING;
+  document.getElementById('wa_closing').value = WA_DEFAULT_CLOSING;
+  showToast('Dikembalikan ke teks default — klik Simpan Template untuk menerapkan.');
 }
 async function addAccount(){
   const u = document.getElementById('new_acc_user').value.trim();
@@ -2697,10 +2741,18 @@ const debHistory = deb(()=>renderHistory());
 function desktopNotifSupported(){ return 'Notification' in window; }
 function desktopNotifEnabled(){ return desktopNotifSupported() && Notification.permission==='granted' && localStorage.getItem('fleetops_desktop_notif')==='on'; }
 function updateDesktopNotifBtnUI(){
-  const btn = document.getElementById('desktopNotifBtn'); if(!btn) return;
-  if(!desktopNotifSupported()){ btn.style.display='none'; return; }
-  btn.classList.toggle('active', desktopNotifEnabled());
-  btn.title = desktopNotifEnabled() ? 'Notifikasi desktop: AKTIF (klik untuk matikan)' : 'Klik untuk aktifkan notifikasi desktop';
+  const topBtn = document.getElementById('desktopNotifBtn');
+  const setBtn = document.getElementById('desktopNotifBtnSettings');
+  const status = document.getElementById('desktopNotifStatus');
+  if(!desktopNotifSupported()){
+    if(topBtn) topBtn.style.display='none';
+    if(setBtn){ setBtn.disabled=true; setBtn.textContent='Browser tidak mendukung'; }
+    return;
+  }
+  const on = desktopNotifEnabled();
+  if(topBtn){ topBtn.classList.toggle('active', on); topBtn.title = on ? 'Notifikasi desktop: AKTIF (klik untuk matikan)' : 'Klik untuk aktifkan notifikasi desktop'; }
+  if(setBtn) setBtn.textContent = on ? '🔕 Matikan Notifikasi Desktop' : '🔔 Aktifkan Notifikasi Desktop';
+  if(status) status.textContent = on ? 'Status: AKTIF — Anda akan diberi tahu lewat notifikasi komputer.' : 'Status: belum aktif.';
 }
 async function toggleDesktopNotif(){
   if(!desktopNotifSupported()){ showToast('Browser ini tidak mendukung notifikasi desktop.', true); return; }
