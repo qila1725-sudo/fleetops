@@ -257,6 +257,10 @@
   table{border-collapse:collapse;width:100%;min-width:1280px;font-size:12.8px;}
   th,td{padding:13px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
   thead th{background:#fafbfd;font-weight:800;color:var(--ink-faint);font-size:10.8px;letter-spacing:.04em;position:sticky;top:0;white-space:nowrap;}
+  thead th.sortable{cursor:pointer;user-select:none;}
+  thead th.sortable:hover{color:var(--ink);}
+  .sort-ic{display:inline-block;margin-left:3px;opacity:.55;}
+  .sort-ic.active{opacity:1;color:var(--brand);}
   tbody tr:hover{background:#fafcff;}
   .cell-primary{font-weight:800;color:var(--ink);}
   .cell-sub{font-size:11.3px;color:var(--ink-faint);margin-top:2px;}
@@ -485,9 +489,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <table>
               <thead><tr>
                 <th><input type="checkbox" id="chkAll" onclick="toggleAll(this)"></th>
-                <th>NAMA PT</th><th>DRIVER / PIC &amp; TELP</th><th>NOMOR POLISI (NOPOL)</th>
-                <th>SPESIFIKASI KENDARAAN</th><th>AREA OPERASIONAL</th><th>SERVICE TERAKHIR &amp; KM</th><th>KM AKTUAL SAAT INI</th>
-                <th>INTERVAL</th><th>STATUS</th><th>AKSI CEPAT</th>
+                <th class="sortable" onclick="setVSort('pt')">NAMA PT<span class="sort-ic" id="sic_pt"></span></th><th>DRIVER / PIC &amp; TELP</th><th class="sortable" onclick="setVSort('nopol')">NOMOR POLISI (NOPOL)<span class="sort-ic" id="sic_nopol"></span></th>
+                <th>SPESIFIKASI KENDARAAN</th><th>AREA OPERASIONAL</th><th class="sortable" onclick="setVSort('lastdate')">SERVICE TERAKHIR &amp; KM<span class="sort-ic" id="sic_lastdate"></span></th><th class="sortable" onclick="setVSort('currentkm')">KM AKTUAL SAAT INI<span class="sort-ic" id="sic_currentkm"></span></th>
+                <th class="sortable" onclick="setVSort('interval')">INTERVAL<span class="sort-ic" id="sic_interval"></span></th><th class="sortable" onclick="setVSort('nextdate')">STATUS<span class="sort-ic" id="sic_nextdate"></span></th><th>AKSI CEPAT</th>
               </tr></thead>
               <tbody id="vehicleBody"></tbody>
             </table>
@@ -1459,10 +1463,18 @@ function populateFilterOptions(){
 }
 function setQuickTab(t){ quickTab=t; document.querySelectorAll('.tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderTable(); }
 function resetFilters(){ document.getElementById('q_search').value=''; document.getElementById('q_pt').value=''; document.getElementById('q_area').value=''; setQuickTab('all'); }
+let vSortKey = null, vSortDir = 1; // 1=naik(A-Z/lama ke baru), -1=turun
+function setVSort(key){
+  if(vSortKey===key) vSortDir = -vSortDir; else { vSortKey=key; vSortDir=1; }
+  document.querySelectorAll('.sort-ic').forEach(el=>{ el.classList.remove('active'); el.textContent=''; });
+  const ic = document.getElementById('sic_'+key);
+  if(ic){ ic.classList.add('active'); ic.textContent = vSortDir===1 ? '▲' : '▼'; }
+  renderTable();
+}
 function filteredVehicles(){
   const q=document.getElementById('q_search').value.trim().toLowerCase();
   const pt=document.getElementById('q_pt').value, area=document.getElementById('q_area').value;
-  return DB.vehicles.filter(v=>{
+  let list = DB.vehicles.filter(v=>{
     if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''} ${vLabel(v)}`.toLowerCase().includes(q))) return false;
     if(pt && v.pt!==pt) return false;
     if(area && v.area!==area) return false;
@@ -1470,6 +1482,16 @@ function filteredVehicles(){
     else if(quickTab!=='all' && statusOf(v)!==quickTab) return false;
     return true;
   });
+  if(vSortKey){
+    list = [...list].sort((a,b)=>{
+      let av=a[vSortKey], bv=b[vSortKey];
+      if(vSortKey==='pt' || vSortKey==='nopol') { av=(av||'').toLowerCase(); bv=(bv||'').toLowerCase(); return vSortDir*av.localeCompare(bv); }
+      av = Number(av)||0; bv = Number(bv)||0;
+      if(vSortKey==='lastdate' || vSortKey==='nextdate'){ av=a[vSortKey]||''; bv=b[vSortKey]||''; return vSortDir*String(av).localeCompare(String(bv)); }
+      return vSortDir*(av-bv);
+    });
+  }
+  return list;
 }
 function renderTable(){
   invalidateWaIdx();
@@ -1492,7 +1514,7 @@ function renderTable(){
       <td><div class="cell-primary">${fmtDate(v.lastdate)}</div><div class="cell-sub">${(v.lastkm||0).toLocaleString('id-ID')} KM</div></td>
       <td><div class="cell-primary">${(v.currentkm||0).toLocaleString('id-ID')} KM</div><div class="cell-sub">${kmLeftTxt}</div></td>
       <td>${v.interval||'-'} Hari</td>
-      <td><span class="status-badge ${s}">${statusLabel(s)}</span></td>
+      <td><span class="status-badge ${s}">${statusLabel(s)}</span>${inWorkshopNow(v) ? '<br><span class="status-badge" style="background:#fff4e0;color:#b26a00;margin-top:4px;">🔧 Di Bengkel</span>' : ''}</td>
       <td><div class="aksi-cell">
         <a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WA Reminder')}</a>
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
