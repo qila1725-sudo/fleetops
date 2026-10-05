@@ -777,7 +777,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <input type="hidden" id="bg_id">
     <div class="form-grid">
-      <div><label>Nomor Polisi</label><input id="bg_vehicle" list="bgVehicleList" placeholder="Ketik nomor polisi..." style="text-transform:uppercase" oninput="bgAutofillFromVehicle()"></div>
+      <div><label>Nomor Polisi</label><input id="bg_vehicle" list="bgVehicleList" placeholder="Ketik nomor polisi..." style="text-transform:uppercase" oninput="bgAutofillFromVehicle()" onchange="bgAutofillFromVehicle()"></div>
       <div><label>Nama PT</label><input id="bg_pt" list="bgPtList" placeholder="Ketik nama PT..."></div>
       <datalist id="bgVehicleList"></datalist>
       <datalist id="bgPtList"></datalist>
@@ -1955,7 +1955,7 @@ function filteredBengkel(){
   const bFilter = document.getElementById('bg_bengkel')?.value||'';
   const sFilter = document.getElementById('bg_status')?.value||'';
   return DB.bengkel.filter(b=>{
-    if(q && !(`${b.nopol||''} ${b.pt||''} ${b.pic||''}`.toLowerCase().includes(q))) return false;
+    if(q && !(`${b.nopol||''} ${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(q))) return false;
     if(bFilter && b.bengkel!==bFilter) return false;
     if(sFilter && bengkelStatus(b)!==sFilter) return false;
     if(bengkelTab==='or'){ if(!orUnpaid(b)) return false; }
@@ -1978,10 +1978,11 @@ function renderBengkel(){
   if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="14">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
   body.innerHTML = list.map(b=>{
     const status = bengkelStatus(b);
+    const picName = bgPic(b).name;
     const lama = status==='in' ? `${daysBetween(b.tglMasuk, today())} hari (berjalan)` : `${daysBetween(b.tglMasuk, b.tglKeluar)} hari`;
     return `<tr>
       <td><span class="nopol-badge" style="cursor:default;">${b.nopol||'-'}</span></td>
-      <td>${b.pt||'-'}${b.pic ? `<div class="small-note">PIC: ${escH(b.pic)}</div>` : ''}</td>
+      <td>${b.pt||'-'}${picName ? `<div class="small-note">PIC: ${escH(picName)}</div>` : ''}</td>
       <td>${b.bengkel||'-'}</td>
       <td>${fmtDate(b.tglMasuk)}</td>
       <td>${b.tglKeluar? fmtDate(b.tglKeluar) : '-'}</td>
@@ -2014,7 +2015,7 @@ function orVehicleOf(b){
       || DB.vehicles.find(v=>(v.nopol||'').toUpperCase().replace(/\s+/g,'')===(b.nopol||'').toUpperCase().replace(/\s+/g,''));
 }
 function orMessage(b, v){
-  const nm = (b.pic || (v && v.user) || '').trim();
+  const nm = bgPic(b).name;
   const nama = nm ? ` ${nm}` : '';
   let msg = `Selamat ${waGreeting()} Bapak/Ibu${nama}, mohon dibantu informasi pembayaran nya terkait OR (Own Risk) dengan Nopol ${b.nopol||'-'}.`;
   const files = (b.kwFiles||[]).filter(f=>f && f.u);
@@ -2026,7 +2027,7 @@ function orMessage(b, v){
 function openWaOR(id){
   const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
   const v = orVehicleOf(b);
-  const ph = (b.picPhone ? waPhoneKey({phone:b.picPhone}) : '') || (v ? waPhoneKey(v) : '');
+  const ph = waPhoneKey({phone: bgPic(b).phone});
   if(!ph) showToast('Nomor WA PIC tidak ditemukan — isi di Edit Data Bengkel, atau pilih kontak manual di WhatsApp.');
   window.open(`https://wa.me/${ph}?text=${encodeURIComponent(orMessage(b, v))}`, '_blank');
 }
@@ -2041,6 +2042,7 @@ function openBengkelInModal(){
   const customNames = [...new Set(DB.bengkel.map(b=>b.bengkel).filter(Boolean))]
     .filter(n=>!['Padimas','IRM','Lido','Kita','Layanan'].includes(n));
   bdl.innerHTML = ['Padimas','IRM','Lido','Kita','Layanan', ...customNames].map(n=>`<option value="${n}">`).join('');
+  bgAuto = { pt:'', pic:'', phone:'' };
   document.getElementById('bg_id').value = '';
   document.getElementById('bgInModalTitle').textContent = 'Tambahkan Kendaraan ke Bengkel';
   document.getElementById('bgInSaveBtn').textContent = 'Simpan';
@@ -2058,13 +2060,28 @@ function openBengkelInModal(){
   bgInitFoto([]);
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
+let bgAuto = { pt:'', pic:'', phone:'' };
+function normNopol(n){ return String(n||'').toUpperCase().replace(/[\s\-\.]+/g,''); }
+// Isi otomatis Nama PT, PIC, dan No. WA dari data Reminder / Data Kendaraan (cocokkan lewat nopol).
+// Kolom hanya diisi kalau masih kosong, atau masih berisi hasil isi-otomatis sebelumnya (jadi ikut berganti saat nopol diganti).
 function bgAutofillFromVehicle(){
-  const nopol = document.getElementById('bg_vehicle').value.trim().toUpperCase();
-  const v = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
+  const k = normNopol(document.getElementById('bg_vehicle').value);
+  if(!k) return;
+  const v = DB.vehicles.find(x=>normNopol(x.nopol)===k);
   if(!v) return;
-  if(!document.getElementById('bg_pt').value) document.getElementById('bg_pt').value = v.pt||'';
-  if(!document.getElementById('bg_pic').value) document.getElementById('bg_pic').value = v.user||'';
-  if(!document.getElementById('bg_pic_phone').value) document.getElementById('bg_pic_phone').value = v.phone||'';
+  const put = (id, key, val)=>{
+    if(!val) return;
+    const el = document.getElementById(id);
+    if(!el.value.trim() || el.value===bgAuto[key]){ el.value = val; bgAuto[key] = val; }
+  };
+  put('bg_pt','pt', v.pt||'');
+  put('bg_pic','pic', v.user||'');
+  put('bg_pic_phone','phone', v.phone||'');
+}
+// PIC & nomor WA yang dipakai di tabel / reminder: isian bengkel dulu, kalau kosong ambil dari data kendaraan.
+function bgPic(b){
+  const v = orVehicleOf(b);
+  return { name: ((b.pic||'').trim() || (v&&v.user) || '').trim(), phone: ((b.picPhone||'').trim() || (v&&v.phone) || '').trim() };
 }
 function openBengkelEditModal(id){
   const b = DB.bengkel.find(x=>x.id===id);
@@ -2091,6 +2108,8 @@ function openBengkelEditModal(id){
   document.getElementById('bg_in_bayar').value = b.statusBayar||'Belum Bayar';
   document.getElementById('bg_in_note').value = b.note||'';
   bgInitFoto(b.foto||[]);
+  bgAuto = { pt:'', pic:'', phone:'' };
+  bgAutofillFromVehicle();
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
 function closeBengkelInModal(){ document.getElementById('bengkelInModalBg').classList.remove('show'); bgResetFoto(); }
@@ -2173,7 +2192,7 @@ function exportBengkel(){
   const rows = filteredBengkel().map(b=>({
     'Nopol':b.nopol,'Nama PT':b.pt,'Bengkel':b.bengkel,'Tanggal Masuk':b.tglMasuk,'Tanggal Keluar':b.tglKeluar||'',
     'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Harga OR':b.hargaOR||0,'Kwitansi':b.kwitansi||'Belum',
-    'Status Pembayaran':b.statusBayar||'Belum Bayar','PIC':b.pic||'','No. WA PIC':b.picPhone||'','Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
+    'Status Pembayaran':b.statusBayar||'Belum Bayar','PIC':bgPic(b).name,'No. WA PIC':bgPic(b).phone,'Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Keluar Masuk Bengkel'); XLSX.writeFile(wb, 'keluar-masuk-bengkel.xlsx');
