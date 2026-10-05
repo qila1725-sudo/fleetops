@@ -330,6 +330,13 @@
   .foto-prev{position:relative;width:76px;height:76px;}
   .foto-prev img{width:100%;height:100%;object-fit:cover;border-radius:9px;border:1px solid var(--line);}
   .foto-prev button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:11px;font-weight:800;cursor:pointer;line-height:20px;padding:0;}
+  .foto-file-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:800;color:var(--brand);cursor:pointer;white-space:nowrap;}
+  .foto-file-btn:hover{border-color:var(--brand);background:#f3f7ff;}
+  .gal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px;margin:4px 0 18px;}
+  .gal-item{position:relative;aspect-ratio:1/1;}
+  .gal-item img{width:100%;height:100%;object-fit:cover;border-radius:10px;border:1px solid var(--line);cursor:zoom-in;background:#eef1f6;}
+  .gal-item button{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(220,38,38,.92);color:#fff;font-size:12px;font-weight:800;cursor:pointer;padding:0;line-height:24px;}
+  .gal-empty{grid-column:1/-1;text-align:center;color:var(--ink-soft);padding:30px 0;font-size:13px;}
   .lightbox{position:fixed;inset:0;background:rgba(10,15,22,.9);display:none;align-items:center;justify-content:center;z-index:90;}
   .lightbox.show{display:flex;}
   .lightbox img{max-width:88vw;max-height:84vh;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
@@ -789,7 +796,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
       <div class="full">
-        <label>Foto Kerusakan (maks. 6 foto)</label>
+        <label>Foto Kerusakan (maks. 50 foto)</label>
         <div class="foto-prev-grid" id="bgFotoGrid"></div>
         <input id="bg_foto_input" type="file" accept="image/*" multiple style="display:none" onchange="bgFotoPicked(this)">
         <button type="button" class="btn-outline" onclick="document.getElementById('bg_foto_input').click()">📷 Tambah Foto</button>
@@ -854,6 +861,21 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeKwitansiModal()">Batal</button>
       <button class="btn btn-primary small" onclick="saveKwitansi()" id="kwSaveBtn">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Galeri foto kerusakan -->
+<div class="modal-bg" id="fotoGalleryModalBg">
+  <div class="modal wide">
+    <div class="modal-head">
+      <div><h3 id="galTitle">Foto Kerusakan</h3><p class="sub"><span id="galSub">-</span> • <b id="galCount">0 foto</b></p></div>
+      <button class="x-btn" onclick="closeFotoGallery()">✕</button>
+    </div>
+    <div class="gal-grid" id="galGrid"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeFotoGallery()">Tutup</button>
+      <button class="btn btn-primary small" id="galAddBtn" onclick="galAddFoto()">📷 Tambah Foto</button>
     </div>
   </div>
 </div>
@@ -2072,7 +2094,7 @@ function exportBengkel(){
 
 /* ================= FOTO KERUSAKAN (Supabase Storage) ================= */
 const FOTO_BUCKET = 'foto-kerusakan';
-const BG_MAX_FOTO = 6;
+const BG_MAX_FOTO = 50;
 function parseFoto(v){
   if(Array.isArray(v)) return v.filter(Boolean);
   if(!v) return [];
@@ -2164,30 +2186,69 @@ async function bgApplyPhotos(rowId){
   deleteFotoFiles(st.removed);
 }
 
-/* --- kolom foto di tabel + tambah foto cepat --- */
+/* --- kolom foto di tabel: cukup 1 tombol file, isi foto dibuka di galeri --- */
 function fotoCellHtml(b){
-  const f = b.foto||[];
-  const thumbs = f.slice(0,3).map((u,i)=>`<img class="foto-thumb" src="${escH(u)}" loading="lazy" alt="Foto kerusakan" onclick="openLightbox('${b.id}',${i})">`).join('');
-  const more = f.length>3 ? `<span class="foto-more" onclick="openLightbox('${b.id}',3)">+${f.length-3}</span>` : '';
-  return `<div class="foto-cell">${thumbs}${more}<button class="foto-add" onclick="quickAddFoto('${b.id}')" title="Tambah foto kerusakan">📷 ${f.length?'+':'Tambah'}</button></div>`;
+  const n = (b.foto||[]).length;
+  return n
+    ? `<button class="foto-file-btn" onclick="openFotoGallery('${b.id}')" title="Buka foto kerusakan">📁 ${n} Foto</button>`
+    : `<button class="foto-add" onclick="openFotoGallery('${b.id}')" title="Tambah foto kerusakan">📷 Tambah</button>`;
 }
-function quickAddFoto(id){
+let galId = null;
+function openFotoGallery(id){
   const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  galId = id;
+  document.getElementById('galTitle').textContent = `Foto Kerusakan — ${b.nopol||'-'}`;
+  document.getElementById('galSub').textContent = `${b.pt||'-'} • ${b.bengkel||'-'}`;
+  renderFotoGallery();
+  document.getElementById('fotoGalleryModalBg').classList.add('show');
+}
+function closeFotoGallery(){ document.getElementById('fotoGalleryModalBg').classList.remove('show'); galId = null; renderBengkel(); }
+function renderFotoGallery(){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  const f = b.foto||[];
+  document.getElementById('galCount').textContent = `${f.length} foto`;
+  document.getElementById('galGrid').innerHTML = f.length
+    ? f.map((u,i)=>`<div class="gal-item"><img src="${escH(u)}" loading="lazy" alt="Foto ${i+1}" onclick="openLightbox('${b.id}',${i})"><button type="button" onclick="galRemoveFoto(${i})" title="Hapus foto">✕</button></div>`).join('')
+    : `<div class="gal-empty">Belum ada foto kerusakan. Klik "Tambah Foto" untuk mengunggah.</div>`;
+}
+function galAddFoto(){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
   const inp = document.createElement('input');
   inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
   inp.onchange = async ()=>{
     const files = [...inp.files].filter(f=>f.type.startsWith('image/'));
     if(!files.length) return;
     const cur = (b.foto||[]).slice();
-    if(cur.length + files.length > BG_MAX_FOTO){ showToast(`Maksimal ${BG_MAX_FOTO} foto per kendaraan.`, true); return; }
-    showToast('Mengunggah foto...');
+    if(cur.length + files.length > BG_MAX_FOTO){ showToast(`Maksimal ${BG_MAX_FOTO} foto per kendaraan (sekarang ${cur.length}).`, true); return; }
+    const btn = document.getElementById('galAddBtn'); btn.disabled = true;
     try{
-      for(const f of files){ cur.push(await uploadFoto(await compressImage(f), id)); }
-      await sbUpdate('bengkel_log', id, { foto: JSON.stringify(cur) });
-      b.foto = cur; renderBengkel(); showToast('Foto berhasil ditambahkan.');
-    }catch(e){ console.error(e); showToast('Gagal mengunggah foto. Pastikan SQL foto kerusakan sudah dijalankan di Supabase.', true); }
+      let done = 0;
+      for(let i=0;i<files.length;i+=3){
+        const batch = files.slice(i,i+3);
+        const urls = await Promise.all(batch.map(async f=> uploadFoto(await compressImage(f), galId)));
+        cur.push(...urls); done += batch.length;
+        showToast(`Mengunggah foto ${done}/${files.length}...`);
+      }
+      await sbUpdate('bengkel_log', galId, { foto: JSON.stringify(cur) });
+      b.foto = cur; renderFotoGallery(); showToast(`${files.length} foto berhasil ditambahkan.`);
+    }catch(e){
+      console.error(e);
+      if(cur.length !== (b.foto||[]).length){ try{ await sbUpdate('bengkel_log', galId, { foto: JSON.stringify(cur) }); b.foto = cur; renderFotoGallery(); }catch(e2){} }
+      showToast('Gagal mengunggah foto. Pastikan SQL foto kerusakan sudah dijalankan di Supabase.', true);
+    }
+    btn.disabled = false;
   };
   inp.click();
+}
+async function galRemoveFoto(i){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  if(!confirm('Hapus foto ini?')) return;
+  const cur = (b.foto||[]).slice();
+  const [u] = cur.splice(i,1);
+  try{
+    await sbUpdate('bengkel_log', galId, { foto: JSON.stringify(cur) });
+    b.foto = cur; deleteFotoFiles([u]); renderFotoGallery(); showToast('Foto dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus foto.', true); }
 }
 
 /* --- lightbox --- */
