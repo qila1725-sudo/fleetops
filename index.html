@@ -557,7 +557,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <button class="btn-outline" onclick="exportBengkel()">⭳ Export Excel</button>
           </div>
           <div class="filter-row">
-            <div class="search-box">🔍 <input id="bg_search" oninput="debBengkel()" placeholder="Cari Nopol atau PT..."></div>
+            <div class="search-box">🔍 <input id="bg_search" oninput="debBengkel()" placeholder="Cari Nopol, PT, atau PIC..."></div>
             <select class="filter-select" id="bg_bengkel" onchange="renderBengkel()">
               <option value="">Semua Bengkel</option>
               <option>Padimas</option><option>IRM</option><option>Lido</option><option>Kita</option><option>Layanan</option>
@@ -781,6 +781,8 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Nama PT</label><input id="bg_pt" list="bgPtList" placeholder="Ketik nama PT..."></div>
       <datalist id="bgVehicleList"></datalist>
       <datalist id="bgPtList"></datalist>
+      <div><label>PIC (Nama)</label><input id="bg_pic" placeholder="Nama PIC / driver yang dihubungi"></div>
+      <div><label>No. WhatsApp PIC</label><input id="bg_pic_phone" inputmode="tel" placeholder="Contoh: 0812xxxxxxxx"></div>
       <div>
         <label>Nama Bengkel</label>
         <input id="bg_in_bengkel" list="bgBengkelList" placeholder="Ketik atau pilih nama bengkel...">
@@ -1080,10 +1082,12 @@ const toDbHistory = h => ({ vehicle_id:h.vehicleId, pt:h.pt, nopol:h.nopol, vehi
 const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active });
 const toDbAccount = a => ({ username:a.username, password:a.password, role:a.role, active:a.active });
 
-const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file) });
+const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file), pic:r.pic||'', picPhone:r.pic_phone||'', picCol:('pic' in r) });
 const fromDbKwitansi = r => ({ id:r.id, tanggal:r.tanggal||(r.created_at?String(r.created_at).slice(0,10):''), toko:r.toko||'', nopol:r.nopol||'', pt:r.pt||'', note:r.keterangan||'', bayar:r.pembayaran||'Paid Bu Ika' });
 const toDbKwitansi = k => ({ tanggal:k.tanggal||null, toko:k.toko||'', nopol:k.nopol||'', pt:k.pt||'', keterangan:k.note||'', pembayaran:k.bayar||'Paid Bu Ika' });
-const toDbBengkel = b => ({ vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' });
+const toDbBengkel = b => { const o = { vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' };
+  if(b.pic || b.picPhone || b.picCol){ o.pic = b.pic||''; o.pic_phone = b.picPhone||''; }
+  return o; };
 
 const fromDbMaster = r => ({ id:r.id, category:r.category, kode:r.kode||'', name:r.name, lokasi:r.lokasi||'', address:r.address, phone:r.phone });
 const toDbMaster = m => ({ category:m.category, kode:m.kode||'', name:m.name||'', lokasi:m.lokasi||'', address:m.address||'', phone:m.phone||'' });
@@ -1951,7 +1955,7 @@ function filteredBengkel(){
   const bFilter = document.getElementById('bg_bengkel')?.value||'';
   const sFilter = document.getElementById('bg_status')?.value||'';
   return DB.bengkel.filter(b=>{
-    if(q && !(`${b.nopol||''} ${b.pt||''}`.toLowerCase().includes(q))) return false;
+    if(q && !(`${b.nopol||''} ${b.pt||''} ${b.pic||''}`.toLowerCase().includes(q))) return false;
     if(bFilter && b.bengkel!==bFilter) return false;
     if(sFilter && bengkelStatus(b)!==sFilter) return false;
     if(bengkelTab==='or'){ if(!orUnpaid(b)) return false; }
@@ -1977,7 +1981,7 @@ function renderBengkel(){
     const lama = status==='in' ? `${daysBetween(b.tglMasuk, today())} hari (berjalan)` : `${daysBetween(b.tglMasuk, b.tglKeluar)} hari`;
     return `<tr>
       <td><span class="nopol-badge" style="cursor:default;">${b.nopol||'-'}</span></td>
-      <td>${b.pt||'-'}</td>
+      <td>${b.pt||'-'}${b.pic ? `<div class="small-note">PIC: ${escH(b.pic)}</div>` : ''}</td>
       <td>${b.bengkel||'-'}</td>
       <td>${fmtDate(b.tglMasuk)}</td>
       <td>${b.tglKeluar? fmtDate(b.tglKeluar) : '-'}</td>
@@ -2010,14 +2014,20 @@ function orVehicleOf(b){
       || DB.vehicles.find(v=>(v.nopol||'').toUpperCase().replace(/\s+/g,'')===(b.nopol||'').toUpperCase().replace(/\s+/g,''));
 }
 function orMessage(b, v){
-  const nama = v && v.user ? ` ${v.user}` : '';
-  return `Selamat ${waGreeting()} Bapak/Ibu${nama}, mohon dibantu informasi pembayaran nya terkait OR (Own Risk) dengan Nopol ${b.nopol||'-'}. Terimakasih`;
+  const nm = (b.pic || (v && v.user) || '').trim();
+  const nama = nm ? ` ${nm}` : '';
+  let msg = `Selamat ${waGreeting()} Bapak/Ibu${nama}, mohon dibantu informasi pembayaran nya terkait OR (Own Risk) dengan Nopol ${b.nopol||'-'}.`;
+  const files = (b.kwFiles||[]).filter(f=>f && f.u);
+  if(files.length){
+    msg += `\n\nBerikut kwitansi OR:\n` + files.map((f,i)=> files.length>1 ? `${i+1}) ${f.u}` : f.u).join('\n');
+  }
+  return msg + (files.length ? `\n\nTerimakasih` : ` Terimakasih`);
 }
 function openWaOR(id){
   const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
   const v = orVehicleOf(b);
-  const ph = v ? waPhoneKey(v) : '';
-  if(!ph) showToast('Nomor WA driver/PIC tidak ditemukan — pilih kontak secara manual di WhatsApp.');
+  const ph = (b.picPhone ? waPhoneKey({phone:b.picPhone}) : '') || (v ? waPhoneKey(v) : '');
+  if(!ph) showToast('Nomor WA PIC tidak ditemukan — isi di Edit Data Bengkel, atau pilih kontak manual di WhatsApp.');
   window.open(`https://wa.me/${ph}?text=${encodeURIComponent(orMessage(b, v))}`, '_blank');
 }
 function openBengkelInModal(){
@@ -2036,6 +2046,8 @@ function openBengkelInModal(){
   document.getElementById('bgInSaveBtn').textContent = 'Simpan';
   document.getElementById('bg_vehicle').value = '';
   document.getElementById('bg_pt').value = '';
+  document.getElementById('bg_pic').value = '';
+  document.getElementById('bg_pic_phone').value = '';
   document.getElementById('bg_in_bengkel').value = 'Padimas';
   document.getElementById('bg_in_date').value = today();
   document.getElementById('bg_in_outdate').value = '';
@@ -2051,6 +2063,8 @@ function bgAutofillFromVehicle(){
   const v = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
   if(!v) return;
   if(!document.getElementById('bg_pt').value) document.getElementById('bg_pt').value = v.pt||'';
+  if(!document.getElementById('bg_pic').value) document.getElementById('bg_pic').value = v.user||'';
+  if(!document.getElementById('bg_pic_phone').value) document.getElementById('bg_pic_phone').value = v.phone||'';
 }
 function openBengkelEditModal(id){
   const b = DB.bengkel.find(x=>x.id===id);
@@ -2067,6 +2081,8 @@ function openBengkelEditModal(id){
   document.getElementById('bgInSaveBtn').textContent = 'Simpan Perubahan';
   document.getElementById('bg_vehicle').value = b.nopol||'';
   document.getElementById('bg_pt').value = b.pt||'';
+  document.getElementById('bg_pic').value = b.pic||'';
+  document.getElementById('bg_pic_phone').value = b.picPhone||'';
   document.getElementById('bg_in_bengkel').value = b.bengkel||'';
   document.getElementById('bg_in_date').value = b.tglMasuk||'';
   document.getElementById('bg_in_outdate').value = b.tglKeluar||'';
@@ -2082,6 +2098,8 @@ async function saveBengkelIn(){
   const id = document.getElementById('bg_id').value;
   const nopol = document.getElementById('bg_vehicle').value.trim().toUpperCase();
   const pt = document.getElementById('bg_pt').value.trim();
+  const pic = document.getElementById('bg_pic').value.trim();
+  const picPhone = document.getElementById('bg_pic_phone').value.trim();
   if(!nopol){ showToast('Isi nomor polisi terlebih dahulu.'); return; }
   const bengkelName = document.getElementById('bg_in_bengkel').value.trim();
   if(!bengkelName){ showToast('Isi nama bengkel terlebih dahulu.'); return; }
@@ -2095,14 +2113,14 @@ async function saveBengkelIn(){
   try{
     if(id){
       const existing = DB.bengkel.find(x=>x.id===id);
-      const updated = { ...existing, nopol, pt, bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
+      const updated = { ...existing, nopol, pt, pic, picPhone, bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
       await sbUpdate('bengkel_log', id, toDbBengkel(updated));
       const idx = DB.bengkel.findIndex(x=>x.id===id);
       DB.bengkel[idx] = updated;
       showToast(`${nopol} berhasil diperbarui.`);
     } else {
       const matched = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
-      const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
+      const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', pic, picPhone, bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
       const rows = await sbInsert('bengkel_log', toDbBengkel(b));
       DB.bengkel.unshift(fromDbBengkel(rows[0]));
       rowId = rows[0].id;
@@ -2155,7 +2173,7 @@ function exportBengkel(){
   const rows = filteredBengkel().map(b=>({
     'Nopol':b.nopol,'Nama PT':b.pt,'Bengkel':b.bengkel,'Tanggal Masuk':b.tglMasuk,'Tanggal Keluar':b.tglKeluar||'',
     'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Harga OR':b.hargaOR||0,'Kwitansi':b.kwitansi||'Belum',
-    'Status Pembayaran':b.statusBayar||'Belum Bayar','Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
+    'Status Pembayaran':b.statusBayar||'Belum Bayar','PIC':b.pic||'','No. WA PIC':b.picPhone||'','Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Keluar Masuk Bengkel'); XLSX.writeFile(wb, 'keluar-masuk-bengkel.xlsx');
