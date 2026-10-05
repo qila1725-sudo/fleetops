@@ -597,7 +597,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div class="table-wrap">
             <table style="min-width:1000px">
               <thead><tr>
-                <th>TANGGAL</th><th>NAMA TOKO / BENGKEL</th><th>NOPOL</th><th>NAMA PT / STANDBY</th><th>KETERANGAN</th><th>PEMBAYARAN</th><th>AKSI</th>
+                <th>TANGGAL PENGAJUAN</th><th>NAMA TOKO / BENGKEL</th><th>NOPOL</th><th>NAMA PT / STANDBY</th><th>KETERANGAN</th><th>PEMBAYARAN</th><th>AKSI</th>
               </tr></thead>
               <tbody id="kwitansiBody"></tbody>
             </table>
@@ -836,7 +836,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <input type="hidden" id="kw_id">
     <div class="form-grid">
-      <div><label>Tanggal</label><input id="kw_tanggal" type="date"></div>
+      <div><label>Tanggal Pengajuan</label><input id="kw_tanggal" type="date"></div>
       <div>
         <label>Nama Toko / Bengkel</label>
         <input id="kw_toko" list="kwTokoList" placeholder="Ketik atau pilih nama toko / bengkel...">
@@ -2373,7 +2373,7 @@ async function deleteKwitansi(id){
   }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
 }
 function exportKwitansi(){
-  const rows = filteredKwitansi().map(k=>({ 'Tanggal':k.tanggal, 'Nama Toko / Bengkel':k.toko, 'Nopol':k.nopol, 'Nama PT / Standby':k.pt, 'Keterangan':k.note, 'Pembayaran':k.bayar }));
+  const rows = filteredKwitansi().map(k=>({ 'Tanggal Pengajuan':k.tanggal, 'Nama Toko / Bengkel':k.toko, 'Nopol':k.nopol, 'Nama PT / Standby':k.pt, 'Keterangan':k.note, 'Pembayaran':k.bayar }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
 }
