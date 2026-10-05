@@ -568,6 +568,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="tab-pill active" data-tab="all" onclick="setBengkelTab('all')">Semua <span class="cnt" id="bg_cnt_all">0</span></div>
             <div class="tab-pill" data-tab="in" onclick="setBengkelTab('in')"><span class="cdot" style="background:var(--warn);"></span> Masih di Bengkel <span class="cnt" id="bg_cnt_in">0</span></div>
             <div class="tab-pill" data-tab="out" onclick="setBengkelTab('out')"><span class="cdot" style="background:var(--ok);"></span> Sudah Keluar <span class="cnt" id="bg_cnt_out">0</span></div>
+            <div class="tab-pill" data-tab="or" onclick="setBengkelTab('or')"><span class="cdot" style="background:var(--bad);"></span> OR Belum Dibayar <span class="cnt" id="bg_cnt_or">0</span></div>
           </div>
           <div class="table-wrap">
             <table style="min-width:1400px">
@@ -1903,6 +1904,7 @@ function closeHistoryModal(){ document.getElementById('historyModalBg').classLis
 let bengkelTab = 'all';
 function setBengkelTab(t){ bengkelTab=t; document.querySelectorAll('#page-bengkel .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderBengkel(); }
 function bengkelStatus(b){ return b.tglKeluar ? 'out' : 'in'; }
+function orUnpaid(b){ return (b.statusBayar||'Belum Bayar')==='Belum Bayar'; }
 function filteredBengkel(){
   const q = (document.getElementById('bg_search')?.value||'').trim().toLowerCase();
   const bFilter = document.getElementById('bg_bengkel')?.value||'';
@@ -1911,7 +1913,8 @@ function filteredBengkel(){
     if(q && !(`${b.nopol||''} ${b.pt||''}`.toLowerCase().includes(q))) return false;
     if(bFilter && b.bengkel!==bFilter) return false;
     if(sFilter && bengkelStatus(b)!==sFilter) return false;
-    if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
+    if(bengkelTab==='or'){ if(!orUnpaid(b)) return false; }
+    else if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
     return true;
   });
 }
@@ -1920,6 +1923,7 @@ function renderBengkel(){
   document.getElementById('bg_cnt_all').textContent = all.length;
   document.getElementById('bg_cnt_in').textContent = all.filter(b=>bengkelStatus(b)==='in').length;
   document.getElementById('bg_cnt_out').textContent = all.filter(b=>bengkelStatus(b)==='out').length;
+  document.getElementById('bg_cnt_or').textContent = all.filter(orUnpaid).length;
   const navCount = document.getElementById('navBengkelCount');
   if(navCount) navCount.textContent = all.filter(b=>bengkelStatus(b)==='in').length;
 
@@ -1945,6 +1949,7 @@ function renderBengkel(){
       <td>${fotoCellHtml(b)}</td>
       <td>
         <div class="aksi-cell">
+          ${orUnpaid(b) ? `<a class="wa-btn" href="javascript:void(0)" onclick="openWaOR('${b.id}')" title="Kirim reminder pembayaran OR via WhatsApp">💬 Reminder OR</a>` : ''}
           ${status==='in' ? `<button class="update-btn" onclick="openBengkelOutModal('${b.id}')">✅ Catat Keluar</button>` : ''}
           <button class="edit-icon-btn" onclick="openBengkelEditModal('${b.id}')" title="Edit">✎</button>
           <button class="edit-icon-btn" onclick="deleteBengkelEntry('${b.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
@@ -1952,6 +1957,26 @@ function renderBengkel(){
       </td>
     </tr>`;
   }).join('');
+}
+/* --- Reminder OR (Own Risk) belum dibayar via WhatsApp --- */
+function waGreeting(){
+  const h = new Date().getHours();
+  return h<4 ? 'malam' : h<11 ? 'pagi' : h<15 ? 'siang' : h<18 ? 'sore' : 'malam';
+}
+function orVehicleOf(b){
+  return DB.vehicles.find(v=>v.id===b.vehicleId)
+      || DB.vehicles.find(v=>(v.nopol||'').toUpperCase().replace(/\s+/g,'')===(b.nopol||'').toUpperCase().replace(/\s+/g,''));
+}
+function orMessage(b, v){
+  const nama = v && v.user ? ` ${v.user}` : '';
+  return `Selamat ${waGreeting()} Bapak/Ibu${nama}, mohon dibantu informasi pembayaran nya terkait OR (Own Risk) dengan Nopol ${b.nopol||'-'}. Terimakasih`;
+}
+function openWaOR(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  const v = orVehicleOf(b);
+  const ph = v ? waPhoneKey(v) : '';
+  if(!ph) showToast('Nomor WA driver/PIC tidak ditemukan — pilih kontak secara manual di WhatsApp.');
+  window.open(`https://wa.me/${ph}?text=${encodeURIComponent(orMessage(b, v))}`, '_blank');
 }
 function openBengkelInModal(){
   const dl = document.getElementById('bgVehicleList');
