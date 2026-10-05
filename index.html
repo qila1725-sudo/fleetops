@@ -796,7 +796,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
       <div class="full">
-        <label>Foto Kerusakan (maks. 50 foto)</label>
+        <label>Foto Kerusakan (maks. 300 foto)</label>
         <div class="foto-prev-grid" id="bgFotoGrid"></div>
         <input id="bg_foto_input" type="file" accept="image/*" multiple style="display:none" onchange="bgFotoPicked(this)">
         <button type="button" class="btn-outline" onclick="document.getElementById('bg_foto_input').click()">📷 Tambah Foto</button>
@@ -2094,7 +2094,7 @@ function exportBengkel(){
 
 /* ================= FOTO KERUSAKAN (Supabase Storage) ================= */
 const FOTO_BUCKET = 'foto-kerusakan';
-const BG_MAX_FOTO = 50;
+const BG_MAX_FOTO = 300;
 function parseFoto(v){
   if(Array.isArray(v)) return v.filter(Boolean);
   if(!v) return [];
