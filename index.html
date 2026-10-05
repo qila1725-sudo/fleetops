@@ -414,7 +414,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 
       <div class="sidebar-foot">
         <div class="avatar" id="avatarInit">AM</div>
-        <div><div class="who" id="whoUser">-</div><div class="role">Super Admin Fleet</div></div>
+        <div><div class="who" id="whoUser">-</div><div class="role" id="whoRole">Maintenance</div></div>
         <button class="logout-btn" onclick="doLogout()" title="Keluar">⏻</button>
       </div>
     </div>
@@ -424,9 +424,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         <div><h2 id="topTitle">Dashboard</h2><div class="sub" id="topSub">Ringkasan status service seluruh unit</div></div>
         <div class="top-right">
           <div class="sync-chip" id="syncChip">☁️ Tersinkronisasi Cloud DB <span id="syncTime"></span></div>
-          <div class="quickjump">🔍 <span>Cari nopol, driver, atau PT…</span></div>
+          <div class="quickjump" id="topQuickjump">🔍 <span>Cari nopol, driver, atau PT…</span></div>
           <div class="bell" id="desktopNotifBtn" onclick="toggleDesktopNotif()" title="Notifikasi desktop" style="font-size:15px;">🖥️</div>
-          <div class="bell" onclick="toggleNotifPanel(event)">🔔<span class="badge" id="bellCount">0</span>
+          <div class="bell" id="topBell" onclick="toggleNotifPanel(event)">🔔<span class="badge" id="bellCount">0</span>
             <div class="notif-panel" id="notifPanel" onclick="event.stopPropagation()">
               <div class="notif-head">Notifikasi Reminder <span id="notifCountLabel">0 unit</span></div>
               <div id="notifList"></div>
@@ -719,7 +719,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <div class="form-grid">
                 <div><label>Username Baru</label><input id="new_acc_user" type="text"></div>
                 <div><label>Password</label><input id="new_acc_pass" type="text"></div>
-                <div><label>Role</label><select id="new_acc_role"><option>Admin</option><option>Staff</option><option>Viewer</option></select></div>
+                <div><label>Role</label><select id="new_acc_role"><option value="Maintenance">Maintenance (akses semua menu)</option><option value="Staff">Staff (hanya Keluar Masuk Bengkel)</option></select></div>
               </div>
               <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;"><button class="btn-outline" onclick="addAccount()">+ Tambah Akun</button></div>
               <div class="hr"></div>
@@ -1454,7 +1454,9 @@ async function doLogin(){
   document.getElementById('avatarInit').textContent = initials(acc.username);
   document.getElementById('syncTime').textContent = '• Hari Ini '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+' WIB';
   updateDbStatusUI();
+  applyAccess();
   renderAll();
+  goPage(isMaintenance() ? 'dashboard' : 'bengkel');
 }
 function doLogout(){
   currentUser=null;
@@ -1481,7 +1483,26 @@ const titles = {
   masterdata:['Master Data','Kelola daftar Workshop, Customer, Brand, Type & Model untuk form SPKL'],
   akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
 };
+/* ================= HAK AKSES (Maintenance vs Staff) ================= */
+// Maintenance = semua menu. Staff/Viewer = hanya Keluar Masuk Bengkel.
+// Akun bawaan DPM2026 selalu Maintenance supaya tidak bisa terkunci.
+const STAFF_PAGES = ['bengkel'];
+function roleKind(a){
+  if(!a) return 'staff';
+  if(String(a.username||'').trim().toUpperCase()==='DPM2026') return 'maintenance';
+  const r = String(a.role||'').trim().toLowerCase();
+  return (r==='staff' || r==='viewer') ? 'staff' : 'maintenance';
+}
+function isMaintenance(){ return roleKind(currentUser)==='maintenance'; }
+function canAccess(p){ return isMaintenance() || STAFF_PAGES.includes(p); }
+function applyAccess(){
+  const full = isMaintenance();
+  document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || STAFF_PAGES.includes(n.dataset.page)) ? '' : 'none'; });
+  ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
+  const r = document.getElementById('whoRole'); if(r) r.textContent = full ? 'Maintenance' : 'Staff';
+}
 function goPage(p){
+  if(!canAccess(p)) p = 'bengkel';
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===p));
   document.querySelectorAll('.page').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -3248,9 +3269,14 @@ function renderAccountPage(){
   document.getElementById('wa_closing').value = DB.settings.waClosing || WA_DEFAULT_CLOSING;
   updateDesktopNotifBtnUI();
   const list = document.getElementById('acctList');
-  list.innerHTML = DB.accounts.map((a,i)=>`<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${a.role||'Staff'}</div></div>
-    <div style="display:flex;align-items:center;gap:8px;"><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
-    <button class="edit-icon-btn" style="width:auto;padding:5px 10px;font-size:11px;" onclick="toggleAccount(${i})">${a.active!==false?'Nonaktifkan':'Aktifkan'}</button></div></div>`).join('');
+  list.innerHTML = DB.accounts.map((a,i)=>{
+    const kind = roleKind(a);
+    const locked = String(a.username||'').trim().toUpperCase()==='DPM2026' || (currentUser && a.username===currentUser.username);
+    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':'Hanya Keluar Masuk Bengkel'}</div></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+    <select class="filter-select" style="padding:5px 8px;font-size:11.5px;min-width:0;" ${locked?'disabled title="Akun ini tidak bisa diubah perannya"':''} onchange="changeAccountRole(${i}, this.value)"><option value="Maintenance" ${kind==='maintenance'?'selected':''}>Maintenance</option><option value="Staff" ${kind==='staff'?'selected':''}>Staff</option></select><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
+    <button class="edit-icon-btn" style="width:auto;padding:5px 10px;font-size:11px;" onclick="toggleAccount(${i})">${a.active!==false?'Nonaktifkan':'Aktifkan'}</button></div></div>`;
+  }).join('');
   const log = document.getElementById('loginLog');
   log.innerHTML = DB.loginlog.length? DB.loginlog.map(l=>`<div>• ${l.user} — ${l.time}</div>`).join('') : '<div>Belum ada aktivitas.</div>';
 }
@@ -3310,6 +3336,11 @@ async function addAccount(){
     document.getElementById('new_acc_user').value=''; document.getElementById('new_acc_pass').value='';
     renderAccountPage(); showToast('Akun baru ditambahkan.');
   }catch(e){ console.error(e); showToast('Gagal menambah akun ke database.', true); }
+}
+async function changeAccountRole(i, role){
+  const a = DB.accounts[i]; if(!a) return;
+  try{ await sbUpdate('accounts', a.id, {role}); a.role = role; renderAccountPage(); showToast(`Peran ${a.username} diubah menjadi ${role}.`); }
+  catch(e){ console.error(e); showToast('Gagal mengubah peran akun.', true); renderAccountPage(); }
 }
 async function toggleAccount(i){
   const newActive = DB.accounts[i].active===false ? true : false;
@@ -3395,6 +3426,7 @@ async function toggleDesktopNotif(){
 // Kirim notifikasi desktop kalau ada unit overdue/mendekati BARU dibanding pengecekan terakhir,
 // dan paling sering sekali per jam supaya tidak spam.
 function maybeFireDesktopNotif(urgent){
+  if(!isMaintenance()) return;
   if(!desktopNotifEnabled()) return;
   const now = Date.now();
   const last = Number(localStorage.getItem('fleetops_notif_last_ts')||0);
