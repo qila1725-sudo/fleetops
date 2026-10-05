@@ -319,6 +319,24 @@
   .h-item::before{content:"";position:absolute;left:-23px;top:3px;width:9px;height:9px;border-radius:50%;background:var(--brand);}
   .h-item .d{font-weight:800;font-size:12.5px;}
   .h-item .m{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+  /* ===== Foto kerusakan & Kwitansi Pengajuan ===== */
+  .foto-cell{display:flex;align-items:center;gap:5px;flex-wrap:wrap;min-width:150px;}
+  .foto-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;background:#eef1f6;}
+  .foto-more{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:8px;background:#eef1f6;color:var(--ink-soft);font-weight:800;font-size:12px;cursor:pointer;}
+  .foto-add{border:1px dashed var(--line);background:#fff;border-radius:8px;padding:6px 9px;font-size:11.5px;font-weight:800;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .foto-add:hover{border-color:var(--brand);color:var(--brand);}
+  .foto-prev-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+  .foto-prev{position:relative;width:76px;height:76px;}
+  .foto-prev img{width:100%;height:100%;object-fit:cover;border-radius:9px;border:1px solid var(--line);}
+  .foto-prev button{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;border:none;background:var(--bad);color:#fff;font-size:11px;font-weight:800;cursor:pointer;line-height:20px;padding:0;}
+  .lightbox{position:fixed;inset:0;background:rgba(10,15,22,.9);display:none;align-items:center;justify-content:center;z-index:90;}
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:88vw;max-height:84vh;border-radius:10px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  .lb-x{position:absolute;top:18px;right:22px;background:rgba(255,255,255,.15);color:#fff;border:none;width:38px;height:38px;border-radius:50%;font-size:18px;cursor:pointer;}
+  .lb-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);color:#fff;border:none;width:44px;height:44px;border-radius:50%;font-size:26px;cursor:pointer;}
+  .lb-nav.prev{left:22px;} .lb-nav.next{right:22px;}
+  .lb-cap{position:absolute;bottom:20px;left:0;right:0;text-align:center;color:#fff;font-size:12.5px;font-weight:700;}
 </style>
 </head>
 <body>
@@ -372,6 +390,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div class="nav-item" data-page="reminder" onclick="goPage('reminder')"><span class="l"><span class="ic">🚗</span> Reminder / Data Kendaraan</span><span class="count" id="navReminderCount">0</span></div>
       <div class="nav-item" data-page="histori" onclick="goPage('histori')"><span class="l"><span class="ic">🕘</span> Histori Service</span></div>
       <div class="nav-item" data-page="bengkel" onclick="goPage('bengkel')"><span class="l"><span class="ic">🏭</span> Keluar Masuk Bengkel</span><span class="count" id="navBengkelCount">0</span></div>
+      <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
       <div class="nav-item" data-page="spkl" onclick="goPage('spkl')"><span class="l"><span class="ic">📋</span> SPKL</span><span class="count" id="navSpklCount">0</span></div>
       <div class="nav-item" data-page="masterdata" onclick="goPage('masterdata')"><span class="l"><span class="ic">🗂️</span> Master Data</span><span class="count" id="navMasterCount">0</span></div>
       <div class="nav-item" data-page="akun" onclick="goPage('akun')"><span class="l"><span class="ic">⚙️</span> Pengaturan Akun</span></div>
@@ -544,12 +563,36 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="tab-pill" data-tab="out" onclick="setBengkelTab('out')"><span class="cdot" style="background:var(--ok);"></span> Sudah Keluar <span class="cnt" id="bg_cnt_out">0</span></div>
           </div>
           <div class="table-wrap">
-            <table style="min-width:1200px">
+            <table style="min-width:1400px">
               <thead><tr>
                 <th>NOPOL</th><th>NAMA PT</th><th>BENGKEL</th><th>TANGGAL MASUK</th><th>TANGGAL KELUAR</th>
-                <th>LAMA DI BENGKEL</th><th>STATUS</th><th>HARGA OR</th><th>KWITANSI</th><th>PEMBAYARAN</th><th>KETERANGAN</th><th>AKSI</th>
+                <th>LAMA DI BENGKEL</th><th>STATUS</th><th>HARGA OR</th><th>KWITANSI</th><th>PEMBAYARAN</th><th>KETERANGAN</th><th>FOTO KERUSAKAN</th><th>AKSI</th>
               </tr></thead>
               <tbody id="bengkelBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="page" id="page-kwitansi">
+          <div class="toolbar">
+            <button class="btn btn-primary small" onclick="openKwitansiModal()">+ Tambah Kwitansi Pengajuan</button>
+            <div class="spacer"></div>
+            <button class="btn-outline" onclick="exportKwitansi()">⭳ Export Excel</button>
+          </div>
+          <div class="filter-row">
+            <div class="search-box">🔍 <input id="kw_search" oninput="debKwitansi()" placeholder="Cari toko/bengkel, nopol, PT, atau keterangan..."></div>
+          </div>
+          <div class="tabs-row">
+            <div class="tab-pill active" data-tab="all" onclick="setKwTab('all')">Semua <span class="cnt" id="kw_cnt_all">0</span></div>
+            <div class="tab-pill" data-tab="ika" onclick="setKwTab('ika')"><span class="cdot" style="background:var(--ok);"></span> Paid Bu Ika <span class="cnt" id="kw_cnt_ika">0</span></div>
+            <div class="tab-pill" data-tab="bella" onclick="setKwTab('bella')"><span class="cdot" style="background:var(--warn);"></span> Pengajuan Mba Bella <span class="cnt" id="kw_cnt_bella">0</span></div>
+          </div>
+          <div class="table-wrap">
+            <table style="min-width:1000px">
+              <thead><tr>
+                <th>TANGGAL</th><th>NAMA TOKO / BENGKEL</th><th>NOPOL</th><th>NAMA PT / STANDBY</th><th>KETERANGAN</th><th>PEMBAYARAN</th><th>AKSI</th>
+              </tr></thead>
+              <tbody id="kwitansiBody"></tbody>
             </table>
           </div>
         </div>
@@ -745,6 +788,12 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         <select id="bg_in_bayar"><option>Belum Bayar</option><option>Sudah Bayar</option><option>PO</option></select>
       </div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
+      <div class="full">
+        <label>Foto Kerusakan (maks. 6 foto)</label>
+        <div class="foto-prev-grid" id="bgFotoGrid"></div>
+        <input id="bg_foto_input" type="file" accept="image/*" multiple style="display:none" onchange="bgFotoPicked(this)">
+        <button type="button" class="btn-outline" onclick="document.getElementById('bg_foto_input').click()">📷 Tambah Foto</button>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn-outline" onclick="closeBengkelInModal()">Batal</button>
@@ -769,6 +818,53 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <button class="btn-green" onclick="saveBengkelOut()">Simpan Tanggal Keluar</button>
     </div>
   </div>
+</div>
+
+<!-- MODAL: Kwitansi Pengajuan -->
+<div class="modal-bg" id="kwitansiModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3 id="kwModalTitle">Tambah Kwitansi Pengajuan</h3><p class="sub">Catat kwitansi pengajuan dari toko / bengkel beserta status pembayarannya.</p></div>
+      <button class="x-btn" onclick="closeKwitansiModal()">✕</button>
+    </div>
+    <input type="hidden" id="kw_id">
+    <div class="form-grid">
+      <div><label>Tanggal</label><input id="kw_tanggal" type="date"></div>
+      <div>
+        <label>Nama Toko / Bengkel</label>
+        <input id="kw_toko" list="kwTokoList" placeholder="Ketik atau pilih nama toko / bengkel...">
+        <datalist id="kwTokoList"></datalist>
+      </div>
+      <div>
+        <label>Nopol</label>
+        <input id="kw_nopol" list="kwVehicleList" placeholder="Ketik nomor polisi..." style="text-transform:uppercase" oninput="kwAutofillFromVehicle()">
+        <datalist id="kwVehicleList"></datalist>
+      </div>
+      <div>
+        <label>Nama PT / Standby</label>
+        <input id="kw_pt" list="kwPtList" placeholder="Ketik nama PT, atau pilih Standby">
+        <datalist id="kwPtList"></datalist>
+      </div>
+      <div class="full"><label>Keterangan</label><textarea id="kw_note" placeholder="Contoh: ganti kampas rem depan, servis AC, dll"></textarea></div>
+      <div class="full">
+        <label>Pembayaran</label>
+        <select id="kw_pay"><option>Paid Bu Ika</option><option>Pengajuan Mba Bella</option></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeKwitansiModal()">Batal</button>
+      <button class="btn btn-primary small" onclick="saveKwitansi()" id="kwSaveBtn">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX foto kerusakan -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-x" onclick="closeLightbox()">✕</button>
+  <button class="lb-nav prev" onclick="event.stopPropagation();lbStep(-1)">‹</button>
+  <img id="lbImg" alt="Foto kerusakan" onclick="event.stopPropagation()">
+  <button class="lb-nav next" onclick="event.stopPropagation();lbStep(1)">›</button>
+  <div class="lb-cap" id="lbCap"></div>
 </div>
 
 <!-- MODAL: SPKL & Delivery Form -->
@@ -893,7 +989,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_c7-ZUEFGufFp2lMT5CK7zQ_ZyRZShW-";
 
 const isConfigured = !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
 
-let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], spkl:[], master:[] };
+let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], spkl:[], master:[], kwitansi:[] };
 let currentUser = null;
 let quickTab = 'all';
 let selectedIds = new Set();
@@ -940,7 +1036,9 @@ const toDbHistory = h => ({ vehicle_id:h.vehicleId, pt:h.pt, nopol:h.nopol, vehi
 const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active });
 const toDbAccount = a => ({ username:a.username, password:a.password, role:a.role, active:a.active });
 
-const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar });
+const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto) });
+const fromDbKwitansi = r => ({ id:r.id, tanggal:r.tanggal||(r.created_at?String(r.created_at).slice(0,10):''), toko:r.toko||'', nopol:r.nopol||'', pt:r.pt||'', note:r.keterangan||'', bayar:r.pembayaran||'Paid Bu Ika' });
+const toDbKwitansi = k => ({ tanggal:k.tanggal||null, toko:k.toko||'', nopol:k.nopol||'', pt:k.pt||'', keterangan:k.note||'', pembayaran:k.bayar||'Paid Bu Ika' });
 const toDbBengkel = b => ({ vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' });
 
 const fromDbMaster = r => ({ id:r.id, category:r.category, kode:r.kode||'', name:r.name, lokasi:r.lokasi||'', address:r.address, phone:r.phone });
@@ -978,6 +1076,13 @@ async function loadAll(){
     }catch(e){
       console.warn('Tabel bengkel_log belum tersedia — jalankan SQL tambahan untuk fitur Keluar Masuk Bengkel.', e);
       DB.bengkel = [];
+    }
+    try{
+      const kwRows = await sbGet('kwitansi_pengajuan','select=*&order=tanggal.desc,created_at.desc');
+      DB.kwitansi = (kwRows||[]).map(fromDbKwitansi);
+    }catch(e){
+      console.warn('Tabel kwitansi_pengajuan belum tersedia — jalankan SQL tambahan untuk fitur Kwitansi Pengajuan.', e);
+      DB.kwitansi = [];
     }
     try{
       const spRows = await sbGet('spkl_log','select=*&order=created_at.desc');
@@ -1327,6 +1432,7 @@ const titles = {
   reminder:['Reminder & Data Kendaraan','Sistem Pengingat Jadwal Perawatan & Inventaris Armada Terpusat'],
   histori:['Histori Service','Riwayat lengkap pembaruan service tiap kendaraan'],
   bengkel:['Keluar Masuk Bengkel','Catat kendaraan yang masuk & keluar bengkel repair'],
+  kwitansi:['Kwitansi Pengajuan','Catat kwitansi pengajuan toko / bengkel & status pembayarannya'],
   spkl:['SPKL','Surat Perintah Kerja Lapangan — Delivery Form kendaraan'],
   masterdata:['Master Data','Kelola daftar Workshop, Customer, Brand, Type & Model untuk form SPKL'],
   akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
@@ -1341,11 +1447,12 @@ function goPage(p){
   if(p==='reminder') renderTable();
   if(p==='histori') renderHistory();
   if(p==='bengkel') renderBengkel();
+  if(p==='kwitansi') renderKwitansi();
   if(p==='spkl') renderSpkl();
   if(p==='masterdata') renderMasterData();
   if(p==='akun') renderAccountPage();
 }
-function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderSpkl(); cancelMasterEdit(); renderMasterData(); renderAccountPage(); }
+function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); renderSpkl(); cancelMasterEdit(); renderMasterData(); renderAccountPage(); }
 
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
@@ -1796,7 +1903,7 @@ function renderBengkel(){
   const list = filteredBengkel();
   const body = document.getElementById('bengkelBody');
   if(!body) return;
-  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="12">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
+  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="13">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
   body.innerHTML = list.map(b=>{
     const status = bengkelStatus(b);
     const lama = status==='in' ? `${daysBetween(b.tglMasuk, today())} hari (berjalan)` : `${daysBetween(b.tglMasuk, b.tglKeluar)} hari`;
@@ -1812,6 +1919,7 @@ function renderBengkel(){
       <td><span class="pill ${b.kwitansi==='Sudah'?'on':'off'}">${b.kwitansi||'Belum'}</span></td>
       <td><span class="status-badge ${b.statusBayar==='Sudah Bayar'?'ok':(b.statusBayar==='PO'?'warn':'bad')}">${b.statusBayar||'Belum Bayar'}</span></td>
       <td class="row-note">${b.note||'-'}</td>
+      <td>${fotoCellHtml(b)}</td>
       <td>
         <div class="aksi-cell">
           ${status==='in' ? `<button class="update-btn" onclick="openBengkelOutModal('${b.id}')">✅ Catat Keluar</button>` : ''}
@@ -1845,6 +1953,7 @@ function openBengkelInModal(){
   document.getElementById('bg_in_kwitansi').value = 'Belum';
   document.getElementById('bg_in_bayar').value = 'Belum Bayar';
   document.getElementById('bg_in_note').value = '';
+  bgInitFoto([]);
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
 function bgAutofillFromVehicle(){
@@ -1875,9 +1984,10 @@ function openBengkelEditModal(id){
   document.getElementById('bg_in_kwitansi').value = b.kwitansi||'Belum';
   document.getElementById('bg_in_bayar').value = b.statusBayar||'Belum Bayar';
   document.getElementById('bg_in_note').value = b.note||'';
+  bgInitFoto(b.foto||[]);
   document.getElementById('bengkelInModalBg').classList.add('show');
 }
-function closeBengkelInModal(){ document.getElementById('bengkelInModalBg').classList.remove('show'); }
+function closeBengkelInModal(){ document.getElementById('bengkelInModalBg').classList.remove('show'); bgResetFoto(); }
 async function saveBengkelIn(){
   const id = document.getElementById('bg_id').value;
   const nopol = document.getElementById('bg_vehicle').value.trim().toUpperCase();
@@ -1891,6 +2001,7 @@ async function saveBengkelIn(){
   const kwitansi = document.getElementById('bg_in_kwitansi').value;
   const statusBayar = document.getElementById('bg_in_bayar').value;
   const note = document.getElementById('bg_in_note').value.trim();
+  let rowId = id;
   try{
     if(id){
       const existing = DB.bengkel.find(x=>x.id===id);
@@ -1904,8 +2015,11 @@ async function saveBengkelIn(){
       const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
       const rows = await sbInsert('bengkel_log', toDbBengkel(b));
       DB.bengkel.unshift(fromDbBengkel(rows[0]));
+      rowId = rows[0].id;
       showToast(`${nopol} tercatat masuk bengkel ${bengkelName}.`);
     }
+    try{ await bgApplyPhotos(rowId); }
+    catch(e2){ console.error(e2); showToast('Data tersimpan, tetapi foto gagal diunggah. Pastikan SQL foto kerusakan sudah dijalankan di Supabase.', true); }
     closeBengkelInModal(); renderBengkel();
   }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel bengkel_log sudah dibuat di Supabase.', true); }
 }
@@ -1915,6 +2029,7 @@ async function deleteBengkelEntry(id){
   if(!confirm(`Hapus catatan bengkel untuk ${b.nopol} (${b.bengkel})? Tindakan ini tidak bisa dibatalkan.`)) return;
   try{
     await sbDeleteIds('bengkel_log', [id]);
+    deleteFotoFiles(b.foto||[]);
     DB.bengkel = DB.bengkel.filter(x=>x.id!==id);
     renderBengkel();
     showToast('Data berhasil dihapus.');
@@ -1949,10 +2064,257 @@ function exportBengkel(){
   const rows = filteredBengkel().map(b=>({
     'Nopol':b.nopol,'Nama PT':b.pt,'Bengkel':b.bengkel,'Tanggal Masuk':b.tglMasuk,'Tanggal Keluar':b.tglKeluar||'',
     'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Harga OR':b.hargaOR||0,'Kwitansi':b.kwitansi||'Belum',
-    'Status Pembayaran':b.statusBayar||'Belum Bayar','Keterangan':b.note||''
+    'Status Pembayaran':b.statusBayar||'Belum Bayar','Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n')
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Keluar Masuk Bengkel'); XLSX.writeFile(wb, 'keluar-masuk-bengkel.xlsx');
+}
+
+/* ================= FOTO KERUSAKAN (Supabase Storage) ================= */
+const FOTO_BUCKET = 'foto-kerusakan';
+const BG_MAX_FOTO = 6;
+function parseFoto(v){
+  if(Array.isArray(v)) return v.filter(Boolean);
+  if(!v) return [];
+  try{ const a = JSON.parse(v); return Array.isArray(a) ? a.filter(Boolean) : []; }catch(e){ return []; }
+}
+function escH(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function compressImage(file, maxSide, quality){
+  maxSide = maxSide||1280; quality = quality||0.75;
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, maxSide/Math.max(w,h));
+      w = Math.round(w*sc); h = Math.round(h*sc);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=> b ? resolve(b) : reject(new Error('Gagal memproses gambar')), 'image/jpeg', quality);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('File bukan gambar yang valid')); };
+    img.src = url;
+  });
+}
+async function uploadFoto(blob, folder){
+  const path = `${folder}/${Date.now()}_${Math.random().toString(16).slice(2,8)}.jpg`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}/${path}`, {
+    method:'POST',
+    headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'image/jpeg', 'x-upsert':'false' },
+    body: blob
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error(`Upload foto gagal ${res.status}: ${t}`); }
+  return `${SUPABASE_URL}/storage/v1/object/public/${FOTO_BUCKET}/${path}`;
+}
+async function deleteFotoFiles(urls){
+  const prefix = `${SUPABASE_URL}/storage/v1/object/public/${FOTO_BUCKET}/`;
+  const paths = (urls||[]).filter(u=>String(u).startsWith(prefix)).map(u=>u.slice(prefix.length));
+  if(!paths.length) return;
+  try{
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}`, {
+      method:'DELETE',
+      headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json' },
+      body: JSON.stringify({ prefixes: paths })
+    });
+  }catch(e){ console.warn('Gagal menghapus file foto dari storage', e); }
+}
+
+/* --- foto di modal tambah/edit bengkel --- */
+let bgPhotoState = { existing:[], added:[], removed:[] };
+function bgInitFoto(list){
+  bgResetFoto();
+  bgPhotoState.existing = (list||[]).slice();
+  bgRenderFotoGrid();
+}
+function bgResetFoto(){
+  (bgPhotoState.added||[]).forEach(a=>{ try{ URL.revokeObjectURL(a.preview); }catch(e){} });
+  bgPhotoState = { existing:[], added:[], removed:[] };
+  const g = document.getElementById('bgFotoGrid'); if(g) g.innerHTML = '';
+}
+function bgRenderFotoGrid(){
+  const g = document.getElementById('bgFotoGrid'); if(!g) return;
+  const ex = bgPhotoState.existing.map((u,i)=>`<div class="foto-prev"><img src="${escH(u)}" alt="Foto"><button type="button" onclick="bgRemoveFoto('e',${i})" title="Hapus foto">✕</button></div>`);
+  const ad = bgPhotoState.added.map((a,i)=>`<div class="foto-prev"><img src="${a.preview}" alt="Foto baru"><button type="button" onclick="bgRemoveFoto('a',${i})" title="Batalkan foto">✕</button></div>`);
+  g.innerHTML = ex.concat(ad).join('');
+}
+function bgFotoPicked(inp){
+  const files = [...(inp.files||[])];
+  inp.value = '';
+  for(const f of files){
+    if(bgPhotoState.existing.length + bgPhotoState.added.length >= BG_MAX_FOTO){ showToast(`Maksimal ${BG_MAX_FOTO} foto per kendaraan.`, true); break; }
+    if(!f.type.startsWith('image/')) continue;
+    bgPhotoState.added.push({ file:f, preview:URL.createObjectURL(f) });
+  }
+  bgRenderFotoGrid();
+}
+function bgRemoveFoto(kind, i){
+  if(kind==='e'){ const [u] = bgPhotoState.existing.splice(i,1); if(u) bgPhotoState.removed.push(u); }
+  else { const [a] = bgPhotoState.added.splice(i,1); if(a) try{ URL.revokeObjectURL(a.preview); }catch(e){} }
+  bgRenderFotoGrid();
+}
+async function bgApplyPhotos(rowId){
+  const st = bgPhotoState;
+  if(!rowId || (!st.added.length && !st.removed.length)) return;
+  const keep = st.existing.slice();
+  for(const a of st.added){ keep.push(await uploadFoto(await compressImage(a.file), rowId)); }
+  await sbUpdate('bengkel_log', rowId, { foto: JSON.stringify(keep) });
+  const idx = DB.bengkel.findIndex(x=>x.id===rowId);
+  if(idx>=0) DB.bengkel[idx].foto = keep;
+  deleteFotoFiles(st.removed);
+}
+
+/* --- kolom foto di tabel + tambah foto cepat --- */
+function fotoCellHtml(b){
+  const f = b.foto||[];
+  const thumbs = f.slice(0,3).map((u,i)=>`<img class="foto-thumb" src="${escH(u)}" loading="lazy" alt="Foto kerusakan" onclick="openLightbox('${b.id}',${i})">`).join('');
+  const more = f.length>3 ? `<span class="foto-more" onclick="openLightbox('${b.id}',3)">+${f.length-3}</span>` : '';
+  return `<div class="foto-cell">${thumbs}${more}<button class="foto-add" onclick="quickAddFoto('${b.id}')" title="Tambah foto kerusakan">📷 ${f.length?'+':'Tambah'}</button></div>`;
+}
+function quickAddFoto(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.onchange = async ()=>{
+    const files = [...inp.files].filter(f=>f.type.startsWith('image/'));
+    if(!files.length) return;
+    const cur = (b.foto||[]).slice();
+    if(cur.length + files.length > BG_MAX_FOTO){ showToast(`Maksimal ${BG_MAX_FOTO} foto per kendaraan.`, true); return; }
+    showToast('Mengunggah foto...');
+    try{
+      for(const f of files){ cur.push(await uploadFoto(await compressImage(f), id)); }
+      await sbUpdate('bengkel_log', id, { foto: JSON.stringify(cur) });
+      b.foto = cur; renderBengkel(); showToast('Foto berhasil ditambahkan.');
+    }catch(e){ console.error(e); showToast('Gagal mengunggah foto. Pastikan SQL foto kerusakan sudah dijalankan di Supabase.', true); }
+  };
+  inp.click();
+}
+
+/* --- lightbox --- */
+let lb = { list:[], i:0, title:'' };
+function openLightbox(id, i){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b || !(b.foto||[]).length) return;
+  lb = { list:b.foto, i:i||0, title:`${b.nopol||''} • ${b.bengkel||''}` };
+  lbShow();
+  document.getElementById('lightbox').classList.add('show');
+}
+function lbShow(){
+  document.getElementById('lbImg').src = lb.list[lb.i];
+  document.getElementById('lbCap').textContent = `${lb.title}  (${lb.i+1}/${lb.list.length})`;
+}
+function lbStep(d){ if(!lb.list.length) return; lb.i = (lb.i + d + lb.list.length) % lb.list.length; lbShow(); }
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('show'); }
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('lightbox').classList.contains('show')) return;
+  if(e.key==='Escape') closeLightbox();
+  if(e.key==='ArrowLeft') lbStep(-1);
+  if(e.key==='ArrowRight') lbStep(1);
+});
+
+/* ================= KWITANSI PENGAJUAN ================= */
+let kwTab = 'all';
+const KW_IKA = 'Paid Bu Ika', KW_BELLA = 'Pengajuan Mba Bella';
+function setKwTab(t){ kwTab=t; document.querySelectorAll('#page-kwitansi .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderKwitansi(); }
+function filteredKwitansi(){
+  const q = (document.getElementById('kw_search')?.value||'').trim().toLowerCase();
+  return DB.kwitansi.filter(k=>{
+    if(kwTab==='ika' && k.bayar!==KW_IKA) return false;
+    if(kwTab==='bella' && k.bayar!==KW_BELLA) return false;
+    if(q && !`${k.toko} ${k.nopol} ${k.pt} ${k.note}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function renderKwitansi(){
+  const all = DB.kwitansi;
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('kw_cnt_all', all.length);
+  set('kw_cnt_ika', all.filter(k=>k.bayar===KW_IKA).length);
+  set('kw_cnt_bella', all.filter(k=>k.bayar===KW_BELLA).length);
+  set('navKwitansiCount', all.length);
+  const body = document.getElementById('kwitansiBody'); if(!body) return;
+  const list = filteredKwitansi();
+  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="7">Belum ada kwitansi pengajuan yang cocok.</td></tr>`; return; }
+  body.innerHTML = list.map(k=>`<tr>
+    <td>${fmtDate(k.tanggal)}</td>
+    <td>${escH(k.toko)||'-'}</td>
+    <td><span class="nopol-badge" style="cursor:default;">${escH(k.nopol)||'-'}</span></td>
+    <td>${escH(k.pt)||'-'}</td>
+    <td class="row-note">${escH(k.note)||'-'}</td>
+    <td><span class="status-badge ${k.bayar===KW_IKA?'ok':'warn'}">${escH(k.bayar)}</span></td>
+    <td>
+      <div class="aksi-cell">
+        <button class="edit-icon-btn" onclick="openKwitansiModal('${k.id}')" title="Edit">✎</button>
+        <button class="edit-icon-btn" onclick="deleteKwitansi('${k.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+function kwFillLists(){
+  document.getElementById('kwVehicleList').innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${escH(n)}">`).join('');
+  const pts = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort();
+  document.getElementById('kwPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
+  const tokos = [...new Set(['Padimas','IRM','Lido','Kita','Layanan', ...DB.bengkel.map(b=>b.bengkel), ...DB.kwitansi.map(k=>k.toko), ...masterByCategory('workshop').map(m=>m.name)].filter(Boolean))];
+  document.getElementById('kwTokoList').innerHTML = tokos.map(n=>`<option value="${escH(n)}">`).join('');
+}
+function kwAutofillFromVehicle(){
+  const nopol = document.getElementById('kw_nopol').value.trim().toUpperCase();
+  const v = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
+  if(v && !document.getElementById('kw_pt').value) document.getElementById('kw_pt').value = v.pt||'';
+}
+function openKwitansiModal(id){
+  kwFillLists();
+  const k = id ? DB.kwitansi.find(x=>x.id===id) : null;
+  document.getElementById('kw_id').value = k ? k.id : '';
+  document.getElementById('kwModalTitle').textContent = k ? 'Edit Kwitansi Pengajuan' : 'Tambah Kwitansi Pengajuan';
+  document.getElementById('kwSaveBtn').textContent = k ? 'Simpan Perubahan' : 'Simpan';
+  document.getElementById('kw_tanggal').value = k ? (k.tanggal||today()) : today();
+  document.getElementById('kw_toko').value = k ? k.toko : '';
+  document.getElementById('kw_nopol').value = k ? k.nopol : '';
+  document.getElementById('kw_pt').value = k ? k.pt : '';
+  document.getElementById('kw_note').value = k ? k.note : '';
+  document.getElementById('kw_pay').value = k ? k.bayar : KW_IKA;
+  document.getElementById('kwitansiModalBg').classList.add('show');
+}
+function closeKwitansiModal(){ document.getElementById('kwitansiModalBg').classList.remove('show'); }
+async function saveKwitansi(){
+  const id = document.getElementById('kw_id').value;
+  const data = {
+    tanggal: document.getElementById('kw_tanggal').value || today(),
+    toko: document.getElementById('kw_toko').value.trim(),
+    nopol: document.getElementById('kw_nopol').value.trim().toUpperCase(),
+    pt: document.getElementById('kw_pt').value.trim(),
+    note: document.getElementById('kw_note').value.trim(),
+    bayar: document.getElementById('kw_pay').value
+  };
+  if(!data.toko){ showToast('Isi nama toko / bengkel terlebih dahulu.'); return; }
+  if(!data.nopol){ showToast('Isi nopol terlebih dahulu.'); return; }
+  try{
+    if(id){
+      const rows = await sbUpdate('kwitansi_pengajuan', id, toDbKwitansi(data));
+      const idx = DB.kwitansi.findIndex(x=>x.id===id);
+      DB.kwitansi[idx] = fromDbKwitansi((rows&&rows[0]) || { id, ...toDbKwitansi(data) });
+      showToast('Kwitansi pengajuan berhasil diperbarui.');
+    } else {
+      const rows = await sbInsert('kwitansi_pengajuan', toDbKwitansi(data));
+      DB.kwitansi.unshift(fromDbKwitansi(rows[0]));
+      showToast(`Kwitansi pengajuan ${data.nopol} tersimpan.`);
+    }
+    closeKwitansiModal(); renderKwitansi();
+  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel kwitansi_pengajuan sudah dibuat di Supabase.', true); }
+}
+async function deleteKwitansi(id){
+  const k = DB.kwitansi.find(x=>x.id===id); if(!k) return;
+  if(!confirm(`Hapus kwitansi pengajuan ${k.nopol} (${k.toko})? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbDeleteIds('kwitansi_pengajuan', [id]);
+    DB.kwitansi = DB.kwitansi.filter(x=>x.id!==id);
+    renderKwitansi(); showToast('Data berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
+}
+function exportKwitansi(){
+  const rows = filteredKwitansi().map(k=>({ 'Tanggal':k.tanggal, 'Nama Toko / Bengkel':k.toko, 'Nopol':k.nopol, 'Nama PT / Standby':k.pt, 'Keterangan':k.note, 'Pembayaran':k.bayar }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
 }
 
 /* ================= SPKL ================= */
@@ -2756,6 +3118,7 @@ function deb(fn, ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn
 const debTable = deb(()=>renderTable());
 const debBengkel = deb(()=>renderBengkel());
 const debSpkl = deb(()=>renderSpkl());
+const debKwitansi = deb(()=>renderKwitansi());
 const debMaster = deb(()=>renderMasterData());
 const debHistory = deb(()=>renderHistory());
 
