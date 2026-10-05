@@ -874,6 +874,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <div class="gal-grid" id="galGrid"></div>
     <div class="modal-actions">
+      <button class="btn-outline" id="galDelAllBtn" onclick="galRemoveAll()" style="color:var(--bad);border-color:var(--bad-line);margin-right:auto;">🗑 Hapus Semua Foto</button>
       <button class="btn-outline" onclick="closeFotoGallery()">Tutup</button>
       <button class="btn btn-primary small" id="galAddBtn" onclick="galAddFoto()">📷 Tambah Foto</button>
     </div>
@@ -2134,11 +2135,13 @@ async function deleteFotoFiles(urls){
   const paths = (urls||[]).filter(u=>String(u).startsWith(prefix)).map(u=>u.slice(prefix.length));
   if(!paths.length) return;
   try{
-    await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}`, {
-      method:'DELETE',
-      headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json' },
-      body: JSON.stringify({ prefixes: paths })
-    });
+    for(let i=0;i<paths.length;i+=100){
+      await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}`, {
+        method:'DELETE',
+        headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ prefixes: paths.slice(i,i+100) })
+      });
+    }
   }catch(e){ console.warn('Gagal menghapus file foto dari storage', e); }
 }
 
@@ -2207,6 +2210,7 @@ function renderFotoGallery(){
   const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
   const f = b.foto||[];
   document.getElementById('galCount').textContent = `${f.length} foto`;
+  document.getElementById('galDelAllBtn').style.display = f.length ? '' : 'none';
   document.getElementById('galGrid').innerHTML = f.length
     ? f.map((u,i)=>`<div class="gal-item"><img src="${escH(u)}" loading="lazy" alt="Foto ${i+1}" onclick="openLightbox('${b.id}',${i})"><button type="button" onclick="galRemoveFoto(${i})" title="Hapus foto">✕</button></div>`).join('')
     : `<div class="gal-empty">Belum ada foto kerusakan. Klik "Tambah Foto" untuk mengunggah.</div>`;
@@ -2239,6 +2243,18 @@ function galAddFoto(){
     btn.disabled = false;
   };
   inp.click();
+}
+async function galRemoveAll(){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  const old = (b.foto||[]).slice();
+  if(!old.length) return;
+  if(!confirm(`Hapus SEMUA ${old.length} foto kerusakan ${b.nopol||''}? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbUpdate('bengkel_log', galId, { foto: '[]' });
+    b.foto = [];
+    deleteFotoFiles(old);
+    renderFotoGallery(); showToast(`${old.length} foto berhasil dihapus.`);
+  }catch(e){ console.error(e); showToast('Gagal menghapus foto.', true); }
 }
 async function galRemoveFoto(i){
   const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
