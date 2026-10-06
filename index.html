@@ -411,7 +411,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div class="nav-item" data-page="histori" onclick="goPage('histori')"><span class="l"><span class="ic">🕘</span> Histori Service</span></div>
       <div class="nav-item" data-page="bengkel" onclick="goPage('bengkel')"><span class="l"><span class="ic">🏭</span> Keluar Masuk Bengkel</span><span class="count" id="navBengkelCount">0</span></div>
       <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
-      <div class="nav-item" data-page="spkl" onclick="goPage('spkl')"><span class="l"><span class="ic">📋</span> SPKL</span><span class="count" id="navSpklCount">0</span></div>
       <div class="nav-item" data-page="masterdata" onclick="goPage('masterdata')"><span class="l"><span class="ic">🗂️</span> Master Data</span><span class="count" id="navMasterCount">0</span></div>
       <div class="nav-item" data-page="akun" onclick="goPage('akun')"><span class="l"><span class="ic">⚙️</span> Pengaturan Akun</span></div>
 
@@ -616,30 +615,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
                 <th>TANGGAL PENGAJUAN</th><th>NAMA TOKO / BENGKEL</th><th>NOPOL</th><th>NAMA PT / STANDBY</th><th>KETERANGAN</th><th>PEMBAYARAN</th><th>AKSI</th>
               </tr></thead>
               <tbody id="kwitansiBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="page" id="page-spkl">
-          <div class="toolbar">
-            <button class="btn btn-primary small" onclick="openSpklModal()">+ Tambah SPKL</button>
-            <div class="spacer"></div>
-            <button class="btn-outline" onclick="exportSpkl()">⭳ Export Excel</button>
-          </div>
-          <div class="filter-row">
-            <div class="search-box">🔍 <input id="spkl_search" oninput="debSpkl()" placeholder="Cari Nopol, Workshop, atau Customer..."></div>
-            <select class="filter-select" id="spkl_jenis" onchange="renderSpkl()">
-              <option value="">Semua Jenis</option>
-              <option>Bengkel</option><option>Kerja Luar</option><option>Kerja Luar Kota</option>
-            </select>
-          </div>
-          <div class="table-wrap">
-            <table style="min-width:1300px">
-              <thead><tr>
-                <th>SPKLK NO.</th><th>JENIS</th><th>WORKSHOP</th><th>NO. POLISI</th><th>MODEL / TYPE</th><th>CUSTOMER</th>
-                <th>PIC / HP</th><th>KM</th><th>TANGGAL MASUK</th><th>TANGGAL KELUAR</th><th>AKSI</th>
-              </tr></thead>
-              <tbody id="spklBody"></tbody>
             </table>
           </div>
         </div>
@@ -934,55 +909,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   <div class="lb-cap" id="lbCap"></div>
 </div>
 
-<!-- MODAL: SPKL & Delivery Form -->
-<div class="modal-bg" id="spklModalBg">
-  <div class="modal wide">
-    <div class="modal-head">
-      <div><h3 id="spklModalTitle">SPKL &amp; Delivery Form</h3><p class="sub">Lengkapi data serah terima kendaraan.</p></div>
-      <button class="x-btn" onclick="closeSpklModal()">✕</button>
-    </div>
-    <input type="hidden" id="spkl_id">
-    <div class="form-grid">
-      <div><label>SPKLK No.</label><input id="spkl_no" placeholder="Otomatis, boleh diedit"></div>
-      <div>
-        <label>Jenis</label>
-        <select id="spkl_jenis_in" onchange="onSpklJenisChange()">
-          <option>Bengkel</option><option>Kerja Luar</option><option>Kerja Luar Kota</option>
-        </select>
-      </div>
-      <div><label>Workshop</label><input id="spkl_workshop" list="bgBengkelList2" placeholder="Pilih dari daftar Master Data" onchange="spklAutofillWorkshop()"></div>
-      <datalist id="bgBengkelList2"></datalist>
-      <div class="full"><label>Alamat Bengkel</label><textarea id="spkl_workshop_addr" placeholder="Alamat lengkap bengkel/workshop" style="min-height:44px;"></textarea></div>
-      <div><label>Telp/Fax Bengkel</label><input id="spkl_workshop_phone" placeholder="Nomor telp/fax bengkel"></div>
-      <div><label>Registration No. (Nopol)</label><input id="spkl_regno" list="bgVehicleList2" placeholder="Nomor polisi" style="text-transform:uppercase" oninput="spklAutofillFromVehicle()"></div>
-      <datalist id="bgVehicleList2"></datalist>
-      <div><label>Model</label><input id="spkl_model" placeholder="Otomatis dari Nopol / isi manual"></div>
-      <div><label>Brand</label><input id="spkl_brand" placeholder="Otomatis dari Nopol / isi manual"></div>
-      <div><label>Type</label><input id="spkl_type" placeholder="Otomatis dari Nopol / isi manual"></div>
-      <div><label>Customer</label><input id="spkl_customer" list="bgPtList2" placeholder="Pilih dari daftar Master Data" onchange="spklAutofillCustomer()"></div>
-      <datalist id="bgPtList2"></datalist>
-      <div class="full"><label>Alamat Customer</label><textarea id="spkl_customer_addr" placeholder="Alamat lengkap customer" style="min-height:44px;"></textarea></div>
-      <div><label>Telp/Fax Customer</label><input id="spkl_customer_phone" placeholder="Nomor telp/fax customer"></div>
-      <div><label>PIC</label><input id="spkl_pic" placeholder="Nama PIC"></div>
-      <div><label>Handphone</label><input id="spkl_hp" placeholder="08xx / 62xx"></div>
-      <div><label>Km</label><input id="spkl_km" type="number" placeholder="0"></div>
-      <div></div>
-      <div><label>Date In</label><input id="spkl_date_in" type="date"></div>
-      <div><label>Time In</label><input id="spkl_time_in" type="time"></div>
-      <div><label>Date Out</label><input id="spkl_date_out" type="date"></div>
-      <div><label>Time Out</label><input id="spkl_time_out" type="time"></div>
-      <div class="full"><label>Permintaan</label><textarea id="spkl_permintaan" placeholder="Permintaan dari user"></textarea></div>
-      <div class="full"><label>Pengerjaan</label><textarea id="spkl_pengerjaan" placeholder="Pekerjaan yang dilakukan"></textarea></div>
-      <div class="full"><label>Notes / Catatan</label><textarea id="spkl_notes" placeholder="Catatan tambahan"></textarea></div>
-      <div class="full"><label>Alasan</label><textarea id="spkl_alasan" placeholder="Alasan (jika ada)"></textarea></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-outline" onclick="closeSpklModal()">Batal</button>
-      <button class="btn btn-primary small" onclick="saveSpkl()" id="spklSaveBtn">Simpan</button>
-    </div>
-  </div>
-</div>
-
 <div class="modal-bg" id="updateServiceModalBg">
   <div class="modal">
     <div class="modal-head">
@@ -1056,7 +982,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_c7-ZUEFGufFp2lMT5CK7zQ_ZyRZShW-";
 
 const isConfigured = !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
 
-let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], spkl:[], master:[], kwitansi:[] };
+let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], master:[], kwitansi:[] };
 let currentUser = null;
 let quickTab = 'all';
 let selectedIds = new Set();
@@ -1113,12 +1039,6 @@ const toDbBengkel = b => { const o = { vehicle_id:b.vehicleId||null, nopol:b.nop
 const fromDbMaster = r => ({ id:r.id, category:r.category, kode:r.kode||'', name:r.name, lokasi:r.lokasi||'', address:r.address, phone:r.phone });
 const toDbMaster = m => ({ category:m.category, kode:m.kode||'', name:m.name||'', lokasi:m.lokasi||'', address:m.address||'', phone:m.phone||'' });
 
-const fromDbSpkl = r => ({ id:r.id, spklNo:r.spklk_no, jenis:r.jenis, workshop:r.workshop, workshopAddr:r.workshop_address, workshopPhone:r.workshop_phone, regNo:r.registration_no, model:r.model, brand:r.brand,
-  type:r.type, customer:r.customer, customerAddr:r.customer_address, customerPhone:r.customer_phone, pic:r.pic, hp:r.handphone, km:r.km, dateIn:r.date_in, timeIn:r.time_in, dateOut:r.date_out, timeOut:r.time_out,
-  permintaan:r.permintaan, pengerjaan:r.pengerjaan, notes:r.notes, alasan:r.alasan });
-const toDbSpkl = s => ({ spklk_no:s.spklNo||'', jenis:s.jenis||'Bengkel', workshop:s.workshop||'', workshop_address:s.workshopAddr||'', workshop_phone:s.workshopPhone||'', registration_no:s.regNo||'', model:s.model||'',
-  brand:s.brand||'', type:s.type||'', customer:s.customer||'', customer_address:s.customerAddr||'', customer_phone:s.customerPhone||'', pic:s.pic||'', handphone:s.hp||'', km:s.km||0, date_in:s.dateIn||null, time_in:s.timeIn||'',
-  date_out:s.dateOut||null, time_out:s.timeOut||'', permintaan:s.permintaan||'', pengerjaan:s.pengerjaan||'', notes:s.notes||'', alasan:s.alasan||'' });
 
 /* ================= LOAD & PERSIST ================= */
 async function loadAll(){
@@ -1152,13 +1072,6 @@ async function loadAll(){
     }catch(e){
       console.warn('Tabel kwitansi_pengajuan belum tersedia — jalankan SQL tambahan untuk fitur Kwitansi Pengajuan.', e);
       DB.kwitansi = [];
-    }
-    try{
-      const spRows = await sbGet('spkl_log','select=*&order=created_at.desc');
-      DB.spkl = (spRows||[]).map(fromDbSpkl);
-    }catch(e){
-      console.warn('Tabel spkl_log belum tersedia — jalankan SQL tambahan untuk fitur SPKL.', e);
-      DB.spkl = [];
     }
     try{
       const mRows = await sbGet('master_data','select=*&order=name.asc');
@@ -1509,8 +1422,7 @@ const titles = {
   histori:['Histori Service','Riwayat lengkap pembaruan service tiap kendaraan'],
   bengkel:['Keluar Masuk Bengkel','Catat kendaraan yang masuk & keluar bengkel repair'],
   kwitansi:['Kwitansi Pengajuan','Catat kwitansi pengajuan toko / bengkel & status pembayarannya'],
-  spkl:['SPKL','Surat Perintah Kerja Lapangan — Delivery Form kendaraan'],
-  masterdata:['Master Data','Kelola daftar Workshop, Customer, Brand, Type & Model untuk form SPKL'],
+  masterdata:['Master Data','Kelola daftar Workshop, Customer, Brand, Type & Model'],
   akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
 };
 /* ================= HAK AKSES (Maintenance vs Staff) ================= */
@@ -1543,11 +1455,10 @@ function goPage(p){
   if(p==='histori') renderHistory();
   if(p==='bengkel') renderBengkel();
   if(p==='kwitansi') renderKwitansi();
-  if(p==='spkl') renderSpkl();
   if(p==='masterdata') renderMasterData();
   if(p==='akun') renderAccountPage();
 }
-function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); renderSpkl(); cancelMasterEdit(); renderMasterData(); renderAccountPage(); }
+function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); cancelMasterEdit(); renderMasterData(); renderAccountPage(); }
 
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
@@ -2751,185 +2662,6 @@ function exportKwitansi(){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
 }
 
-/* ================= SPKL ================= */
-function filteredSpkl(){
-  const q = (document.getElementById('spkl_search')?.value||'').trim().toLowerCase();
-  const jenisF = document.getElementById('spkl_jenis')?.value||'';
-  return DB.spkl.filter(s=>{
-    if(q){ const hay = `${s.regNo||''} ${s.workshop||''} ${s.customer||''}`.toLowerCase(); if(!hay.includes(q)) return false; }
-    if(jenisF && s.jenis!==jenisF) return false;
-    return true;
-  });
-}
-function renderSpkl(){
-  const navCount = document.getElementById('navSpklCount');
-  if(navCount) navCount.textContent = DB.spkl.length;
-  const list = filteredSpkl();
-  const body = document.getElementById('spklBody');
-  if(!body) return;
-  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="11">Belum ada data SPKL yang cocok.</td></tr>`; return; }
-  body.innerHTML = list.map(s=>`<tr>
-    <td><span class="nopol-badge" style="cursor:default;">${s.spklNo||'-'}</span></td>
-    <td><span class="area-badge">${s.jenis||'-'}</span></td>
-    <td>${s.workshop||'-'}</td>
-    <td>${s.regNo||'-'}</td>
-    <td>${[s.model,s.type].filter(Boolean).join(' • ')||'-'}</td>
-    <td>${s.customer||'-'}</td>
-    <td>${s.pic||'-'}${s.hp? ' ('+s.hp+')':''}</td>
-    <td>${s.km? Number(s.km).toLocaleString('id-ID'):'-'}</td>
-    <td>${s.dateIn? fmtDate(s.dateIn)+(s.timeIn? ' '+s.timeIn:''):'-'}</td>
-    <td>${s.dateOut? fmtDate(s.dateOut)+(s.timeOut? ' '+s.timeOut:''):'-'}</td>
-    <td>
-      <div class="aksi-cell">
-        <button class="edit-icon-btn" onclick="printSPKL('${s.id}')" title="Cetak SPK">🖨</button>
-        <button class="edit-icon-btn" onclick="openSpklModal('${s.id}')" title="Edit">✎</button>
-        <button class="edit-icon-btn" onclick="deleteSpklEntry('${s.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
-      </div>
-    </td>
-  </tr>`).join('');
-}
-const SPKL_DEFAULT_NOTES = `> Tagihan ke PT Dokar Putra Mandiri
-> Tidak tambal ban dan tidak tambah angin nitrogen (kecuali free)
-> Semua pengerjaaan dan penggantian part harus sesuai dengan SPK, jika ada perbedaan harus konfirmasi ke Dokar. perbedaan selisih harga diluar tanggung jawab kami.
-
-Tagihan PT.Dokar Putra Mandiri
-Jika ada Penambahan/pergantian part Mohon hubngi sidik - 08777500177`;
-const SPKL_JENIS_CODE = { 'Bengkel':'01', 'Kerja Luar':'02', 'Kerja Luar Kota':'03' };
-function genSpklNo(jenis){
-  const d = new Date();
-  const yy = String(d.getFullYear()).slice(-2);
-  const code = SPKL_JENIS_CODE[jenis] || '01';
-  const prefix = `${code}${yy}-`;
-  let maxSeq = 0;
-  DB.spkl.forEach(s=>{
-    if((s.spklNo||'').startsWith(prefix)){
-      const n = parseInt((s.spklNo||'').slice(prefix.length), 10);
-      if(!isNaN(n) && n>maxSeq) maxSeq = n;
-    }
-  });
-  return `${prefix}${String(maxSeq+1).padStart(4,'0')}`;
-}
-function onSpklJenisChange(){
-  if(document.getElementById('spkl_id').value) return; // jangan ubah nomor saat edit data lama
-  document.getElementById('spkl_no').value = genSpklNo(document.getElementById('spkl_jenis_in').value);
-}
-function openSpklModal(id){
-  const dl1 = document.getElementById('bgVehicleList2');
-  dl1.innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${n}">`).join('');
-  const custNames = new Set([...masterByCategory('customer').map(m=>m.name), ...DB.vehicles.map(v=>v.pt)].filter(Boolean));
-  document.getElementById('bgPtList2').innerHTML = [...custNames].sort().map(n=>`<option value="${n}">`).join('');
-  document.getElementById('bgBengkelList2').innerHTML = masterByCategory('workshop').map(m=>`<option value="${m.kode?m.kode+' - ':''}${m.name}">`).join('');
-  const s = id ? DB.spkl.find(x=>x.id===id) : null;
-  document.getElementById('spkl_id').value = id||'';
-  document.getElementById('spklModalTitle').textContent = id ? 'Edit SPKL' : 'SPKL & Delivery Form';
-  document.getElementById('spklSaveBtn').textContent = id ? 'Simpan Perubahan' : 'Simpan';
-  document.getElementById('spkl_jenis_in').value = s?.jenis || 'Bengkel';
-  document.getElementById('spkl_no').value = s?.spklNo || genSpklNo(document.getElementById('spkl_jenis_in').value);
-  document.getElementById('spkl_workshop').value = s?.workshop || '';
-  document.getElementById('spkl_workshop_addr').value = s?.workshopAddr || '';
-  document.getElementById('spkl_workshop_phone').value = s?.workshopPhone || '';
-  document.getElementById('spkl_regno').value = s?.regNo || '';
-  document.getElementById('spkl_model').value = s?.model || '';
-  document.getElementById('spkl_brand').value = s?.brand || '';
-  document.getElementById('spkl_type').value = s?.type || '';
-  document.getElementById('spkl_customer').value = s?.customer || '';
-  document.getElementById('spkl_customer_addr').value = s?.customerAddr || '';
-  document.getElementById('spkl_customer_phone').value = s?.customerPhone || '';
-  document.getElementById('spkl_pic').value = s?.pic || '';
-  document.getElementById('spkl_hp').value = s?.hp || '';
-  document.getElementById('spkl_km').value = s?.km || '';
-  document.getElementById('spkl_date_in').value = s?.dateIn || today();
-  document.getElementById('spkl_time_in').value = s?.timeIn || new Date().toTimeString().slice(0,5);
-  document.getElementById('spkl_date_out').value = s?.dateOut || '';
-  document.getElementById('spkl_time_out').value = s?.timeOut || '';
-  document.getElementById('spkl_permintaan').value = s?.permintaan || '';
-  document.getElementById('spkl_pengerjaan').value = s?.pengerjaan || '';
-  document.getElementById('spkl_notes').value = s ? (s.notes||'') : SPKL_DEFAULT_NOTES;
-  document.getElementById('spkl_alasan').value = s?.alasan || '';
-  document.getElementById('spklModalBg').classList.add('show');
-}
-function spklAutofillWorkshop(){
-  const raw = document.getElementById('spkl_workshop').value.trim();
-  const list = masterByCategory('workshop');
-  // input bisa berupa "Nama" saja atau "Kode - Nama" (dari saran dropdown), cocokkan keduanya
-  let m = list.find(x=>(x.name||'').toLowerCase()===raw.toLowerCase());
-  if(!m) m = list.find(x=> raw.toLowerCase()===`${(x.kode||'').toLowerCase()} - ${(x.name||'').toLowerCase()}`);
-  if(m){
-    document.getElementById('spkl_workshop').value = m.name; // simpan nama bersih (tanpa kode) sebagai nilai workshop
-    document.getElementById('spkl_workshop_addr').value = m.address||'';
-    document.getElementById('spkl_workshop_phone').value = m.phone||'';
-  }
-}
-function spklAutofillCustomer(){
-  const name = document.getElementById('spkl_customer').value.trim();
-  const m = masterByCategory('customer').find(x=>(x.name||'').toLowerCase()===name.toLowerCase());
-  if(m){
-    document.getElementById('spkl_customer_addr').value = m.address||'';
-    document.getElementById('spkl_customer_phone').value = m.phone||'';
-  }
-}
-function spklAutofillFromVehicle(){
-  const nopol = document.getElementById('spkl_regno').value.trim().toUpperCase();
-  const v = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
-  if(!v) return;
-  if(!document.getElementById('spkl_customer').value) document.getElementById('spkl_customer').value = v.pt||'';
-  if(!document.getElementById('spkl_km').value) document.getElementById('spkl_km').value = v.currentkm||'';
-  if(!document.getElementById('spkl_pic').value) document.getElementById('spkl_pic').value = v.user||'';
-  if(!document.getElementById('spkl_hp').value) document.getElementById('spkl_hp').value = v.phone||'';
-  // Brand / Model / Type kendaraan sudah tersimpan terpisah di data kendaraan (Reminder), langsung dipakai apa adanya.
-  if(!document.getElementById('spkl_brand').value) document.getElementById('spkl_brand').value = v.brand||'';
-  if(!document.getElementById('spkl_model').value) document.getElementById('spkl_model').value = v.model||'';
-  if(!document.getElementById('spkl_type').value) document.getElementById('spkl_type').value = v.type||'';
-}
-
-function closeSpklModal(){ document.getElementById('spklModalBg').classList.remove('show'); }
-async function saveSpkl(){
-  const id = document.getElementById('spkl_id').value;
-  const regNo = document.getElementById('spkl_regno').value.trim().toUpperCase();
-  if(!regNo){ showToast('Isi Registration No. (nopol) terlebih dahulu.'); return; }
-  const s = {
-    spklNo: document.getElementById('spkl_no').value.trim(),
-    jenis: document.getElementById('spkl_jenis_in').value,
-    workshop: document.getElementById('spkl_workshop').value.trim(),
-    workshopAddr: document.getElementById('spkl_workshop_addr').value.trim(),
-    workshopPhone: document.getElementById('spkl_workshop_phone').value.trim(),
-    regNo, model: document.getElementById('spkl_model').value.trim(), brand: document.getElementById('spkl_brand').value.trim(),
-    type: document.getElementById('spkl_type').value.trim(), customer: document.getElementById('spkl_customer').value.trim(),
-    customerAddr: document.getElementById('spkl_customer_addr').value.trim(),
-    customerPhone: document.getElementById('spkl_customer_phone').value.trim(),
-    pic: document.getElementById('spkl_pic').value.trim(), hp: document.getElementById('spkl_hp').value.trim(),
-    km: Number(document.getElementById('spkl_km').value)||0,
-    dateIn: document.getElementById('spkl_date_in').value||null, timeIn: document.getElementById('spkl_time_in').value||'',
-    dateOut: document.getElementById('spkl_date_out').value||null, timeOut: document.getElementById('spkl_time_out').value||'',
-    permintaan: document.getElementById('spkl_permintaan').value.trim(), pengerjaan: document.getElementById('spkl_pengerjaan').value.trim(),
-    notes: document.getElementById('spkl_notes').value.trim(), alasan: document.getElementById('spkl_alasan').value.trim()
-  };
-  try{
-    if(id){
-      await sbUpdate('spkl_log', id, toDbSpkl(s));
-      const idx = DB.spkl.findIndex(x=>x.id===id);
-      DB.spkl[idx] = { ...s, id };
-      showToast(`SPKL ${s.spklNo} berhasil diperbarui.`);
-    } else {
-      const rows = await sbInsert('spkl_log', toDbSpkl(s));
-      DB.spkl.unshift(fromDbSpkl(rows[0]));
-      showToast(`SPKL ${s.spklNo} berhasil disimpan.`);
-    }
-    closeSpklModal(); renderSpkl();
-  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel spkl_log sudah dibuat di Supabase.', true); }
-}
-async function deleteSpklEntry(id){
-  const s = DB.spkl.find(x=>x.id===id);
-  if(!s) return;
-  if(!confirm(`Hapus SPKL ${s.spklNo} (${s.regNo})? Tindakan ini tidak bisa dibatalkan.`)) return;
-  try{
-    await sbDeleteIds('spkl_log', [id]);
-    DB.spkl = DB.spkl.filter(x=>x.id!==id);
-    renderSpkl();
-    showToast('Data berhasil dihapus.');
-  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
-}
-
 /* ================= MASTER DATA (Workshop / Customer / Brand / Type / Model) ================= */
 let masterTab = 'workshop';
 let masterSelectedIds = new Set();
@@ -3241,141 +2973,6 @@ async function importMasterData(evt){
   evt.target.value='';
 }
 
-function exportSpkl(){
-  const list = filteredSpkl();
-  const header1 = ['No.','No. SPK','Date','No. Polisi','Type','User','','Bengkel','City','Km.','Descprition','Pengerjaan','Note'];
-  const header2 = ['','','','','','Company','Pesonal','Company','','','','',''];
-  const data = [header1, header2];
-  list.forEach((s,i)=>{
-    data.push([
-      i+1,
-      s.spklNo||'',
-      s.dateIn||'',
-      s.regNo||'',
-      [s.brand,s.model,s.type].filter(Boolean).join(' '),
-      s.customer||'',
-      s.pic||'',
-      s.workshop||'',
-      s.workshopAddr||'',
-      s.km||0,
-      s.permintaan||'',
-      s.pengerjaan||'',
-      s.notes||''
-    ]);
-  });
-  const ws = XLSX.utils.aoa_to_sheet(data);
-  ws['!merges'] = [
-    {s:{r:0,c:0},e:{r:1,c:0}},  // No.
-    {s:{r:0,c:1},e:{r:1,c:1}},  // No. SPK
-    {s:{r:0,c:2},e:{r:1,c:2}},  // Date
-    {s:{r:0,c:3},e:{r:1,c:3}},  // No. Polisi
-    {s:{r:0,c:4},e:{r:1,c:4}},  // Type
-    {s:{r:0,c:5},e:{r:0,c:6}},  // User (span Company/Pesonal)
-    {s:{r:0,c:8},e:{r:1,c:8}},  // City
-    {s:{r:0,c:9},e:{r:1,c:9}},  // Km.
-    {s:{r:0,c:10},e:{r:1,c:10}}, // Descprition
-    {s:{r:0,c:11},e:{r:1,c:11}}, // Pengerjaan
-    {s:{r:0,c:12},e:{r:1,c:12}}  // Note
-  ];
-  ws['!cols'] = [13,13,13,13,13,13,13,26.4,13,13,13,13,13].map(w=>({wch:w}));
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'SPKL'); XLSX.writeFile(wb, 'spkl.xlsx');
-}
-const DOKAR_LOGO_B64 = "data:image/jpeg;base64,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";
-function fmtDateTimeSPK(d, t){
-  if(!d) return '-';
-  const dt = new Date(d+'T00:00:00');
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const s = `${String(dt.getDate()).padStart(2,'0')}-${months[dt.getMonth()]}-${dt.getFullYear()}`;
-  return t ? `${s} ${t}` : s;
-}
-function printSPKL(id){
-  const s = DB.spkl.find(x=>x.id===id);
-  if(!s) return;
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>SPK ${s.spklNo}</title>
-  <style>
-    @page{ margin:12mm; }
-    *{box-sizing:border-box;} body{font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#111;padding:24px;max-width:820px;margin:0 auto;}
-    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:0;border:1px solid #111;border-bottom:none;padding:10px 12px;}
-    .head .logoblock{width:170px;}
-    .head .logoblock img{height:56px;display:block;}
-    .head .logoblock .pt{font-weight:800;font-size:12px;margin-top:2px;white-space:nowrap;}
-    .head .title{text-align:center;font-weight:800;font-size:15px;line-height:1.35;flex:1;padding-top:0;}
-    .head .addr{text-align:right;font-size:12.5px;line-height:1.6;white-space:nowrap;width:200px;}
-    .noUrut{text-align:center;font-size:12px;margin:0 0 10px;border:1px solid #111;border-top:none;padding:5px 0;}
-    table{width:100%;border-collapse:collapse;margin-bottom:0;}
-    table+table{margin-top:-1px;}
-    td{border:1px solid #111;padding:7px 9px;vertical-align:top;font-size:12px;}
-    .lab{font-weight:700;text-decoration:underline;margin-bottom:4px;display:block;}
-    .addrtext{white-space:pre-line;line-height:1.35;}
-    .row{margin-bottom:2px;}
-    .row b{display:inline-block;width:88px;}
-    .box-title{font-weight:700;text-decoration:underline;margin-bottom:6px;}
-    .tall{min-height:90px;white-space:pre-line;line-height:1.4;}
-    .notesbox{min-height:70px;white-space:pre-line;line-height:1.4;font-size:11.5px;}
-    .sig{display:flex;justify-content:space-between;margin-top:16px;gap:14px;}
-    .sig div{flex:1;text-align:center;}
-    .sig .line{border:1px solid #111;height:70px;margin-bottom:6px;}
-    @media print{ body{padding:8px;} }
-  </style></head><body>
-    <div class="head">
-      <div class="logoblock"><img src="${DOKAR_LOGO_B64}" alt="dokar"><div class="pt">PT. Dokar Putra Mandiri</div></div>
-      <div class="title">SURAT PERINTAH KERJA<br>PERAWATAN &amp; PERBAIKAN KENDARAAN</div>
-      <div class="addr">Jl. Kelapa Dua Raya No. 28<br>Jakarta Barat 11550<br>Tel 021-549 2988, 549 2932<br>Fax. 021-549 3092</div>
-    </div>
-    <div class="noUrut">No. urut : <b>${s.spklNo||'-'}</b></div>
-    <table>
-      <tr>
-        <td style="width:50%;">
-          <span class="lab">Bengkel</span>
-          <div class="row">${s.workshop||'-'}</div>
-          <div class="row addrtext">${s.workshopAddr||''}</div>
-          <div class="row">Tel${s.workshopPhone? ' '+s.workshopPhone:' ,'} Fax.</div>
-        </td>
-        <td style="width:50%;">
-          <span class="lab">User</span>
-          <div class="row">${s.customer||'-'}</div>
-          <div class="row addrtext">${s.customerAddr||''}</div>
-          <div class="row">Telp. / Fax : ${s.customerPhone||'/'}</div>
-          <div class="row">PIC / HP : ${s.pic||''} ${s.hp? '/ '+s.hp:'/'}</div>
-        </td>
-      </tr>
-    </table>
-    <table>
-      <tr>
-        <td style="width:50%;">
-          <span class="lab">Kendaraan</span>
-          <div class="row"><b>Tipe Kendaraan</b>: ${[s.brand,s.model,s.type].filter(Boolean).join(' ')||'-'}</div>
-          <div class="row"><b>No. Polisi</b>: ${s.regNo||'-'}</div>
-          <div class="row"><b>KM</b>: ${s.km? Number(s.km).toLocaleString('id-ID'):'-'}</div>
-        </td>
-        <td style="width:50%;">
-          <span class="lab">Pengerjaan</span>
-          <div class="row"><b>Tgl. Masuk</b>: ${fmtDateTimeSPK(s.dateIn, s.timeIn)}</div>
-          <div class="row"><b>Tgl Keluar</b>: ${fmtDateTimeSPK(s.dateOut, s.timeOut)}</div>
-        </td>
-      </tr>
-    </table>
-    <table>
-      <tr>
-        <td style="width:50%;"><span class="box-title">Permintaan</span><div class="tall">${s.permintaan||''}</div></td>
-        <td style="width:50%;"><span class="box-title">Pengerjaan</span><div class="tall">${s.pengerjaan||''}</div></td>
-      </tr>
-    </table>
-    <table>
-      <tr><td><span class="box-title">Note / Catatan</span><div class="notesbox">${s.notes||''}</div></td></tr>
-    </table>
-    <div class="sig">
-      <div><div class="line"></div>Pengguna</div>
-      <div><div class="line"></div>Bengkel</div>
-      <div><div class="line"></div>Diketahui</div>
-    </div>
-  </body></html>`;
-  const w = window.open('', '_blank');
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>w.print(), 400);
-}
-
 /* ================= EXCEL ================= */
 const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Type','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
 function exportExcel(){
@@ -3561,7 +3158,6 @@ async function toggleAccount(i){
 function deb(fn, ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn, ms||180); }; }
 const debTable = deb(()=>renderTable());
 const debBengkel = deb(()=>renderBengkel());
-const debSpkl = deb(()=>renderSpkl());
 const debKwitansi = deb(()=>renderKwitansi());
 const debMaster = deb(()=>renderMasterData());
 const debHistory = deb(()=>renderHistory());
