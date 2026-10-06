@@ -503,6 +503,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" id="importFile" accept=".xlsx,.xls" onchange="importExcel(event)"></label>
             <button class="btn-outline" onclick="exportExcel()">🗂 Export Excel</button>
             <div class="spacer"></div>
+            <button class="btn-outline wa-sender-btn" onclick="openWaSender()" title="Nama yang tampil di pesan WhatsApp: Saya ... dari PT.Dokar Putra Mandiri">👤 Pengirim WA: -</button>
             <button class="btn btn-primary small" onclick="openVehicleModal()">+ Tambah Kendaraan</button>
           </div>
 
@@ -563,7 +564,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div class="toolbar">
             <button class="btn btn-primary small" onclick="openBengkelInModal()">+ Tambahkan Kendaraan</button>
             <div class="spacer"></div>
-            <button class="btn-outline" id="waSenderBtn" onclick="openWaSender()" title="Nama yang tampil di pesan WhatsApp reminder OR">👤 Pengirim WA: -</button>
+            <button class="btn-outline wa-sender-btn" id="waSenderBtn" onclick="openWaSender()" title="Nama yang tampil di pesan WhatsApp reminder OR">👤 Pengirim WA: -</button>
             <button class="btn-outline" onclick="exportBengkel()">⭳ Export Excel</button>
           </div>
           <div class="filter-row">
@@ -1242,6 +1243,11 @@ function waFillTokens(tpl, v){
     .replace(/\{tgl_berikutnya\}/g, fmtDate(v?.nextdate))
     .replace(/\{km_berikutnya\}/g, (v?.nextkm||0).toLocaleString('id-ID'));
 }
+// Salam + perkenalan: "Halo Bpk/Ibu Nepi (PT. ...)" lalu "Saya Kila dari PT.Dokar Putra Mandiri" (nama pengirim diatur lewat tombol 👤 Pengirim WA)
+function waGreetLine(v){
+  const sender = (typeof waSender==='function') ? waSender() : '';
+  return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})` + (sender ? `\nSaya ${sender} dari ${WA_COMPANY}` : '');
+}
 function waMessageFor(list){
   const v = list[0];
   const opening = waFillTokens(DB.settings.waOpening || WA_DEFAULT_OPENING, v);
@@ -1250,14 +1256,14 @@ function waMessageFor(list){
     const blocks = list.map((x,i)=>`${i+1}) ${waVehicleBlock(x)}`).join('\n\n');
     // baris pembuka untuk pesan gabungan: pakai kalimat custom tapi ganti sebutan ke jamak
     const openingMulti = opening.replace(/kendaraan\s*\{kendaraan\}\s*anda/i, `${list.length} kendaraan Anda`).replace(/\{kendaraan\}/gi, `${list.length} unit`);
-    return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
+    return `${waGreetLine(v)}
 ${openingMulti}
 
 ${blocks}
 
 ${closing}`;
   }
-  return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
+  return `${waGreetLine(v)}
 Nopol ${v.nopol||'-'},
 ${opening}
 
@@ -1427,7 +1433,7 @@ async function downloadDataImage(idx){
 function openWaForDataImage(idx){
   const it = window._dataImgCanvases[idx]; if(!it) return;
   const v = it.list[0];
-  const msg = `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})
+  const msg = `${waGreetLine(v)}
 Berikut kami kirimkan data jadwal service berkala ${it.list.length} kendaraan Anda (lihat gambar).
 
 Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
@@ -2067,7 +2073,7 @@ function orVehicleOf(b){
 }
 const WA_COMPANY = 'PT.Dokar Putra Mandiri';
 function waSender(){ try{ return (localStorage.getItem('fleetops_wa_sender')||'').trim(); }catch(e){ return ''; } }
-function updateWaSenderBtn(){ const el=document.getElementById('waSenderBtn'); if(el) el.textContent = `👤 Pengirim WA: ${waSender()||'-'}`; }
+function updateWaSenderBtn(){ document.querySelectorAll('.wa-sender-btn').forEach(el=>{ el.textContent = `👤 Pengirim WA: ${waSender()||'-'}`; }); }
 let waPendingId = null;
 function openWaSender(pendingId){
   waPendingId = (typeof pendingId==='string') ? pendingId : null;
@@ -2081,6 +2087,7 @@ function saveWaSender(){
   if(!n){ showToast('Isi nama pengirim terlebih dahulu.'); return; }
   try{ localStorage.setItem('fleetops_wa_sender', n); }catch(e){}
   updateWaSenderBtn();
+  try{ renderTable(); }catch(e){}
   const pid = waPendingId; closeWaSender();
   if(pid) openWaOR(pid);
 }
