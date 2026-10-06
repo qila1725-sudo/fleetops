@@ -273,6 +273,14 @@
   .status-badge.warn{background:var(--warn-bg);color:var(--warn);}
   .status-badge.bad{background:var(--bad-bg);color:var(--bad);}
   .status-badge.info{background:#e8f0ff;color:#1d4ed8;}
+  .inl-sel{appearance:none;-webkit-appearance:none;border:none;border-radius:100px;padding:5px 22px 5px 10px;font-size:10.8px;font-weight:800;cursor:pointer;font-family:inherit;background-repeat:no-repeat;background-position:right 8px center;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23667085' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");max-width:150px;}
+  .inl-sel.ok{background-color:var(--ok-bg);color:var(--ok);}
+  .inl-sel.warn{background-color:var(--warn-bg);color:var(--warn);}
+  .inl-sel.bad{background-color:var(--bad-bg);color:var(--bad);}
+  .inl-sel.info{background-color:#e8f0ff;color:#1d4ed8;}
+  .inl-sel.off{background-color:#eef1f6;color:var(--ink-soft);}
+  .inl-sel option{color:#111;background:#fff;font-weight:600;}
+  .or-wait{font-size:11px;color:var(--ink-soft);font-weight:700;}
   .aksi-cell{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;}
   .wa-btn{background:var(--ok);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:5px;}
   .wa-btn:hover{background:#106b34;}
@@ -555,6 +563,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div class="toolbar">
             <button class="btn btn-primary small" onclick="openBengkelInModal()">+ Tambahkan Kendaraan</button>
             <div class="spacer"></div>
+            <button class="btn-outline" id="waSenderBtn" onclick="openWaSender()" title="Nama yang tampil di pesan WhatsApp reminder OR">👤 Pengirim WA: -</button>
             <button class="btn-outline" onclick="exportBengkel()">⭳ Export Excel</button>
           </div>
           <div class="filter-row">
@@ -576,10 +585,10 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="tab-pill" data-tab="or" onclick="setBengkelTab('or')"><span class="cdot" style="background:var(--bad);"></span> OR Belum Dibayar <span class="cnt" id="bg_cnt_or">0</span></div>
           </div>
           <div class="table-wrap">
-            <table style="min-width:1560px">
+            <table style="min-width:1750px">
               <thead><tr>
                 <th>NOPOL</th><th>NAMA PT</th><th>BENGKEL</th><th>TANGGAL MASUK</th><th>TANGGAL KELUAR</th>
-                <th>LAMA DI BENGKEL</th><th>STATUS</th><th>HARGA OR</th><th>KWITANSI</th><th>PEMBAYARAN</th><th>KETERANGAN</th><th>FOTO KERUSAKAN</th><th>FILE KWITANSI OR</th><th>AKSI</th>
+                <th>LAMA DI BENGKEL</th><th>STATUS</th><th>HARGA OR</th><th>KWITANSI</th><th>PEMBAYARAN</th><th>FILE KWITANSI OR</th><th>REMINDER TAGIHAN OR</th><th>KETERANGAN</th><th>FOTO KERUSAKAN</th><th>AKSI</th>
               </tr></thead>
               <tbody id="bengkelBody"></tbody>
             </table>
@@ -794,14 +803,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Tanggal Masuk</label><input id="bg_in_date" type="date"></div>
       <div><label>Tanggal Keluar (kosongkan jika masih di bengkel)</label><input id="bg_in_outdate" type="date"></div>
       <div><label>Harga OR (Own Risk)</label><input id="bg_in_or" type="number" min="0" placeholder="0"></div>
-      <div>
-        <label>Kwitansi</label>
-        <select id="bg_in_kwitansi"><option>Belum</option><option>Sudah</option></select>
-      </div>
-      <div class="full">
-        <label>Status Pembayaran</label>
-        <select id="bg_in_bayar"><option value="Belum Bayar">Belum Bayar</option><option value="Sudah Bayar">Paid</option><option value="PO">Pembayaran pakai PO</option><option value="Invoice">Invoice</option></select>
-      </div>
+      <div class="full small-note" style="margin-top:-4px;">Kwitansi & Pembayaran diubah langsung di tabel (klik pilihannya di kolom KWITANSI / PEMBAYARAN).</div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
       <div class="full">
         <label>Foto Kerusakan (maks. 300 foto)</label>
@@ -885,6 +887,23 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <button class="btn-outline" id="galDelAllBtn" onclick="galRemoveAll()" style="color:var(--bad);border-color:var(--bad-line);margin-right:auto;">🗑 Hapus Semua Foto</button>
       <button class="btn-outline" onclick="closeFotoGallery()">Tutup</button>
       <button class="btn btn-primary small" id="galAddBtn" onclick="galAddFoto()">📷 Tambah Foto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nama pengirim WA -->
+<div class="modal-bg" id="waSenderModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3>Nama Pengirim WhatsApp</h3><p class="sub">Nama ini tampil di pesan reminder OR: "saya <b>nama</b> dari PT.Dokar Putra Mandiri ...". Tersimpan di perangkat ini.</p></div>
+      <button class="x-btn" onclick="closeWaSender()">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="full"><label>Nama Pengirim</label><input id="waSenderInput" placeholder="Contoh: Kila" onkeydown="if(event.key==='Enter')saveWaSender()"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWaSender()">Batal</button>
+      <button class="btn btn-primary small" onclick="saveWaSender()">Simpan</button>
     </div>
   </div>
 </div>
@@ -1953,6 +1972,34 @@ function bengkelStatus(b){ return b.tglKeluar ? 'out' : 'in'; }
 function bayarLabel(v){ return v==='Sudah Bayar' ? 'Paid' : v==='PO' ? 'Pembayaran pakai PO' : v==='Invoice' ? 'Invoice' : 'Belum Bayar'; }
 function bayarClass(v){ return v==='Sudah Bayar' ? 'ok' : v==='PO' ? 'warn' : v==='Invoice' ? 'info' : 'bad'; }
 function orUnpaid(b){ return (b.statusBayar||'Belum Bayar')==='Belum Bayar'; }
+// OR baru ditagihkan setelah mobil keluar dari bengkel
+function orBillable(b){ return !!b.tglKeluar && orUnpaid(b); }
+function kwitansiSelectHtml(b){
+  const v = b.kwitansi==='Sudah' ? 'Sudah' : 'Belum';
+  return `<select class="inl-sel ${v==='Sudah'?'ok':'off'}" onchange="setBengkelField('${b.id}','kwitansi',this.value)" title="Ubah status kwitansi"><option value="Belum" ${v==='Belum'?'selected':''}>Belum</option><option value="Sudah" ${v==='Sudah'?'selected':''}>Sudah</option></select>`;
+}
+function bayarSelectHtml(b){
+  const v = b.statusBayar || 'Belum Bayar';
+  const opt = (val,label)=>`<option value="${val}" ${v===val?'selected':''}>${label}</option>`;
+  return `<select class="inl-sel ${bayarClass(v)}" onchange="setBengkelField('${b.id}','statusBayar',this.value)" title="Ubah status pembayaran">${opt('Belum Bayar','Belum Bayar')}${opt('Sudah Bayar','Paid')}${opt('PO','Pembayaran pakai PO')}${opt('Invoice','Invoice')}</select>`;
+}
+function orReminderCellHtml(b){
+  if(!b.tglKeluar) return `<span class="or-wait">Menunggu mobil keluar</span>`;
+  if(orUnpaid(b)) return `<a class="wa-btn" href="javascript:void(0)" onclick="openWaOR('${b.id}')" title="Kirim reminder tagihan OR via WhatsApp">💬 Reminder OR</a>`;
+  return `<span class="or-wait">-</span>`;
+}
+async function setBengkelField(id, field, value){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  const prev = b[field];
+  if(prev===value) return;
+  b[field] = value; renderBengkel();
+  try{
+    await sbUpdate('bengkel_log', id, field==='kwitansi' ? { kwitansi:value } : { status_bayar:value });
+    showToast(field==='kwitansi' ? `Kwitansi ${b.nopol}: ${value}` : `Pembayaran ${b.nopol}: ${bayarLabel(value)}`);
+  }catch(e){
+    console.error(e); b[field] = prev; renderBengkel(); showToast('Gagal menyimpan perubahan.', true);
+  }
+}
 function filteredBengkel(){
   const q = (document.getElementById('bg_search')?.value||'').trim().toLowerCase();
   const bFilter = document.getElementById('bg_bengkel')?.value||'';
@@ -1961,24 +2008,25 @@ function filteredBengkel(){
     if(q && !(`${b.nopol||''} ${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(q))) return false;
     if(bFilter && b.bengkel!==bFilter) return false;
     if(sFilter && bengkelStatus(b)!==sFilter) return false;
-    if(bengkelTab==='or'){ if(!orUnpaid(b)) return false; }
+    if(bengkelTab==='or'){ if(!orBillable(b)) return false; }
     else if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
     return true;
   });
 }
 function renderBengkel(){
+  updateWaSenderBtn();
   const all = DB.bengkel;
   document.getElementById('bg_cnt_all').textContent = all.length;
   document.getElementById('bg_cnt_in').textContent = all.filter(b=>bengkelStatus(b)==='in').length;
   document.getElementById('bg_cnt_out').textContent = all.filter(b=>bengkelStatus(b)==='out').length;
-  document.getElementById('bg_cnt_or').textContent = all.filter(orUnpaid).length;
+  document.getElementById('bg_cnt_or').textContent = all.filter(orBillable).length;
   const navCount = document.getElementById('navBengkelCount');
   if(navCount) navCount.textContent = all.filter(b=>bengkelStatus(b)==='in').length;
 
   const list = filteredBengkel();
   const body = document.getElementById('bengkelBody');
   if(!body) return;
-  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="14">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
+  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="15">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
   body.innerHTML = list.map(b=>{
     const status = bengkelStatus(b);
     const picName = bgPic(b).name;
@@ -1992,14 +2040,14 @@ function renderBengkel(){
       <td>${lama}</td>
       <td><span class="status-badge ${status==='in'?'warn':'ok'}">${status==='in'?'Masih di Bengkel':'Sudah Keluar'}</span></td>
       <td>${b.hargaOR? 'Rp '+Number(b.hargaOR).toLocaleString('id-ID') : '-'}</td>
-      <td><span class="pill ${b.kwitansi==='Sudah'?'on':'off'}">${b.kwitansi||'Belum'}</span></td>
-      <td><span class="status-badge ${bayarClass(b.statusBayar)}">${bayarLabel(b.statusBayar)}</span></td>
+      <td>${kwitansiSelectHtml(b)}</td>
+      <td>${bayarSelectHtml(b)}</td>
+      <td>${kwFileCellHtml(b)}</td>
+      <td>${orReminderCellHtml(b)}</td>
       <td class="row-note">${b.note||'-'}</td>
       <td>${fotoCellHtml(b)}</td>
-      <td>${kwFileCellHtml(b)}</td>
       <td>
         <div class="aksi-cell">
-          ${orUnpaid(b) ? `<a class="wa-btn" href="javascript:void(0)" onclick="openWaOR('${b.id}')" title="Kirim reminder pembayaran OR via WhatsApp">💬 Reminder OR</a>` : ''}
           ${status==='in' ? `<button class="update-btn" onclick="openBengkelOutModal('${b.id}')">✅ Catat Keluar</button>` : ''}
           <button class="edit-icon-btn" onclick="openBengkelEditModal('${b.id}')" title="Edit">✎</button>
           <button class="edit-icon-btn" onclick="deleteBengkelEntry('${b.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
@@ -2017,21 +2065,50 @@ function orVehicleOf(b){
   return DB.vehicles.find(v=>v.id===b.vehicleId)
       || DB.vehicles.find(v=>(v.nopol||'').toUpperCase().replace(/\s+/g,'')===(b.nopol||'').toUpperCase().replace(/\s+/g,''));
 }
+const WA_COMPANY = 'PT.Dokar Putra Mandiri';
+function waSender(){ try{ return (localStorage.getItem('fleetops_wa_sender')||'').trim(); }catch(e){ return ''; } }
+function updateWaSenderBtn(){ const el=document.getElementById('waSenderBtn'); if(el) el.textContent = `👤 Pengirim WA: ${waSender()||'-'}`; }
+let waPendingId = null;
+function openWaSender(pendingId){
+  waPendingId = (typeof pendingId==='string') ? pendingId : null;
+  document.getElementById('waSenderInput').value = waSender();
+  document.getElementById('waSenderModalBg').classList.add('show');
+  setTimeout(()=>document.getElementById('waSenderInput').focus(), 50);
+}
+function closeWaSender(){ document.getElementById('waSenderModalBg').classList.remove('show'); waPendingId = null; }
+function saveWaSender(){
+  const n = document.getElementById('waSenderInput').value.trim();
+  if(!n){ showToast('Isi nama pengirim terlebih dahulu.'); return; }
+  try{ localStorage.setItem('fleetops_wa_sender', n); }catch(e){}
+  updateWaSenderBtn();
+  const pid = waPendingId; closeWaSender();
+  if(pid) openWaOR(pid);
+}
+function fmtDateLong(d){
+  if(!d) return '';
+  const dt = new Date(d+'T00:00:00');
+  const bln = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  return `${dt.getDate()} ${bln[dt.getMonth()]} ${dt.getFullYear()}`;
+}
 function orMessage(b, v){
   const nm = bgPic(b).name;
-  const nama = nm ? ` ${nm}` : '';
-  let msg = `Selamat ${waGreeting()} Bapak/Ibu${nama}, mohon dibantu informasi pembayaran nya terkait OR (Own Risk) dengan Nopol ${b.nopol||'-'}.`;
+  const sapa = waGreeting().charAt(0).toUpperCase() + waGreeting().slice(1);
+  const sender = waSender();
+  const tgl = b.tglMasuk ? ` (${fmtDateLong(b.tglMasuk)})` : '';
+  let msg = `${sapa} Bapak/Ibu${nm?' '+nm:''}, saya ${sender} dari ${WA_COMPANY} berikut saya lampirkan kwitansi ${b.pt||''} OR ${b.nopol||'-'}${tgl}`.replace(/\s+,/g,',').replace(/\s{2,}/g,' ');
   const files = (b.kwFiles||[]).filter(f=>f && f.u);
   if(files.length){
-    msg += `\n\nBerikut kwitansi OR:\n` + files.map((f,i)=> files.length>1 ? `${i+1}) ${f.u}` : f.u).join('\n');
+    msg += `\n\n` + files.map((f,i)=> files.length>1 ? `Kwitansi ${i+1}: ${f.u}` : `Kwitansi: ${f.u}`).join('\n');
   }
-  return msg + (files.length ? `\n\nTerimakasih` : ` Terimakasih`);
+  return msg + `\n\nTerimakasih 🙏`;
 }
 function openWaOR(id){
   const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  if(!waSender()){ openWaSender(id); return; }
   const v = orVehicleOf(b);
   const ph = waPhoneKey({phone: bgPic(b).phone});
   if(!ph) showToast('Nomor WA PIC tidak ditemukan — isi di Edit Data Bengkel, atau pilih kontak manual di WhatsApp.');
+  else if(!(b.kwFiles||[]).length) showToast('Belum ada file kwitansi OR di aplikasi — lampirkan file secara manual di WhatsApp.');
   window.open(`https://wa.me/${ph}?text=${encodeURIComponent(orMessage(b, v))}`, '_blank');
 }
 function openBengkelInModal(){
@@ -2057,8 +2134,6 @@ function openBengkelInModal(){
   document.getElementById('bg_in_date').value = today();
   document.getElementById('bg_in_outdate').value = '';
   document.getElementById('bg_in_or').value = '';
-  document.getElementById('bg_in_kwitansi').value = 'Belum';
-  document.getElementById('bg_in_bayar').value = 'Belum Bayar';
   document.getElementById('bg_in_note').value = '';
   bgInitFoto([]);
   document.getElementById('bengkelInModalBg').classList.add('show');
@@ -2107,8 +2182,6 @@ function openBengkelEditModal(id){
   document.getElementById('bg_in_date').value = b.tglMasuk||'';
   document.getElementById('bg_in_outdate').value = b.tglKeluar||'';
   document.getElementById('bg_in_or').value = b.hargaOR||'';
-  document.getElementById('bg_in_kwitansi').value = b.kwitansi||'Belum';
-  document.getElementById('bg_in_bayar').value = b.statusBayar||'Belum Bayar';
   document.getElementById('bg_in_note').value = b.note||'';
   bgInitFoto(b.foto||[]);
   bgAuto = { pt:'', pic:'', phone:'' };
@@ -2128,8 +2201,9 @@ async function saveBengkelIn(){
   const tglMasuk = document.getElementById('bg_in_date').value||today();
   const tglKeluar = document.getElementById('bg_in_outdate').value || null;
   const hargaOR = Number(document.getElementById('bg_in_or').value)||0;
-  const kwitansi = document.getElementById('bg_in_kwitansi').value;
-  const statusBayar = document.getElementById('bg_in_bayar').value;
+  const prevRow = id ? DB.bengkel.find(x=>x.id===id) : null;
+  const kwitansi = (prevRow && prevRow.kwitansi) || 'Belum';
+  const statusBayar = (prevRow && prevRow.statusBayar) || 'Belum Bayar';
   const note = document.getElementById('bg_in_note').value.trim();
   let rowId = id;
   try{
