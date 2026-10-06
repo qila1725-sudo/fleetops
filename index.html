@@ -272,6 +272,7 @@
   .status-badge.ok{background:var(--ok-bg);color:var(--ok);}
   .status-badge.warn{background:var(--warn-bg);color:var(--warn);}
   .status-badge.bad{background:var(--bad-bg);color:var(--bad);}
+  .status-badge.info{background:#e8f0ff;color:#1d4ed8;}
   .aksi-cell{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;}
   .wa-btn{background:var(--ok);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;gap:5px;}
   .wa-btn:hover{background:#106b34;}
@@ -799,7 +800,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div class="full">
         <label>Status Pembayaran</label>
-        <select id="bg_in_bayar"><option>Belum Bayar</option><option>Sudah Bayar</option><option>PO</option></select>
+        <select id="bg_in_bayar"><option value="Belum Bayar">Belum Bayar</option><option value="Sudah Bayar">Paid</option><option value="PO">Pembayaran pakai PO</option><option value="Invoice">Invoice</option></select>
       </div>
       <div class="full"><label>Keterangan / Keluhan</label><textarea id="bg_in_note" placeholder="Contoh: ganti kampas rem, servis AC, dll"></textarea></div>
       <div class="full">
@@ -1949,6 +1950,8 @@ function closeHistoryModal(){ document.getElementById('historyModalBg').classLis
 let bengkelTab = 'all';
 function setBengkelTab(t){ bengkelTab=t; document.querySelectorAll('#page-bengkel .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderBengkel(); }
 function bengkelStatus(b){ return b.tglKeluar ? 'out' : 'in'; }
+function bayarLabel(v){ return v==='Sudah Bayar' ? 'Paid' : v==='PO' ? 'Pembayaran pakai PO' : v==='Invoice' ? 'Invoice' : 'Belum Bayar'; }
+function bayarClass(v){ return v==='Sudah Bayar' ? 'ok' : v==='PO' ? 'warn' : v==='Invoice' ? 'info' : 'bad'; }
 function orUnpaid(b){ return (b.statusBayar||'Belum Bayar')==='Belum Bayar'; }
 function filteredBengkel(){
   const q = (document.getElementById('bg_search')?.value||'').trim().toLowerCase();
@@ -1990,7 +1993,7 @@ function renderBengkel(){
       <td><span class="status-badge ${status==='in'?'warn':'ok'}">${status==='in'?'Masih di Bengkel':'Sudah Keluar'}</span></td>
       <td>${b.hargaOR? 'Rp '+Number(b.hargaOR).toLocaleString('id-ID') : '-'}</td>
       <td><span class="pill ${b.kwitansi==='Sudah'?'on':'off'}">${b.kwitansi||'Belum'}</span></td>
-      <td><span class="status-badge ${b.statusBayar==='Sudah Bayar'?'ok':(b.statusBayar==='PO'?'warn':'bad')}">${b.statusBayar||'Belum Bayar'}</span></td>
+      <td><span class="status-badge ${bayarClass(b.statusBayar)}">${bayarLabel(b.statusBayar)}</span></td>
       <td class="row-note">${b.note||'-'}</td>
       <td>${fotoCellHtml(b)}</td>
       <td>${kwFileCellHtml(b)}</td>
@@ -2192,7 +2195,7 @@ function exportBengkel(){
   const rows = filteredBengkel().map(b=>({
     'Nopol':b.nopol,'Nama PT':b.pt,'Bengkel':b.bengkel,'Tanggal Masuk':b.tglMasuk,'Tanggal Keluar':b.tglKeluar||'',
     'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Harga OR':b.hargaOR||0,'Kwitansi':b.kwitansi||'Belum',
-    'Status Pembayaran':b.statusBayar||'Belum Bayar','PIC':bgPic(b).name,'No. WA PIC':bgPic(b).phone,'Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
+    'Status Pembayaran':bayarLabel(b.statusBayar),'PIC':bgPic(b).name,'No. WA PIC':bgPic(b).phone,'Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Keluar Masuk Bengkel'); XLSX.writeFile(wb, 'keluar-masuk-bengkel.xlsx');
