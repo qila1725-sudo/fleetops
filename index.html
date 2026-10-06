@@ -1985,7 +1985,7 @@ function bayarSelectHtml(b){
 }
 function orReminderCellHtml(b){
   if(!b.tglKeluar) return `<span class="or-wait">Menunggu mobil keluar</span>`;
-  if(orUnpaid(b)) return `<a class="wa-btn" href="javascript:void(0)" onclick="openWaOR('${b.id}')" title="Kirim reminder tagihan OR via WhatsApp">💬 Reminder OR</a>`;
+  if(orUnpaid(b)) return `<a class="wa-btn" href="javascript:void(0)" onmouseenter="prefetchKw('${b.id}')" onclick="openWaOR('${b.id}')" title="Kirim reminder tagihan OR + file kwitansi via WhatsApp">💬 Reminder OR</a>`;
   return `<span class="or-wait">-</span>`;
 }
 async function setBengkelField(id, field, value){
@@ -2090,26 +2090,80 @@ function fmtDateLong(d){
   const bln = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   return `${dt.getDate()} ${bln[dt.getMonth()]} ${dt.getFullYear()}`;
 }
-function orMessage(b, v){
+function orMessage(b, v, withEmoji){
   const nm = bgPic(b).name;
   const sapa = waGreeting().charAt(0).toUpperCase() + waGreeting().slice(1);
-  const sender = waSender();
   const tgl = b.tglMasuk ? ` (${fmtDateLong(b.tglMasuk)})` : '';
-  let msg = `${sapa} Bapak/Ibu${nm?' '+nm:''}, saya ${sender} dari ${WA_COMPANY} berikut saya lampirkan kwitansi ${b.pt||''} OR ${b.nopol||'-'}${tgl}`.replace(/\s+,/g,',').replace(/\s{2,}/g,' ');
-  const files = (b.kwFiles||[]).filter(f=>f && f.u);
-  if(files.length){
-    msg += `\n\n` + files.map((f,i)=> files.length>1 ? `Kwitansi ${i+1}: ${f.u}` : `Kwitansi: ${f.u}`).join('\n');
-  }
-  return msg + `\n\nTerimakasih 🙏`;
+  const msg = `${sapa} Bapak/Ibu${nm?' '+nm:''}, saya ${waSender()} dari ${WA_COMPANY} berikut saya lampirkan kwitansi ${b.pt||''} OR ${b.nopol||'-'}${tgl}`.replace(/\s+,/g,',').replace(/\s{2,}/g,' ');
+  return msg + `\n\nTerimakasih` + (withEmoji ? ' \u{1F64F}' : '');
 }
-function openWaOR(id){
+/* --- File kwitansi dikirim sebagai file asli (bukan link) --- */
+const waFileCache = new Map(); // url -> File
+function kwFileMime(name, blobType){
+  const n = String(name||'').toLowerCase();
+  if(n.endsWith('.pdf')) return 'application/pdf';
+  if(/\.jpe?g$/.test(n)) return 'image/jpeg';
+  if(n.endsWith('.png')) return 'image/png';
+  if(n.endsWith('.webp')) return 'image/webp';
+  return blobType || 'application/octet-stream';
+}
+async function loadKwFileObjects(files){
+  const out = [];
+  for(const f of files){
+    if(!waFileCache.has(f.u)){
+      const res = await fetch(f.u);
+      if(!res.ok) throw new Error('Gagal mengambil file ('+res.status+')');
+      const blob = await res.blob();
+      let name = (f.n || decodeURIComponent(String(f.u).split('/').pop()||'kwitansi')).replace(/[\\/:*?"<>|]+/g,'-');
+      const type = kwFileMime(name, blob.type);
+      if(type==='application/pdf' && !/\.pdf$/i.test(name)) name += '.pdf';
+      waFileCache.set(f.u, new File([blob], name, { type }));
+    }
+    out.push(waFileCache.get(f.u));
+  }
+  return out;
+}
+function prefetchKw(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  const files = (b.kwFiles||[]).filter(f=>f&&f.u&&!waFileCache.has(f.u));
+  if(files.length) loadKwFileObjects(files).catch(()=>{});
+}
+function downloadFileObjs(list){
+  list.forEach((f,i)=> setTimeout(()=>{
+    const url = URL.createObjectURL(f);
+    const a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }, i*300));
+}
+function openWaChat(ph, text){ window.open(`https://wa.me/${ph}?text=${encodeURIComponent(text)}`, '_blank'); }
+async function openWaOR(id){
   const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
   if(!waSender()){ openWaSender(id); return; }
   const v = orVehicleOf(b);
   const ph = waPhoneKey({phone: bgPic(b).phone});
-  if(!ph) showToast('Nomor WA PIC tidak ditemukan — isi di Edit Data Bengkel, atau pilih kontak manual di WhatsApp.');
-  else if(!(b.kwFiles||[]).length) showToast('Belum ada file kwitansi OR di aplikasi — lampirkan file secara manual di WhatsApp.');
-  window.open(`https://wa.me/${ph}?text=${encodeURIComponent(orMessage(b, v))}`, '_blank');
+  const files = (b.kwFiles||[]).filter(f=>f && f.u);
+  if(!files.length){
+    showToast('Belum ada file kwitansi OR di aplikasi — upload dulu di kolom FILE KWITANSI OR, atau lampirkan manual di WhatsApp.');
+    openWaChat(ph, orMessage(b, v, false)); return;
+  }
+  let objs;
+  try{ if(files.some(f=>!waFileCache.has(f.u))) showToast('Menyiapkan file kwitansi...'); objs = await loadKwFileObjects(files); }
+  catch(e){ console.error(e); showToast('Gagal mengambil file kwitansi. Periksa koneksi lalu coba lagi.', true); return; }
+  // 1) Kirim sebagai FILE lewat menu Bagikan (pilih WhatsApp lalu kontaknya)
+  if(navigator.canShare && navigator.canShare({ files: objs })){
+    const text = orMessage(b, v, true);
+    try{ if(navigator.clipboard) await navigator.clipboard.writeText(text); }catch(e){}
+    try{ await navigator.share({ files: objs, text }); return; }
+    catch(e){
+      if(e && e.name==='AbortError') return;
+      if(e && e.name==='NotAllowedError'){ showToast('File kwitansi sudah siap — klik Reminder OR sekali lagi untuk membuka menu Bagikan.'); return; }
+      console.error(e);
+    }
+  }
+  // 2) Cadangan: unduh file lalu buka chat WhatsApp, file tinggal dilampirkan
+  downloadFileObjs(objs);
+  showToast('File kwitansi diunduh — lampirkan ke chat WhatsApp yang terbuka.');
+  openWaChat(ph, orMessage(b, v, false));
 }
 function openBengkelInModal(){
   const dl = document.getElementById('bgVehicleList');
