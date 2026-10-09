@@ -411,7 +411,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div class="nav-item" data-page="histori" onclick="goPage('histori')"><span class="l"><span class="ic">🕘</span> Histori Service</span></div>
       <div class="nav-item" data-page="bengkel" onclick="goPage('bengkel')"><span class="l"><span class="ic">🏭</span> Keluar Masuk Bengkel</span><span class="count" id="navBengkelCount">0</span></div>
       <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
-      <div class="nav-item" data-page="masterdata" onclick="goPage('masterdata')"><span class="l"><span class="ic">🗂️</span> Master Data</span><span class="count" id="navMasterCount">0</span></div>
       <div class="nav-item" data-page="akun" onclick="goPage('akun')"><span class="l"><span class="ic">⚙️</span> Pengaturan Akun</span></div>
 
       <div class="side-box">
@@ -615,52 +614,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
                 <th>TANGGAL PENGAJUAN</th><th>NAMA TOKO / BENGKEL</th><th>NOPOL</th><th>NAMA PT / STANDBY</th><th>KETERANGAN</th><th>PEMBAYARAN</th><th>AKSI</th>
               </tr></thead>
               <tbody id="kwitansiBody"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="page" id="page-masterdata">
-          <div class="toolbar">
-            <button class="btn-outline" onclick="downloadMasterTemplate()">⭳ Download Template Excel</button>
-            <label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" id="masterImportFile" accept=".xlsx,.xls" onchange="importMasterData(event)"></label>
-            <button class="btn-outline" onclick="exportMasterData()">🗂 Export Excel</button>
-            <button class="btn-outline" onclick="syncCustomerFromVehicles()">⟳ Sync Customer dari Data Kendaraan</button>
-          </div>
-          <div class="tabs-row">
-            <div class="tab-pill active" data-mtab="workshop" onclick="setMasterTab('workshop')">Workshop <span class="cnt" id="mcnt_workshop">0</span></div>
-            <div class="tab-pill" data-mtab="customer" onclick="setMasterTab('customer')">Customer <span class="cnt" id="mcnt_customer">0</span></div>
-            <div class="tab-pill" data-mtab="brand" onclick="setMasterTab('brand')">Brand <span class="cnt" id="mcnt_brand">0</span></div>
-            <div class="tab-pill" data-mtab="type" onclick="setMasterTab('type')">Type <span class="cnt" id="mcnt_type">0</span></div>
-            <div class="tab-pill" data-mtab="model" onclick="setMasterTab('model')">Model <span class="cnt" id="mcnt_model">0</span></div>
-          </div>
-          <div class="panel" style="margin-bottom:14px;">
-            <h3 id="mFormTitle">Tambah Workshop</h3>
-            <input type="hidden" id="m_edit_id">
-            <div class="form-grid">
-              <div id="mKodeWrap"><label>Kode</label><input id="m_kode" placeholder="Contoh: SD01"></div>
-              <div id="mNameWrap"><label id="mNameLabel">Nama</label><input id="m_name" placeholder="Nama"></div>
-              <div id="mLokasiWrap"><label>Lokasi / Kota</label><input id="m_lokasi" placeholder="Contoh: Bandung"></div>
-              <div id="mAddrWrap" class="full"><label>Alamat Lengkap</label><input id="m_address" placeholder="Alamat lengkap"></div>
-              <div id="mPhoneWrap"><label>Telepon / Fax</label><input id="m_phone" placeholder="Nomor telp/fax"></div>
-            </div>
-            <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;">
-              <button class="btn btn-primary small" id="mSaveBtn" onclick="saveMasterItem()">+ Tambah</button>
-              <button class="btn-outline" id="mCancelBtn" style="display:none;" onclick="cancelMasterEdit()">Batal Edit</button>
-            </div>
-          </div>
-          <div class="filter-row">
-            <div class="search-box">🔍 <input id="m_search" oninput="debMaster()" placeholder="Cari nama atau kode..."></div>
-          </div>
-          <div id="mBulkBar" class="bulk-bar">
-            <span id="mBulkCount">0</span> data terpilih
-            <button class="btn-outline" style="color:var(--bad);border-color:var(--bad-line);margin-left:auto;" onclick="deleteMasterSelected()">🗑 Hapus Data Terpilih</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr id="mTableHead">
-                <th style="width:34px;"><input type="checkbox" id="mSelectAll" onchange="toggleMasterSelectAll(this.checked)"></th><th>KODE</th><th>NAMA</th><th>LOKASI</th><th>ALAMAT</th><th>TELEPON</th><th>AKSI</th>
-              </tr></thead>
-              <tbody id="masterBody"></tbody>
             </table>
           </div>
         </div>
@@ -1422,7 +1375,6 @@ const titles = {
   histori:['Histori Service','Riwayat lengkap pembaruan service tiap kendaraan'],
   bengkel:['Keluar Masuk Bengkel','Catat kendaraan yang masuk & keluar bengkel repair'],
   kwitansi:['Kwitansi Pengajuan','Catat kwitansi pengajuan toko / bengkel & status pembayarannya'],
-  masterdata:['Master Data','Kelola daftar Workshop, Customer, Brand, Type & Model'],
   akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
 };
 /* ================= HAK AKSES (Maintenance vs Staff) ================= */
@@ -1455,10 +1407,9 @@ function goPage(p){
   if(p==='histori') renderHistory();
   if(p==='bengkel') renderBengkel();
   if(p==='kwitansi') renderKwitansi();
-  if(p==='masterdata') renderMasterData();
   if(p==='akun') renderAccountPage();
 }
-function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); cancelMasterEdit(); renderMasterData(); renderAccountPage(); }
+function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); renderAccountPage(); }
 
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
@@ -1785,21 +1736,8 @@ async function saveVehicle(logHistory){
       if(logHistory) await recordHistory(v);
     }
     closeVehicleModal(); populateFilterOptions(); renderTable(); renderDashboard(); renderHistory();
-    autoSyncCustomerFromPt(pt);
     showToast(logHistory? 'Data tersimpan & dicatat sebagai update service.':'Data kendaraan tersimpan.');
   }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
-}
-// Setiap kendaraan disimpan, Nama PT-nya otomatis dicatat juga ke Master Data > Customer (kalau belum ada).
-async function autoSyncCustomerFromPt(pt){
-  pt = (pt||'').trim();
-  if(!pt) return;
-  const already = masterByCategory('customer').some(m=>normMasterName(m.name)===normMasterName(pt));
-  if(already) return;
-  try{
-    const rows = await sbInsert('master_data', toDbMaster({category:'customer', name:pt, kode:'', lokasi:'', address:'', phone:''}));
-    DB.master.push(fromDbMaster(rows[0]));
-    if(masterTab==='customer') renderMasterData();
-  }catch(e){ console.error('Gagal auto-sync customer:', e); }
 }
 async function recordHistory(v){
   const h = { vehicleId:v.id, pt:v.pt, nopol:v.nopol, type:v.type, lastdate:v.lastdate, lastkm:v.lastkm, currentkm:v.currentkm,
@@ -2662,9 +2600,7 @@ function exportKwitansi(){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
 }
 
-/* ================= MASTER DATA (Workshop / Customer / Brand / Type / Model) ================= */
-let masterTab = 'workshop';
-let masterSelectedIds = new Set();
+/* ================= DATA PILIHAN (Brand / Type / Model / Workshop) — dipakai dropdown form ================= */
 const MASTER_LABELS = { workshop:'Workshop', customer:'Customer', brand:'Brand', type:'Type', model:'Model' };
 const MASTER_KODE_PREFIX = { workshop:'WS', brand:'', type:'', model:'' };
 const MASTER_KODE_PAD = { workshop:4, brand:0, type:0, model:0 }; // 0 = tanpa angka nol di depan (1,2,3,...)
@@ -2704,275 +2640,6 @@ function nextMasterKode(cat){
   const num = pad>0 ? String(maxSeq+1).padStart(pad,'0') : String(maxSeq+1);
   return `${prefix}${num}`;
 }
-function setMasterTab(t){
-  masterTab = t;
-  masterSelectedIds.clear();
-  document.querySelectorAll('.tab-pill[data-mtab]').forEach(p=>p.classList.toggle('active', p.dataset.mtab===t));
-  cancelMasterEdit();
-  renderMasterData();
-}
-function updateMasterFormMode(){
-  const f = MASTER_FIELDS[masterTab];
-  document.getElementById('mKodeWrap').style.display = f.kode ? '' : 'none';
-  document.getElementById('mLokasiWrap').style.display = f.lokasi ? '' : 'none';
-  document.getElementById('mAddrWrap').style.display = f.addr ? '' : 'none';
-  document.getElementById('mPhoneWrap').style.display = f.phone ? '' : 'none';
-  document.getElementById('mNameLabel').textContent = (masterTab==='workshop' ? 'Nama / Vendor' : 'Nama ' + MASTER_LABELS[masterTab]);
-  document.getElementById('mFormTitle').textContent = (document.getElementById('m_edit_id').value ? 'Edit ' : 'Tambah ') + MASTER_LABELS[masterTab];
-  const addrInput = document.getElementById('m_address');
-  if(addrInput) addrInput.placeholder = f.addr ? 'Alamat lengkap (wajib diisi)' : 'Alamat lengkap';
-  let head = '<th style="width:34px;"><input type="checkbox" id="mSelectAll" onchange="toggleMasterSelectAll(this.checked)"></th>';
-  if(f.kode) head += '<th>KODE</th>';
-  head += '<th>NAMA</th>';
-  if(f.lokasi) head += '<th>LOKASI</th>';
-  if(f.addr) head += '<th>ALAMAT</th>';
-  if(f.phone) head += '<th>TELEPON</th>';
-  head += '<th>AKSI</th>';
-  document.getElementById('mTableHead').innerHTML = head;
-}
-function masterColCount(){
-  const f = MASTER_FIELDS[masterTab];
-  return 3 + (f.kode?1:0) + (f.lokasi?1:0) + (f.addr?1:0) + (f.phone?1:0);
-}
-function renderMasterData(){
-  updateMasterFormMode();
-  const f = MASTER_FIELDS[masterTab];
-  Object.keys(MASTER_LABELS).forEach(cat=>{
-    const el = document.getElementById('mcnt_'+cat);
-    if(el) el.textContent = masterByCategory(cat).length;
-  });
-  const navCount = document.getElementById('navMasterCount');
-  if(navCount) navCount.textContent = DB.master.length;
-  const q = (document.getElementById('m_search')?.value||'').trim().toLowerCase();
-  let list = masterByCategory(masterTab);
-  if(q) list = list.filter(m=>(m.name||'').toLowerCase().includes(q) || (m.kode||'').toLowerCase().includes(q));
-  // urutkan berdasarkan Kode (rapi & berurutan) kalau kategori ini punya kode, kalau tidak urut nama
-  list = [...list].sort((a,b)=> f.kode ? naturalCompare(a.kode, b.kode) || (a.name||'').localeCompare(b.name||'') : (a.name||'').localeCompare(b.name||''));
-  const body = document.getElementById('masterBody');
-  if(!body) return;
-  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="${masterColCount()}">Belum ada data ${MASTER_LABELS[masterTab]}.</td></tr>`; return; }
-  body.innerHTML = list.map(m=>`<tr>
-    <td><input type="checkbox" class="mrowchk" data-id="${m.id}" ${masterSelectedIds.has(m.id)?'checked':''} onchange="onMasterRowCheck('${m.id}',this.checked)"></td>
-    ${f.kode ? `<td>${m.kode||'-'}</td>` : ''}
-    <td><b>${m.name||'-'}</b></td>
-    ${f.lokasi ? `<td>${m.lokasi||'-'}</td>` : ''}
-    ${f.addr ? `<td>${m.address||'-'}</td>` : ''}
-    ${f.phone ? `<td>${m.phone||'-'}</td>` : ''}
-    <td>
-      <div class="aksi-cell">
-        <button class="edit-icon-btn" onclick="editMasterItem('${m.id}')" title="Edit">✎</button>
-        <button class="edit-icon-btn" onclick="deleteMasterItem('${m.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
-      </div>
-    </td>
-  </tr>`).join('');
-  renderMasterBulkBar();
-}
-function onMasterRowCheck(id, checked){ if(checked) masterSelectedIds.add(id); else masterSelectedIds.delete(id); renderMasterBulkBar(); }
-function toggleMasterSelectAll(checked){
-  document.querySelectorAll('.mrowchk').forEach(c=>{ c.checked=checked; if(checked) masterSelectedIds.add(c.dataset.id); else masterSelectedIds.delete(c.dataset.id); });
-  renderMasterBulkBar();
-}
-function renderMasterBulkBar(){
-  const bar = document.getElementById('mBulkBar');
-  if(!bar) return;
-  if(masterSelectedIds.size===0){ bar.classList.remove('show'); return; }
-  bar.classList.add('show');
-  document.getElementById('mBulkCount').textContent = masterSelectedIds.size;
-  const selAll = document.getElementById('mSelectAll');
-  const rowchks = document.querySelectorAll('.mrowchk');
-  if(selAll) selAll.checked = rowchks.length>0 && [...rowchks].every(c=>masterSelectedIds.has(c.dataset.id));
-}
-async function deleteMasterSelected(){
-  if(masterSelectedIds.size===0) return;
-  const ids = [...masterSelectedIds];
-  if(!confirm(`Hapus ${ids.length} data ${MASTER_LABELS[masterTab]} terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
-  try{
-    await sbDeleteIds('master_data', ids);
-    DB.master = DB.master.filter(x=>!masterSelectedIds.has(x.id));
-    masterSelectedIds.clear();
-    renderMasterData();
-    showToast('Data terpilih berhasil dihapus.');
-  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
-}
-async function syncCustomerFromVehicles(){
-  if(masterTab!=='customer'){ showToast('Sync otomatis ini khusus kategori Customer. Untuk Brand/Model/Type, pilih "+ Tambah baru..." langsung di form Tambah Kendaraan — otomatis tersimpan ke Master Data.'); return; }
-  const existing = new Set(masterByCategory('customer').map(m=>normMasterName(m.name)));
-  const names = [...new Set(DB.vehicles.map(v=>(v.pt||'').trim()).filter(Boolean))];
-  const toAdd = names.filter(n=>!existing.has(normMasterName(n)));
-  if(!toAdd.length){ showToast('Semua Nama PT di data kendaraan sudah ada di Master Data Customer.'); return; }
-  if(!confirm(`Tambahkan ${toAdd.length} customer baru dari Nama PT di data kendaraan? Alamat & telepon akan kosong dulu, bisa dilengkapi belakangan lewat ✎ Edit.`)) return;
-  try{
-    const rows = toAdd.map(name=>toDbMaster({category:'customer', name, kode:'', lokasi:'', address:'', phone:''}));
-    const saved = await sbInsert('master_data', rows);
-    DB.master.push(...saved.map(fromDbMaster));
-    renderMasterData();
-    showToast(`${toAdd.length} customer ditambahkan dari data kendaraan. Alamat masih kosong, lengkapi lewat ✎ Edit.`);
-  }catch(e){ console.error(e); showToast('Gagal sync data.', true); }
-}
-function editMasterItem(id){
-  const m = DB.master.find(x=>x.id===id);
-  if(!m) return;
-  document.getElementById('m_edit_id').value = m.id;
-  document.getElementById('m_kode').value = m.kode||'';
-  document.getElementById('m_name').value = m.name||'';
-  document.getElementById('m_lokasi').value = m.lokasi||'';
-  document.getElementById('m_address').value = m.address||'';
-  document.getElementById('m_phone').value = m.phone||'';
-  document.getElementById('mSaveBtn').textContent = 'Simpan Perubahan';
-  document.getElementById('mCancelBtn').style.display = '';
-  updateMasterFormMode();
-}
-function cancelMasterEdit(){
-  document.getElementById('m_edit_id').value = '';
-  document.getElementById('m_name').value = '';
-  document.getElementById('m_lokasi').value = '';
-  document.getElementById('m_address').value = '';
-  document.getElementById('m_phone').value = '';
-  // Kode dibuat otomatis & berurutan supaya rapi, tapi tetap boleh diubah manual kalau perlu
-  document.getElementById('m_kode').value = MASTER_FIELDS[masterTab].kode ? nextMasterKode(masterTab) : '';
-  document.getElementById('mSaveBtn').textContent = '+ Tambah';
-  document.getElementById('mCancelBtn').style.display = 'none';
-  updateMasterFormMode();
-}
-async function saveMasterItem(){
-  const id = document.getElementById('m_edit_id').value;
-  const f = MASTER_FIELDS[masterTab];
-  const name = document.getElementById('m_name').value.trim();
-  if(!name){ showToast(`Isi nama ${MASTER_LABELS[masterTab]} terlebih dahulu.`); return; }
-  const address = document.getElementById('m_address').value.trim();
-  if(f.addr && !address){ showToast(`Alamat ${MASTER_LABELS[masterTab]} wajib diisi.`); return; }
-  const useLoose = ['brand','type','model'].includes(masterTab);
-  const dup = DB.master.find(m=>m.category===masterTab && m.id!==id && (useLoose ? normMasterNameLoose(m.name)===normMasterNameLoose(name) : normMasterName(m.name)===normMasterName(name)));
-  if(dup){ showToast(`${MASTER_LABELS[masterTab]} "${name}" sudah ada di daftar (tersimpan sebagai "${dup.name}").`); return; }
-  let kode = document.getElementById('m_kode').value.trim();
-  if(f.kode && !kode) kode = nextMasterKode(masterTab);
-  const item = {
-    category:masterTab, name, kode,
-    lokasi: document.getElementById('m_lokasi').value.trim(),
-    address,
-    phone: document.getElementById('m_phone').value.trim()
-  };
-  try{
-    if(id){
-      await sbUpdate('master_data', id, toDbMaster(item));
-      const idx = DB.master.findIndex(x=>x.id===id);
-      DB.master[idx] = { ...item, id };
-      showToast(`${MASTER_LABELS[masterTab]} berhasil diperbarui.`);
-    } else {
-      const rows = await sbInsert('master_data', toDbMaster(item));
-      DB.master.push(fromDbMaster(rows[0]));
-      showToast(`${MASTER_LABELS[masterTab]} baru ditambahkan.`);
-    }
-    cancelMasterEdit();
-    renderMasterData();
-  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel master_data sudah dibuat & kolom kode/lokasi sudah ditambahkan di Supabase.', true); }
-}
-async function deleteMasterItem(id){
-  const m = DB.master.find(x=>x.id===id);
-  if(!m) return;
-  if(!confirm(`Hapus "${m.name}" dari daftar ${MASTER_LABELS[m.category]}?`)) return;
-  try{
-    await sbDeleteIds('master_data', [id]);
-    DB.master = DB.master.filter(x=>x.id!==id);
-    masterSelectedIds.delete(id);
-    renderMasterData();
-    showToast('Data berhasil dihapus.');
-  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
-}
-function masterHeaderName(){ return masterTab==='workshop' ? 'Vendor' : 'Nama'; }
-function masterHeaderAddr(){ return 'Alamat Lengkap'; }
-function masterExcelHeaders(){
-  const f = MASTER_FIELDS[masterTab];
-  const h = [];
-  if(f.kode) h.push('Kode');
-  h.push(masterHeaderName());
-  if(f.lokasi) h.push('Lokasi');
-  if(f.addr) h.push(masterHeaderAddr());
-  if(f.phone) h.push('Telepon');
-  return h;
-}
-function exportMasterData(){
-  const f = MASTER_FIELDS[masterTab];
-  const rows = masterByCategory(masterTab).map(m=>{
-    const r = {};
-    if(f.kode) r['Kode'] = m.kode||'';
-    r[masterHeaderName()] = m.name||'';
-    if(f.lokasi) r['Lokasi'] = m.lokasi||'';
-    if(f.addr) r[masterHeaderAddr()] = m.address||'';
-    if(f.phone) r['Telepon'] = m.phone||'';
-    return r;
-  });
-  const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, MASTER_LABELS[masterTab]);
-  XLSX.writeFile(wb, `master-${masterTab}.xlsx`);
-}
-function downloadMasterTemplate(){
-  const ws = XLSX.utils.aoa_to_sheet([masterExcelHeaders()]); const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, MASTER_LABELS[masterTab]);
-  XLSX.writeFile(wb, `template-master-${masterTab}.xlsx`);
-}
-// Cari header (mendukung file template sendiri MAUPUN file kategori seperti TEMPLET_WORKSHOP.xlsx
-// yang headernya tidak di baris pertama dan punya nama kolom Vendor/Alamat Lengkap/Lokasi/Kode).
-function masterFindHeaderRow(aoa){
-  const wanted = ['nama','vendor','kode','alamat','alamat lengkap','lokasi','telepon'];
-  for(let i=0;i<Math.min(aoa.length,10);i++){
-    const row = aoa[i]||[];
-    const hit = row.some(c=> wanted.includes(String(c||'').trim().toLowerCase()));
-    if(hit) return i;
-  }
-  return 0;
-}
-async function importMasterData(evt){
-  const file = evt.target.files[0]; if(!file) return;
-  const f = MASTER_FIELDS[masterTab];
-  const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, {type:'array'});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
-  const headerIdx = masterFindHeaderRow(aoa);
-  const headerRow = (aoa[headerIdx]||[]).map(c=>String(c||'').trim().toLowerCase());
-  const colIdx = key => headerRow.findIndex(h=>key.includes(h) && h!=='');
-  const nameCol = colIdx(['nama','vendor']);
-  const kodeCol = colIdx(['kode']);
-  const lokasiCol = colIdx(['lokasi','kota']);
-  const addrCol = colIdx(['alamat lengkap','alamat']);
-  const phoneCol = colIdx(['telepon','telp','telp/fax','telepon / fax']);
-  const toInsert = []; let skippedDup=0, skippedNoAddr=0, skippedDupList=[], skippedNoAddrList=[];
-  const seen = new Set(masterByCategory(masterTab).map(m=>normMasterName(m.name)));
-  // untuk kode otomatis & berurutan pada baris yang kolom Kode-nya kosong
-  const prefix = MASTER_KODE_PREFIX[masterTab] || '';
-  const pad = MASTER_KODE_PAD[masterTab] || 0;
-  let seq = 0;
-  masterByCategory(masterTab).forEach(m=>{ const mt=(m.kode||'').match(new RegExp('^'+prefix+'(\\d+)$','i')); if(mt){ const n=parseInt(mt[1],10); if(n>seq) seq=n; } });
-  for(let i=headerIdx+1;i<aoa.length;i++){
-    const row = aoa[i]||[];
-    const name = String(nameCol>=0 ? (row[nameCol]||'') : '').trim();
-    if(!name) continue; // baris kosong / baris judul kategori (misal "ACCU","TOKO BAN") otomatis dilewati
-    const key = normMasterName(name);
-    if(seen.has(key)){ skippedDup++; skippedDupList.push(name); continue; }
-    const address = addrCol>=0 ? String(row[addrCol]||'').trim() : '';
-    if(f.addr && !address){ skippedNoAddr++; skippedNoAddrList.push(name); continue; } // data tanpa alamat tidak dimasukkan
-    seen.add(key);
-    let kode = kodeCol>=0 ? String(row[kodeCol]||'').trim() : '';
-    if(f.kode && !kode){ seq++; kode = `${prefix}${pad>0 ? String(seq).padStart(pad,'0') : String(seq)}`; }
-    toInsert.push(toDbMaster({
-      category:masterTab, name, kode,
-      lokasi: lokasiCol>=0 ? String(row[lokasiCol]||'').trim() : '',
-      address,
-      phone: phoneCol>=0 ? String(row[phoneCol]||'').trim() : ''
-    }));
-  }
-  try{
-    if(toInsert.length){ const rowsSaved = await sbInsert('master_data', toInsert); DB.master.push(...rowsSaved.map(fromDbMaster)); }
-    renderMasterData();
-    let msg = `Import selesai: ${toInsert.length} data ditambahkan.`;
-    if(skippedDup) msg += ` ${skippedDup} dilewati (nama duplikat: ${skippedDupList.slice(0,5).join(', ')}${skippedDup>5?', ...':''}).`;
-    if(skippedNoAddr) msg += ` ${skippedNoAddr} dilewati (tanpa alamat: ${skippedNoAddrList.slice(0,5).join(', ')}${skippedNoAddr>5?', ...':''}).`;
-    showToast(msg);
-  }catch(e){ console.error(e); showToast('Gagal mengimpor ke database. Pastikan tabel master_data & kolom kode/lokasi sudah dibuat.', true); }
-  evt.target.value='';
-}
-
 /* ================= EXCEL ================= */
 const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Type','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
 function exportExcel(){
@@ -3159,7 +2826,6 @@ function deb(fn, ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn
 const debTable = deb(()=>renderTable());
 const debBengkel = deb(()=>renderBengkel());
 const debKwitansi = deb(()=>renderKwitansi());
-const debMaster = deb(()=>renderMasterData());
 const debHistory = deb(()=>renderHistory());
 
 /* ================= NOTIFIKASI DESKTOP ================= */
