@@ -1203,7 +1203,7 @@ function dataImgGroups(onlyKey){
   return byPt;
 }
 function drawDataImage(pt, arr){
-  const S = 2, W = 1040, rowH = 46, headH = 96, colHead = 44, footH = 56;
+  const S = 2, W = 1100, rowH = 46, headH = 96, colHead = 44, footH = 56;
   const H = headH + colHead + rowH*arr.length + footH;
   const c = document.createElement('canvas'); c.width=W*S; c.height=H*S;
   const x = c.getContext('2d'); x.scale(S,S);
@@ -1218,9 +1218,11 @@ function drawDataImage(pt, arr){
   const cols = [
     {t:'No',w:44,f:(v,i)=>String(i+1)},
     {t:'Nopol',w:130,f:v=>v.nopol||'-',b:true},
-    {t:'Kendaraan',w:290,f:v=>vLabel(v)},
-    {t:'Terakhir Service',w:170,f:v=>`${fmtDate(v.lastdate)}`, sub:v=>`${(v.lastkm||0).toLocaleString('id-ID')} KM`},
-    {t:'Estimasi Berikutnya',w:190,f:v=>fmtDate(v.nextdate), sub:v=>`${(v.nextkm||0).toLocaleString('id-ID')} KM`},
+    {t:'Kendaraan',w:250,f:v=>vLabel(v)},
+    {t:'Terakhir Service',w:160,f:v=>`${fmtDate(v.lastdate)}`, sub:v=>`${(v.lastkm||0).toLocaleString('id-ID')} KM`},
+    {t:'KM Aktual',w:130,f:v=>v.currentkm ? `${Number(v.currentkm).toLocaleString('id-ID')} KM` : '-', b:true,
+      sub:v=>{ if(!v.currentkm || !v.nextkm) return ''; const d = Number(v.nextkm)-Number(v.currentkm); return d>=0 ? `sisa ${d.toLocaleString('id-ID')} KM` : `lewat ${Math.abs(d).toLocaleString('id-ID')} KM`; }},
+    {t:'Estimasi Berikutnya',w:175,f:v=>fmtDate(v.nextdate), sub:v=>`${(v.nextkm||0).toLocaleString('id-ID')} KM`},
     {t:'Status',w:0,f:v=>statusLabel(statusOf(v)),status:true}
   ];
   const used = cols.reduce((a,c)=>a+c.w,0); cols[cols.length-1].w = W-56-used;
