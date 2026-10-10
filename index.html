@@ -683,9 +683,10 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Nama User / Driver</label><input id="v_user"></div>
       <div><label>Nomor Telepon (format 08xx / 62xx)</label><input id="v_phone"></div>
       <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase"></div>
-      <div><label>Brand</label><select id="v_brand" onchange="onVehicleTypeSelectChange('v_brand')"></select></div>
-      <div><label>Model</label><select id="v_model" onchange="onVehicleTypeSelectChange('v_model')"></select></div>
-      <div><label>Type / Varian</label><select id="v_type" onchange="onVehicleTypeSelectChange('v_type')"></select></div>
+      <div><label>Brand</label><input id="v_brand" list="vBrandList" placeholder="Contoh: Daihatsu"></div>
+      <div><label>Model</label><input id="v_model" list="vModelList" placeholder="Contoh: Granmax"></div>
+      <div><label>Type / Varian</label><input id="v_type" list="vTypeList" placeholder="Contoh: 1.3 BV AC">
+        <datalist id="vBrandList"></datalist><datalist id="vModelList"></datalist><datalist id="vTypeList"></datalist></div>
       <div><label>Warna</label><input id="v_color"></div>
       <div><label>Tahun</label><input id="v_year" type="number"></div>
       <div><label>Tanggal Terakhir Service</label><input id="v_lastdate" type="date" oninput="liveCalc()"></div>
@@ -935,7 +936,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_c7-ZUEFGufFp2lMT5CK7zQ_ZyRZShW-";
 
 const isConfigured = !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
 
-let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], master:[], kwitansi:[] };
+let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], kwitansi:[] };
 let currentUser = null;
 let quickTab = 'all';
 let selectedIds = new Set();
@@ -989,8 +990,6 @@ const toDbBengkel = b => { const o = { vehicle_id:b.vehicleId||null, nopol:b.nop
   if(b.pic || b.picPhone || b.picCol){ o.pic = b.pic||''; o.pic_phone = b.picPhone||''; }
   return o; };
 
-const fromDbMaster = r => ({ id:r.id, category:r.category, kode:r.kode||'', name:r.name, lokasi:r.lokasi||'', address:r.address, phone:r.phone });
-const toDbMaster = m => ({ category:m.category, kode:m.kode||'', name:m.name||'', lokasi:m.lokasi||'', address:m.address||'', phone:m.phone||'' });
 
 
 /* ================= LOAD & PERSIST ================= */
@@ -1025,13 +1024,6 @@ async function loadAll(){
     }catch(e){
       console.warn('Tabel kwitansi_pengajuan belum tersedia — jalankan SQL tambahan untuk fitur Kwitansi Pengajuan.', e);
       DB.kwitansi = [];
-    }
-    try{
-      const mRows = await sbGet('master_data','select=*&order=name.asc');
-      DB.master = (mRows||[]).map(fromDbMaster);
-    }catch(e){
-      console.warn('Tabel master_data belum tersedia — jalankan SQL tambahan untuk fitur Master Data.', e);
-      DB.master = [];
     }
   }catch(e){
     console.error('Gagal memuat data dari Supabase:', e);
@@ -1630,59 +1622,18 @@ async function deleteSelected(){
 }
 
 /* ================= MODAL KENDARAAN ================= */
-const VEHICLE_TYPE_SELECT_CAT = { v_brand:'brand', v_model:'model', v_type:'type' };
+// Saran Brand / Model / Type diambil dari data kendaraan yang sudah ada (tidak ada master data terpisah)
 function populateVehicleTypeSelects(){
-  const mk = (id, cat, placeholder) => {
-    const el = document.getElementById(id);
-    const opts = masterByCategory(cat);
-    el.innerHTML = `<option value="">${placeholder}</option>`
-      + opts.map(m=>`<option value="${m.name}">${m.name}</option>`).join('')
-      + `<option value="__new__">+ Tambah ${MASTER_LABELS[cat]} baru...</option>`;
+  const fill = (listId, key)=>{
+    const vals = [...new Set(DB.vehicles.map(v=>String(v[key]||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'id'));
+    document.getElementById(listId).innerHTML = vals.map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
   };
-  mk('v_brand','brand','Pilih Brand');
-  mk('v_model','model','Pilih Model');
-  mk('v_type','type','Pilih Type/Varian');
+  fill('vBrandList','brand'); fill('vModelList','model'); fill('vTypeList','type');
 }
-async function onVehicleTypeSelectChange(selId){
-  const el = document.getElementById(selId);
-  if(el.value !== '__new__') return;
-  const cat = VEHICLE_TYPE_SELECT_CAT[selId];
-  const name = (prompt(`Nama ${MASTER_LABELS[cat]} baru:`)||'').trim();
-  if(!name){ el.value=''; return; }
-  const dup = masterByCategory(cat).find(m=>normMasterNameLoose(m.name)===normMasterNameLoose(name));
-  if(dup){
-    el.value = dup.name;
-    showToast(`⚠️ "${name}" sudah ada di Master Data (tersimpan sebagai "${dup.name}") — dipilih yang sudah ada, tidak dibuat baru.`, true);
-    return;
-  }
-  try{
-    const kode = MASTER_FIELDS[cat].kode ? nextMasterKode(cat) : '';
-    const rows = await sbInsert('master_data', toDbMaster({category:cat, name, kode, lokasi:'', address:'', phone:''}));
-    DB.master.push(fromDbMaster(rows[0]));
-    populateVehicleTypeSelects();
-    el.value = name;
-    showToast(`${MASTER_LABELS[cat]} "${name}" ditambahkan ke Master Data.`);
-  }catch(e){ console.error(e); showToast('Gagal menambah ke Master Data.', true); el.value=''; }
-}
-// Kalau kendaraan lama masih punya data lama (Tipe Mobil gabungan seperti "Toyota Avanza G"),
-// coba tebak pecahannya ke Brand/Model/Type supaya tidak kosong pas dibuka untuk diedit.
-// Brand & Model & Type tetap disimpan sebagai 3 kolom TERPISAH (tidak digabung lagi).
 function guessVehicleTypeSelects(v){
   document.getElementById('v_brand').value = v?.brand || '';
   document.getElementById('v_model').value = v?.model || '';
   document.getElementById('v_type').value = v?.type || '';
-  if(v && !v.brand && !v.model && v.type){
-    // fallback untuk data lama sebelum Brand/Model dipisah
-    const legacy = v.type.trim();
-    const brands = [...masterByCategory('brand')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
-    const mb = brands.find(b=> b.name && (legacy.toLowerCase()===b.name.toLowerCase() || legacy.toLowerCase().startsWith(b.name.toLowerCase()+' ')));
-    let rest = legacy;
-    if(mb){ document.getElementById('v_brand').value = mb.name; rest = legacy.slice(mb.name.length).trim(); }
-    const models = [...masterByCategory('model')].sort((a,b)=>(b.name||'').length-(a.name||'').length);
-    const mm = models.find(m=> m.name && (rest.toLowerCase()===m.name.toLowerCase() || rest.toLowerCase().startsWith(m.name.toLowerCase()+' ')));
-    if(mm){ document.getElementById('v_model').value = mm.name; rest = rest.slice(mm.name.length).trim(); }
-    document.getElementById('v_type').value = rest || legacy;
-  }
 }
 function openVehicleModal(id){
   document.getElementById('vModalTitle').textContent = id? 'Edit / Update Kendaraan':'Tambah Kendaraan';
@@ -2538,7 +2489,7 @@ function kwFillLists(){
   document.getElementById('kwVehicleList').innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${escH(n)}">`).join('');
   const pts = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort();
   document.getElementById('kwPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
-  const tokos = [...new Set(['Padimas','IRM','Lido','Kita','Layanan', ...DB.bengkel.map(b=>b.bengkel), ...DB.kwitansi.map(k=>k.toko), ...masterByCategory('workshop').map(m=>m.name)].filter(Boolean))];
+  const tokos = [...new Set(['Padimas','IRM','Lido','Kita','Layanan', ...DB.bengkel.map(b=>b.bengkel), ...DB.kwitansi.map(k=>k.toko)].filter(Boolean))];
   document.getElementById('kwTokoList').innerHTML = tokos.map(n=>`<option value="${escH(n)}">`).join('');
 }
 function kwAutofillFromVehicle(){
@@ -2602,46 +2553,6 @@ function exportKwitansi(){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
 }
 
-/* ================= DATA PILIHAN (Brand / Type / Model / Workshop) — dipakai dropdown form ================= */
-const MASTER_LABELS = { workshop:'Workshop', customer:'Customer', brand:'Brand', type:'Type', model:'Model' };
-const MASTER_KODE_PREFIX = { workshop:'WS', brand:'', type:'', model:'' };
-const MASTER_KODE_PAD = { workshop:4, brand:0, type:0, model:0 }; // 0 = tanpa angka nol di depan (1,2,3,...)
-// field yang dipakai tiap kategori: kode = kode internal, lokasi = kota, addr = alamat lengkap, phone = telepon
-const MASTER_FIELDS = {
-  workshop: { kode:true,  lokasi:true,  addr:true,  phone:true  },
-  customer: { kode:false, lokasi:false, addr:true,  phone:true  },
-  brand:    { kode:true,  lokasi:false, addr:false, phone:false },
-  type:     { kode:true,  lokasi:false, addr:false, phone:false },
-  model:    { kode:true,  lokasi:false, addr:false, phone:false }
-};
-function normMasterName(s){ return String(s||'').trim().replace(/\s+/g,' ').toLowerCase(); }
-// Versi "longgar": kata-katanya diurutkan dulu, jadi "Granmax BV 1.3" dan "Granmax 1.3 BV" dianggap sama persis.
-function normMasterNameLoose(s){ return normMasterName(s).split(' ').filter(Boolean).sort().join(' '); }
-function masterByCategory(cat){ return DB.master.filter(m=>m.category===cat); }
-// urutkan kode secara "natural" (WS2 sebelum WS10, bukan urut huruf biasa)
-function naturalCompare(a,b){
-  a=String(a||''); b=String(b||'');
-  const ax=[], bx=[];
-  a.replace(/(\d+)|(\D+)/g, (_,d,s)=>{ ax.push([d?parseInt(d,10):Infinity, s||'']); return ''; });
-  b.replace(/(\d+)|(\D+)/g, (_,d,s)=>{ bx.push([d?parseInt(d,10):Infinity, s||'']); return ''; });
-  while(ax.length && bx.length){
-    const an=ax.shift(), bn=bx.shift();
-    const cmp = (an[0]-bn[0]) || an[1].localeCompare(bn[1]);
-    if(cmp) return cmp;
-  }
-  return ax.length-bx.length;
-}
-function nextMasterKode(cat){
-  const prefix = MASTER_KODE_PREFIX[cat] || '';
-  const pad = MASTER_KODE_PAD[cat] || 0;
-  let maxSeq = 0;
-  masterByCategory(cat).forEach(m=>{
-    const match = (m.kode||'').match(new RegExp('^'+prefix+'(\\d+)$','i'));
-    if(match){ const n=parseInt(match[1],10); if(n>maxSeq) maxSeq=n; }
-  });
-  const num = pad>0 ? String(maxSeq+1).padStart(pad,'0') : String(maxSeq+1);
-  return `${prefix}${num}`;
-}
 /* ================= EXCEL ================= */
 const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Type','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
 function exportExcel(){
