@@ -273,6 +273,23 @@
   .status-badge.warn{background:var(--warn-bg);color:var(--warn);}
   .status-badge.bad{background:var(--bad-bg);color:var(--bad);}
   .status-badge.info{background:#e8f0ff;color:#1d4ed8;}
+  .sp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;align-items:start;}
+  .sp-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(16,24,40,.04);}
+  .sp-card.all-ready{opacity:.8;}
+  .sp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  .sp-pt{font-size:12.5px;color:var(--ink-soft);font-weight:700;flex:1;min-width:0;}
+  .sp-prog{font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;background:var(--warn-bg);color:var(--warn);}
+  .sp-prog.ok{background:var(--ok-bg);color:var(--ok);}
+  .sp-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);}
+  .sp-chk{display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer;}
+  .sp-chk input{width:20px;height:20px;accent-color:var(--ok);cursor:pointer;flex:none;}
+  .sp-name{font-size:14px;font-weight:700;color:var(--ink);word-break:break-word;}
+  .sp-item.done .sp-name{text-decoration:line-through;color:var(--ink-soft);}
+  .sp-meta{font-size:11px;color:var(--ink-soft);font-weight:700;text-align:right;white-space:nowrap;}
+  .sp-item.done .sp-meta{color:var(--ok);}
+  .sp-row{display:flex;gap:8px;margin-bottom:8px;}
+  .sp-row input{flex:1;}
+  .sp-x{border:1px solid var(--bad-line);color:var(--bad);background:#fff;border-radius:10px;width:40px;cursor:pointer;}
   .inl-sel{appearance:none;-webkit-appearance:none;border:none;border-radius:100px;padding:5px 22px 5px 10px;font-size:10.8px;font-weight:800;cursor:pointer;font-family:inherit;background-repeat:no-repeat;background-position:right 8px center;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23667085' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");max-width:150px;}
   .inl-sel.ok{background-color:var(--ok-bg);color:var(--ok);}
   .inl-sel.warn{background-color:var(--warn-bg);color:var(--warn);}
@@ -408,6 +425,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')"><span class="l"><span class="ic">📊</span> Dashboard</span></div>
       <div class="nav-item" data-page="reminder" onclick="goPage('reminder')"><span class="l"><span class="ic">🚗</span> Reminder / Data Kendaraan</span><span class="count" id="navReminderCount">0</span></div>
+      <div class="nav-item" data-page="sparepart" onclick="goPage('sparepart')"><span class="l"><span class="ic">🔩</span> Pending Sparepart</span><span class="count" id="navSparepartCount">0</span></div>
       <div class="nav-item" data-page="histori" onclick="goPage('histori')"><span class="l"><span class="ic">🕘</span> Histori Service</span></div>
       <div class="nav-item" data-page="bengkel" onclick="goPage('bengkel')"><span class="l"><span class="ic">🏭</span> Keluar Masuk Bengkel</span><span class="count" id="navBengkelCount">0</span></div>
       <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
@@ -536,6 +554,24 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           </div>
         </div>
 
+        <div class="page" id="page-sparepart">
+          <div class="toolbar">
+            <button class="btn btn-primary small" id="spAddBtn" onclick="openSparepartModal()">+ Tambah Pending Sparepart</button>
+            <div class="spacer"></div>
+            <button class="btn-outline" id="spExportBtn" onclick="exportSparepart()">⭳ Export Excel</button>
+          </div>
+          <div class="small-note" id="spGudangHint" style="display:none;margin:0 0 10px;">Centang sparepart yang sudah <b>ready</b> di gudang. Data pending hanya bisa ditambah oleh admin maintenance.</div>
+          <div class="filter-row">
+            <div class="search-box">🔍 <input id="sp_search" oninput="debSparepart()" placeholder="Cari nopol, PT, atau sparepart..."></div>
+          </div>
+          <div class="tabs-row">
+            <div class="tab-pill active" data-tab="all" onclick="setSpTab('all')">Semua <span class="cnt" id="sp_cnt_all">0</span></div>
+            <div class="tab-pill" data-tab="pending" onclick="setSpTab('pending')"><span class="cdot" style="background:var(--warn);"></span> Belum Ready <span class="cnt" id="sp_cnt_pending">0</span></div>
+            <div class="tab-pill" data-tab="ready" onclick="setSpTab('ready')"><span class="cdot" style="background:var(--ok);"></span> Sudah Ready <span class="cnt" id="sp_cnt_ready">0</span></div>
+          </div>
+          <div class="sp-list" id="sparepartBody"></div>
+        </div>
+
         <div class="page" id="page-histori">
           <div class="filter-row">
             <input oninput="debHistory()" id="h_nopol" placeholder="Cari nopol" class="filter-select" style="min-width:150px;">
@@ -658,7 +694,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <div class="form-grid">
                 <div><label>Username Baru</label><input id="new_acc_user" type="text"></div>
                 <div><label>Password</label><input id="new_acc_pass" type="text"></div>
-                <div><label>Role</label><select id="new_acc_role"><option value="Maintenance">Maintenance (akses semua menu)</option><option value="Staff">Staff (hanya Keluar Masuk Bengkel)</option></select></div>
+                <div><label>Role</label><select id="new_acc_role"><option value="Maintenance">Maintenance (akses semua menu)</option><option value="Staff">Staff (hanya Keluar Masuk Bengkel)</option><option value="Gudang">Gudang (hanya ceklis Pending Sparepart)</option></select></div>
               </div>
               <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;"><button class="btn-outline" onclick="addAccount()">+ Tambah Akun</button></div>
               <div class="hr"></div>
@@ -821,6 +857,38 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   </div>
 </div>
 
+<!-- MODAL: Pending Sparepart -->
+<div class="modal-bg" id="spModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <div><h3 id="spModalTitle">Tambah Pending Sparepart</h3><p class="sub">Satu mobil bisa punya lebih dari satu sparepart yang masih ditunggu.</p></div>
+      <button class="x-btn" onclick="closeSparepartModal()">✕</button>
+    </div>
+    <input type="hidden" id="sp_edit_id">
+    <div class="form-grid">
+      <div>
+        <label>Nopol</label>
+        <input id="sp_nopol" list="spVehicleList" placeholder="Ketik nomor polisi..." style="text-transform:uppercase" oninput="spAutofill()" onchange="spAutofill()">
+        <datalist id="spVehicleList"></datalist>
+      </div>
+      <div>
+        <label>Nama PT / Standby</label>
+        <input id="sp_pt" list="spPtList" placeholder="Terisi otomatis dari nopol">
+        <datalist id="spPtList"></datalist>
+      </div>
+      <div class="full">
+        <label id="spItemsLabel">Sparepart yang pending</label>
+        <div id="spItems"></div>
+        <button type="button" class="btn-outline" id="spAddItemBtn" onclick="spAddItemRow()">+ Tambah sparepart lagi</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeSparepartModal()">Batal</button>
+      <button class="btn btn-primary small" id="spSaveBtn" onclick="saveSparepart()">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Nama pengirim WA -->
 <div class="modal-bg" id="waSenderModalBg">
   <div class="modal">
@@ -936,7 +1004,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_c7-ZUEFGufFp2lMT5CK7zQ_ZyRZShW-";
 
 const isConfigured = !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
 
-let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], kwitansi:[] };
+let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], kwitansi:[], sparepart:[] };
 let currentUser = null;
 let quickTab = 'all';
 let selectedIds = new Set();
@@ -986,6 +1054,7 @@ const toDbAccount = a => ({ username:a.username, password:a.password, role:a.rol
 const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file), pic:r.pic||'', picPhone:r.pic_phone||'', picCol:('pic' in r) });
 const fromDbKwitansi = r => ({ id:r.id, tanggal:r.tanggal||(r.created_at?String(r.created_at).slice(0,10):''), toko:r.toko||'', nopol:r.nopol||'', pt:r.pt||'', note:r.keterangan||'', bayar:r.pembayaran||'Paid Bu Ika' });
 const toDbKwitansi = k => ({ tanggal:k.tanggal||null, toko:k.toko||'', nopol:k.nopol||'', pt:k.pt||'', keterangan:k.note||'', pembayaran:k.bayar||'Paid Bu Ika' });
+const fromDbSparepart = r => ({ id:r.id, nopol:r.nopol||'', pt:r.pt||'', name:r.sparepart||'', ready:!!r.ready, readyBy:r.ready_by||'', readyAt:r.ready_at||'', createdBy:r.created_by||'', createdAt:r.created_at||'' });
 const toDbBengkel = b => { const o = { vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' };
   if(b.pic || b.picPhone || b.picCol){ o.pic = b.pic||''; o.pic_phone = b.picPhone||''; }
   return o; };
@@ -1024,6 +1093,13 @@ async function loadAll(){
     }catch(e){
       console.warn('Tabel kwitansi_pengajuan belum tersedia — jalankan SQL tambahan untuk fitur Kwitansi Pengajuan.', e);
       DB.kwitansi = [];
+    }
+    try{
+      const spRows = await sbGet('sparepart_pending','select=*&order=created_at.desc');
+      DB.sparepart = (spRows||[]).map(fromDbSparepart);
+    }catch(e){
+      console.warn('Tabel sparepart_pending belum tersedia — jalankan SQL tambahan untuk fitur Pending Sparepart.', e);
+      DB.sparepart = [];
     }
   }catch(e){
     console.error('Gagal memuat data dari Supabase:', e);
@@ -1346,7 +1422,7 @@ async function doLogin(){
   updateDbStatusUI();
   applyAccess();
   renderAll();
-  goPage(isMaintenance() ? 'dashboard' : 'bengkel');
+  goPage(homePage());
 }
 function doLogout(){
   currentUser=null;
@@ -1368,29 +1444,34 @@ const titles = {
   reminder:['Reminder & Data Kendaraan','Sistem Pengingat Jadwal Perawatan & Inventaris Armada Terpusat'],
   histori:['Histori Service','Riwayat lengkap pembaruan service tiap kendaraan'],
   bengkel:['Keluar Masuk Bengkel','Catat kendaraan yang masuk & keluar bengkel repair'],
+  sparepart:['Pending Sparepart','Sparepart mobil yang masih ditunggu — gudang mencentang jika sudah ready'],
   kwitansi:['Kwitansi Pengajuan','Catat kwitansi pengajuan toko / bengkel & status pembayarannya'],
   akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
 };
-/* ================= HAK AKSES (Maintenance vs Staff) ================= */
-// Maintenance = semua menu. Staff/Viewer = hanya Keluar Masuk Bengkel.
+/* ================= HAK AKSES (Maintenance / Staff / Gudang) ================= */
+// Maintenance = semua menu. Staff/Viewer = hanya Keluar Masuk Bengkel. Gudang = hanya Pending Sparepart (ceklis ready).
 // Akun bawaan DPM2026 selalu Maintenance supaya tidak bisa terkunci.
-const STAFF_PAGES = ['bengkel'];
+const ROLE_PAGES = { staff:['bengkel'], gudang:['sparepart'] };
 function roleKind(a){
   if(!a) return 'staff';
   if(String(a.username||'').trim().toUpperCase()==='DPM2026') return 'maintenance';
   const r = String(a.role||'').trim().toLowerCase();
+  if(r==='gudang') return 'gudang';
   return (r==='staff' || r==='viewer') ? 'staff' : 'maintenance';
 }
 function isMaintenance(){ return roleKind(currentUser)==='maintenance'; }
-function canAccess(p){ return isMaintenance() || STAFF_PAGES.includes(p); }
+function isGudang(){ return roleKind(currentUser)==='gudang'; }
+function canAccess(p){ return isMaintenance() || (ROLE_PAGES[roleKind(currentUser)]||['bengkel']).includes(p); }
+function homePage(){ const k = roleKind(currentUser); return k==='maintenance' ? 'dashboard' : k==='gudang' ? 'sparepart' : 'bengkel'; }
 function applyAccess(){
   const full = isMaintenance();
-  document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || STAFF_PAGES.includes(n.dataset.page)) ? '' : 'none'; });
+  const allowed = ROLE_PAGES[roleKind(currentUser)] || ['bengkel'];
+  document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || allowed.includes(n.dataset.page)) ? '' : 'none'; });
   ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
-  const r = document.getElementById('whoRole'); if(r) r.textContent = full ? 'Maintenance' : 'Staff';
+  const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
 }
 function goPage(p){
-  if(!canAccess(p)) p = 'bengkel';
+  if(!canAccess(p)) p = homePage();
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===p));
   document.querySelectorAll('.page').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -1401,9 +1482,10 @@ function goPage(p){
   if(p==='histori') renderHistory();
   if(p==='bengkel') renderBengkel();
   if(p==='kwitansi') renderKwitansi();
+  if(p==='sparepart') renderSparepart();
   if(p==='akun') renderAccountPage();
 }
-function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); renderAccountPage(); }
+function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); renderSparepart(); renderAccountPage(); }
 
 /* ================= DASHBOARD ================= */
 function renderDashboard(){
@@ -2553,6 +2635,153 @@ function exportKwitansi(){
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
 }
 
+/* ================= PENDING SPAREPART ================= */
+let spTab = 'all';
+function setSpTab(t){ spTab=t; document.querySelectorAll('#page-sparepart .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderSparepart(); }
+function filteredSparepart(){
+  const q = (document.getElementById('sp_search')?.value||'').trim().toLowerCase();
+  return DB.sparepart.filter(it=>{
+    if(spTab==='pending' && it.ready) return false;
+    if(spTab==='ready' && !it.ready) return false;
+    if(q && !`${it.nopol} ${it.pt} ${it.name}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function spTimeLabel(iso){
+  if(!iso) return '';
+  const d = new Date(iso); if(isNaN(d)) return '';
+  return d.toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function renderSparepart(){
+  const all = DB.sparepart, canEdit = isMaintenance();
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const pend = all.filter(x=>!x.ready).length;
+  set('sp_cnt_all', all.length); set('sp_cnt_pending', pend); set('sp_cnt_ready', all.length-pend); set('navSparepartCount', pend);
+  const show = (id,on)=>{ const el=document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  show('spAddBtn', canEdit); show('spExportBtn', canEdit); show('spGudangHint', !canEdit);
+  const body = document.getElementById('sparepartBody'); if(!body) return;
+  const list = filteredSparepart();
+  if(!list.length){ body.innerHTML = `<div class="gal-empty" style="grid-column:1/-1;">Belum ada data pending sparepart yang cocok.</div>`; return; }
+  const groups = new Map();
+  list.forEach(it=>{
+    const k = normNopol(it.nopol) || it.id;
+    if(!groups.has(k)) groups.set(k, { nopol:it.nopol, pt:it.pt, items:[], newest:'' });
+    const g = groups.get(k); g.items.push(it);
+    if(!g.pt && it.pt) g.pt = it.pt;
+    if((it.createdAt||'') > g.newest) g.newest = it.createdAt||'';
+  });
+  const arr = [...groups.values()].sort((a,b)=>{
+    const pa = a.items.some(i=>!i.ready) ? 0 : 1, pb = b.items.some(i=>!i.ready) ? 0 : 1;
+    return pa-pb || (b.newest||'').localeCompare(a.newest||'');
+  });
+  body.innerHTML = arr.map(g=>{
+    const done = g.items.filter(i=>i.ready).length, total = g.items.length, allDone = done===total;
+    const items = g.items.slice().sort((a,b)=>(a.ready-b.ready) || (a.createdAt||'').localeCompare(b.createdAt||'')).map(it=>`
+      <div class="sp-item ${it.ready?'done':''}">
+        <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-name">${escH(it.name)}</span></label>
+        <span class="sp-meta">${it.ready ? `✔ Ready • ${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang'}</span>
+        ${canEdit ? `<button class="edit-icon-btn" onclick="openSparepartModal({editId:'${it.id}'})" title="Edit">✎</button><button class="edit-icon-btn" style="color:var(--bad);border-color:var(--bad-line);" onclick="deleteSparepart('${it.id}')" title="Hapus">🗑</button>` : ''}
+      </div>`).join('');
+    return `<div class="sp-card ${allDone?'all-ready':''}">
+      <div class="sp-head">
+        <span class="nopol-badge" style="cursor:default;">${escH(g.nopol)||'-'}</span>
+        <span class="sp-pt">${escH(g.pt)||'-'}</span>
+        <span class="sp-prog ${allDone?'ok':''}">${done}/${total} ready</span>
+        ${canEdit ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}'})">＋</button>` : ''}
+      </div>${items}</div>`;
+  }).join('');
+}
+async function toggleSparepartReady(id, checked){
+  if(!(isMaintenance() || isGudang())) return;
+  const it = DB.sparepart.find(x=>x.id===id); if(!it) return;
+  const prev = { ready:it.ready, readyBy:it.readyBy, readyAt:it.readyAt };
+  it.ready = checked; it.readyBy = checked ? (currentUser?.username||'') : ''; it.readyAt = checked ? new Date().toISOString() : '';
+  renderSparepart();
+  try{
+    await sbUpdate('sparepart_pending', id, { ready:it.ready, ready_by:it.readyBy||null, ready_at:it.readyAt||null });
+    showToast(checked ? `${it.name} (${it.nopol}) ditandai ready.` : `${it.name} (${it.nopol}) dikembalikan ke belum ready.`);
+  }catch(e){ console.error(e); Object.assign(it, prev); renderSparepart(); showToast('Gagal menyimpan. Pastikan tabel sparepart_pending sudah dibuat di Supabase.', true); }
+}
+function spFillLists(){
+  const nopols = [...new Set([...DB.vehicles.map(v=>v.nopol), ...DB.bengkel.map(b=>b.nopol), ...DB.sparepart.map(x=>x.nopol)].filter(Boolean))].sort();
+  document.getElementById('spVehicleList').innerHTML = nopols.map(n=>`<option value="${escH(n)}">`).join('');
+  const pts = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort();
+  document.getElementById('spPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
+}
+function spAutofill(){
+  const k = normNopol(document.getElementById('sp_nopol').value); if(!k) return;
+  const ptEl = document.getElementById('sp_pt');
+  if(ptEl.value.trim() && ptEl.dataset.auto!=='1') return;
+  const v = DB.vehicles.find(x=>normNopol(x.nopol)===k);
+  const b = !v && DB.bengkel.find(x=>normNopol(x.nopol)===k);
+  const pt = (v && v.pt) || (b && b.pt) || '';
+  if(pt){ ptEl.value = pt; ptEl.dataset.auto = '1'; }
+}
+function spAddItemRow(val){
+  const wrap = document.getElementById('spItems');
+  const row = document.createElement('div'); row.className = 'sp-row';
+  row.innerHTML = `<input class="sp-item-input" placeholder="Contoh: Kampas rem depan"><button type="button" class="sp-x" title="Hapus baris">✕</button>`;
+  const inp = row.querySelector('input'); inp.value = val||'';
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!document.getElementById('spAddItemBtn').style.display) { spAddItemRow(); } } });
+  row.querySelector('button').onclick = ()=>{ if(wrap.children.length>1) row.remove(); else inp.value=''; };
+  wrap.appendChild(row); inp.focus();
+}
+function openSparepartModal(opt){
+  if(!isMaintenance()){ showToast('Hanya admin maintenance yang bisa menambah data pending sparepart.', true); return; }
+  opt = opt || {};
+  spFillLists();
+  const edit = opt.editId ? DB.sparepart.find(x=>x.id===opt.editId) : null;
+  document.getElementById('sp_edit_id').value = edit ? edit.id : '';
+  document.getElementById('spModalTitle').textContent = edit ? 'Edit Pending Sparepart' : 'Tambah Pending Sparepart';
+  document.getElementById('spItemsLabel').textContent = edit ? 'Nama sparepart' : 'Sparepart yang pending';
+  document.getElementById('spAddItemBtn').style.display = edit ? 'none' : '';
+  document.getElementById('spSaveBtn').textContent = edit ? 'Simpan Perubahan' : 'Simpan';
+  document.getElementById('sp_nopol').value = edit ? edit.nopol : (opt.nopol||'');
+  const ptEl = document.getElementById('sp_pt'); ptEl.value = edit ? edit.pt : (opt.pt||''); ptEl.dataset.auto = '';
+  document.getElementById('spItems').innerHTML = '';
+  spAddItemRow(edit ? edit.name : '');
+  document.getElementById('spModalBg').classList.add('show');
+}
+function closeSparepartModal(){ document.getElementById('spModalBg').classList.remove('show'); }
+async function saveSparepart(){
+  if(!isMaintenance()) return;
+  const id = document.getElementById('sp_edit_id').value;
+  const nopol = document.getElementById('sp_nopol').value.trim().toUpperCase();
+  const pt = document.getElementById('sp_pt').value.trim();
+  const names = [...document.querySelectorAll('#spItems .sp-item-input')].map(i=>i.value.trim()).filter(Boolean);
+  if(!nopol){ showToast('Isi nopol terlebih dahulu.'); return; }
+  if(!names.length){ showToast('Isi minimal satu sparepart.'); return; }
+  try{
+    if(id){
+      const rows = await sbUpdate('sparepart_pending', id, { nopol, pt, sparepart:names[0] });
+      const idx = DB.sparepart.findIndex(x=>x.id===id);
+      if(idx>=0) DB.sparepart[idx] = fromDbSparepart((rows&&rows[0]) || { id, nopol, pt, sparepart:names[0], ready:DB.sparepart[idx].ready, ready_by:DB.sparepart[idx].readyBy, ready_at:DB.sparepart[idx].readyAt, created_by:DB.sparepart[idx].createdBy, created_at:DB.sparepart[idx].createdAt });
+      showToast('Pending sparepart diperbarui.');
+    } else {
+      const rows = await sbInsert('sparepart_pending', names.map(n=>({ nopol, pt, sparepart:n, ready:false, created_by:currentUser?.username||'' })));
+      DB.sparepart = (rows||[]).map(fromDbSparepart).concat(DB.sparepart);
+      showToast(`${names.length} sparepart pending untuk ${nopol} tersimpan.`);
+    }
+    closeSparepartModal(); renderSparepart();
+  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel sparepart_pending sudah dibuat di Supabase.', true); }
+}
+async function deleteSparepart(id){
+  if(!isMaintenance()) return;
+  const it = DB.sparepart.find(x=>x.id===id); if(!it) return;
+  if(!confirm(`Hapus pending sparepart "${it.name}" untuk ${it.nopol}?`)) return;
+  try{
+    await sbDeleteIds('sparepart_pending', [id]);
+    DB.sparepart = DB.sparepart.filter(x=>x.id!==id);
+    renderSparepart(); showToast('Data berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
+}
+function exportSparepart(){
+  if(!isMaintenance()) return;
+  const rows = filteredSparepart().map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, 'pending-sparepart.xlsx');
+}
+
 /* ================= EXCEL ================= */
 const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Type','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
 function exportExcel(){
@@ -2624,9 +2853,9 @@ function renderAccountPage(){
   list.innerHTML = DB.accounts.map((a,i)=>{
     const kind = roleKind(a);
     const locked = String(a.username||'').trim().toUpperCase()==='DPM2026' || (currentUser && a.username===currentUser.username);
-    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':'Hanya Keluar Masuk Bengkel'}</div></div>
+    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':(kind==='gudang'?'Hanya Pending Sparepart (ceklis ready)':'Hanya Keluar Masuk Bengkel')}</div></div>
     <div style="display:flex;align-items:center;gap:8px;">
-    <select class="filter-select" style="padding:5px 8px;font-size:11.5px;min-width:0;" ${locked?'disabled title="Akun ini tidak bisa diubah perannya"':''} onchange="changeAccountRole(${i}, this.value)"><option value="Maintenance" ${kind==='maintenance'?'selected':''}>Maintenance</option><option value="Staff" ${kind==='staff'?'selected':''}>Staff</option></select><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
+    <select class="filter-select" style="padding:5px 8px;font-size:11.5px;min-width:0;" ${locked?'disabled title="Akun ini tidak bisa diubah perannya"':''} onchange="changeAccountRole(${i}, this.value)"><option value="Maintenance" ${kind==='maintenance'?'selected':''}>Maintenance</option><option value="Staff" ${kind==='staff'?'selected':''}>Staff</option><option value="Gudang" ${kind==='gudang'?'selected':''}>Gudang</option></select><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
     <button class="edit-icon-btn" style="width:auto;padding:5px 10px;font-size:11px;" onclick="toggleAccount(${i})">${a.active!==false?'Nonaktifkan':'Aktifkan'}</button></div></div>`;
   }).join('');
   const log = document.getElementById('loginLog');
@@ -2739,6 +2968,7 @@ function deb(fn, ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn
 const debTable = deb(()=>renderTable());
 const debBengkel = deb(()=>renderBengkel());
 const debKwitansi = deb(()=>renderKwitansi());
+const debSparepart = deb(()=>renderSparepart());
 const debHistory = deb(()=>renderHistory());
 
 /* ================= NOTIFIKASI DESKTOP ================= */
