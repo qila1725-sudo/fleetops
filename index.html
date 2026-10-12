@@ -289,6 +289,10 @@
   .sp-item.done .sp-meta{color:var(--ok);}
   .sp-row{display:flex;gap:8px;margin-bottom:8px;}
   .sp-row input{flex:1;}
+  .sp-row select{width:130px;flex:none;font-weight:800;}
+  .sp-badge{font-size:10.5px;font-weight:800;letter-spacing:.3px;padding:3px 9px;border-radius:100px;flex:none;}
+  .sp-badge.ready{background:var(--ok-bg);color:var(--ok);}
+  .sp-badge.belum{background:var(--warn-bg);color:var(--warn);}
   .sp-x{border:1px solid var(--bad-line);color:var(--bad);background:#fff;border-radius:10px;width:40px;cursor:pointer;}
   .inl-sel{appearance:none;-webkit-appearance:none;border:none;border-radius:100px;padding:5px 22px 5px 10px;font-size:10.8px;font-weight:800;cursor:pointer;font-family:inherit;background-repeat:no-repeat;background-position:right 8px center;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23667085' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");max-width:150px;}
   .inl-sel.ok{background-color:var(--ok-bg);color:var(--ok);}
@@ -618,6 +622,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="tab-pill" data-tab="in" onclick="setBengkelTab('in')"><span class="cdot" style="background:var(--warn);"></span> Masih di Bengkel <span class="cnt" id="bg_cnt_in">0</span></div>
             <div class="tab-pill" data-tab="out" onclick="setBengkelTab('out')"><span class="cdot" style="background:var(--ok);"></span> Sudah Keluar <span class="cnt" id="bg_cnt_out">0</span></div>
             <div class="tab-pill" data-tab="or" onclick="setBengkelTab('or')"><span class="cdot" style="background:var(--bad);"></span> OR Belum Dibayar <span class="cnt" id="bg_cnt_or">0</span></div>
+            <div class="tab-pill" data-tab="orpaid" onclick="setBengkelTab('orpaid')"><span class="cdot" style="background:var(--ok);"></span> OR Sudah Dibayar <span class="cnt" id="bg_cnt_orpaid">0</span></div>
           </div>
           <div class="table-wrap">
             <table style="min-width:1750px">
@@ -1899,6 +1904,7 @@ function filteredBengkel(){
     if(bFilter && b.bengkel!==bFilter) return false;
     if(sFilter && bengkelStatus(b)!==sFilter) return false;
     if(bengkelTab==='or'){ if(!orBillable(b)) return false; }
+    else if(bengkelTab==='orpaid'){ if(b.statusBayar!=='Sudah Bayar') return false; }
     else if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
     return true;
   });
@@ -1910,6 +1916,7 @@ function renderBengkel(){
   document.getElementById('bg_cnt_in').textContent = all.filter(b=>bengkelStatus(b)==='in').length;
   document.getElementById('bg_cnt_out').textContent = all.filter(b=>bengkelStatus(b)==='out').length;
   document.getElementById('bg_cnt_or').textContent = all.filter(orBillable).length;
+  document.getElementById('bg_cnt_orpaid').textContent = all.filter(b=>b.statusBayar==='Sudah Bayar').length;
   const navCount = document.getElementById('navBengkelCount');
   if(navCount) navCount.textContent = all.filter(b=>bengkelStatus(b)==='in').length;
 
@@ -2679,7 +2686,8 @@ function renderSparepart(){
     const items = g.items.slice().sort((a,b)=>(a.ready-b.ready) || (a.createdAt||'').localeCompare(b.createdAt||'')).map(it=>`
       <div class="sp-item ${it.ready?'done':''}">
         <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-name">${escH(it.name)}</span></label>
-        <span class="sp-meta">${it.ready ? `✔ Ready • ${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang'}</span>
+        <span class="sp-badge ${it.ready?'ready':'belum'}">${it.ready?'READY':'BELUM'}</span>
+        <span class="sp-meta">${it.ready ? `${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang'}</span>
         ${canEdit ? `<button class="edit-icon-btn" onclick="openSparepartModal({editId:'${it.id}'})" title="Edit">✎</button><button class="edit-icon-btn" style="color:var(--bad);border-color:var(--bad-line);" onclick="deleteSparepart('${it.id}')" title="Hapus">🗑</button>` : ''}
       </div>`).join('');
     return `<div class="sp-card ${allDone?'all-ready':''}">
@@ -2717,13 +2725,14 @@ function spAutofill(){
   const pt = (v && v.pt) || (b && b.pt) || '';
   if(pt){ ptEl.value = pt; ptEl.dataset.auto = '1'; }
 }
-function spAddItemRow(val){
+function spAddItemRow(val, ready){
   const wrap = document.getElementById('spItems');
   const row = document.createElement('div'); row.className = 'sp-row';
-  row.innerHTML = `<input class="sp-item-input" placeholder="Contoh: Kampas rem depan"><button type="button" class="sp-x" title="Hapus baris">✕</button>`;
+  row.innerHTML = `<input class="sp-item-input" placeholder="Contoh: Kampas rem depan"><select class="sp-status" title="Status sparepart"><option value="belum">BELUM</option><option value="ready">READY</option></select><button type="button" class="sp-x" title="Hapus baris">✕</button>`;
   const inp = row.querySelector('input'); inp.value = val||'';
+  row.querySelector('.sp-status').value = ready ? 'ready' : 'belum';
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!document.getElementById('spAddItemBtn').style.display) { spAddItemRow(); } } });
-  row.querySelector('button').onclick = ()=>{ if(wrap.children.length>1) row.remove(); else inp.value=''; };
+  row.querySelector('.sp-x').onclick = ()=>{ if(wrap.children.length>1) row.remove(); else { inp.value=''; row.querySelector('.sp-status').value='belum'; } };
   wrap.appendChild(row); inp.focus();
 }
 function openSparepartModal(opt){
@@ -2739,7 +2748,7 @@ function openSparepartModal(opt){
   document.getElementById('sp_nopol').value = edit ? edit.nopol : (opt.nopol||'');
   const ptEl = document.getElementById('sp_pt'); ptEl.value = edit ? edit.pt : (opt.pt||''); ptEl.dataset.auto = '';
   document.getElementById('spItems').innerHTML = '';
-  spAddItemRow(edit ? edit.name : '');
+  spAddItemRow(edit ? edit.name : '', edit ? edit.ready : false);
   document.getElementById('spModalBg').classList.add('show');
 }
 function closeSparepartModal(){ document.getElementById('spModalBg').classList.remove('show'); }
@@ -2748,19 +2757,26 @@ async function saveSparepart(){
   const id = document.getElementById('sp_edit_id').value;
   const nopol = document.getElementById('sp_nopol').value.trim().toUpperCase();
   const pt = document.getElementById('sp_pt').value.trim();
-  const names = [...document.querySelectorAll('#spItems .sp-item-input')].map(i=>i.value.trim()).filter(Boolean);
+  const items = [...document.querySelectorAll('#spItems .sp-row')].map(r=>({ name:r.querySelector('.sp-item-input').value.trim(), ready:r.querySelector('.sp-status').value==='ready' })).filter(x=>x.name);
   if(!nopol){ showToast('Isi nopol terlebih dahulu.'); return; }
-  if(!names.length){ showToast('Isi minimal satu sparepart.'); return; }
+  if(!items.length){ showToast('Isi minimal satu sparepart.'); return; }
+  const user = currentUser?.username||'', nowIso = new Date().toISOString();
   try{
     if(id){
-      const rows = await sbUpdate('sparepart_pending', id, { nopol, pt, sparepart:names[0] });
+      const prev = DB.sparepart.find(x=>x.id===id); if(!prev) return;
+      const it = items[0];
+      const patch = { nopol, pt, sparepart:it.name };
+      if(it.ready !== prev.ready){ patch.ready = it.ready; patch.ready_by = it.ready ? user : null; patch.ready_at = it.ready ? nowIso : null; }
+      const rows = await sbUpdate('sparepart_pending', id, patch);
       const idx = DB.sparepart.findIndex(x=>x.id===id);
-      if(idx>=0) DB.sparepart[idx] = fromDbSparepart((rows&&rows[0]) || { id, nopol, pt, sparepart:names[0], ready:DB.sparepart[idx].ready, ready_by:DB.sparepart[idx].readyBy, ready_at:DB.sparepart[idx].readyAt, created_by:DB.sparepart[idx].createdBy, created_at:DB.sparepart[idx].createdAt });
+      DB.sparepart[idx] = fromDbSparepart((rows&&rows[0]) || { id, nopol, pt, sparepart:it.name,
+        ready:('ready' in patch)?patch.ready:prev.ready, ready_by:('ready' in patch)?patch.ready_by:prev.readyBy, ready_at:('ready' in patch)?patch.ready_at:prev.readyAt,
+        created_by:prev.createdBy, created_at:prev.createdAt });
       showToast('Pending sparepart diperbarui.');
     } else {
-      const rows = await sbInsert('sparepart_pending', names.map(n=>({ nopol, pt, sparepart:n, ready:false, created_by:currentUser?.username||'' })));
+      const rows = await sbInsert('sparepart_pending', items.map(it=>({ nopol, pt, sparepart:it.name, ready:it.ready, ready_by:it.ready?user:null, ready_at:it.ready?nowIso:null, created_by:user })));
       DB.sparepart = (rows||[]).map(fromDbSparepart).concat(DB.sparepart);
-      showToast(`${names.length} sparepart pending untuk ${nopol} tersimpan.`);
+      showToast(`${items.length} sparepart untuk ${nopol} tersimpan.`);
     }
     closeSparepartModal(); renderSparepart();
   }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel sparepart_pending sudah dibuat di Supabase.', true); }
