@@ -616,6 +616,13 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <option value="in">Masih di Bengkel</option>
               <option value="out">Sudah Keluar</option>
             </select>
+            <select class="filter-select" id="bg_kwitansi" onchange="renderBengkel()">
+              <option value="">Semua Kwitansi</option>
+              <option value="belum">Kwitansi: Belum</option>
+              <option value="sudah">Kwitansi: Sudah</option>
+              <option value="adafile">Sudah Ada File Kwitansi OR</option>
+              <option value="nofile">Belum Ada File Kwitansi OR</option>
+            </select>
           </div>
           <div class="tabs-row">
             <div class="tab-pill active" data-tab="all" onclick="setBengkelTab('all')">Semua <span class="cnt" id="bg_cnt_all">0</span></div>
@@ -1899,10 +1906,18 @@ function filteredBengkel(){
   const q = (document.getElementById('bg_search')?.value||'').trim().toLowerCase();
   const bFilter = document.getElementById('bg_bengkel')?.value||'';
   const sFilter = document.getElementById('bg_status')?.value||'';
+  const kFilter = document.getElementById('bg_kwitansi')?.value||'';
   return DB.bengkel.filter(b=>{
     if(q && !(`${b.nopol||''} ${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(q))) return false;
     if(bFilter && b.bengkel!==bFilter) return false;
     if(sFilter && bengkelStatus(b)!==sFilter) return false;
+    if(kFilter){
+      const kw = b.kwitansi==='Sudah' ? 'sudah' : 'belum', hasFile = (b.kwFiles||[]).length>0;
+      if(kFilter==='belum' && kw!=='belum') return false;
+      if(kFilter==='sudah' && kw!=='sudah') return false;
+      if(kFilter==='adafile' && !hasFile) return false;
+      if(kFilter==='nofile' && hasFile) return false;
+    }
     if(bengkelTab==='or'){ if(!orBillable(b)) return false; }
     else if(bengkelTab==='orpaid'){ if(b.statusBayar!=='Sudah Bayar') return false; }
     else if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
