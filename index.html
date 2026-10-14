@@ -1058,4 +1058,2385 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <div class="gal-grid" id="kwfGrid"></div>
     <div class="modal-actions">
-      <butto
+      <button class="btn-outline" id="kwfDelAllBtn" onclick="kwfRemoveAll()" style="color:var(--bad);border-color:var(--bad-line);margin-right:auto;">🗑 Hapus Semua File</button>
+      <button class="btn-outline" onclick="closeKwFiles()">Tutup</button>
+      <button class="btn btn-primary small" id="kwfAddBtn" onclick="kwfAdd()">📎 Tambah File</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX foto kerusakan -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lb-x" onclick="closeLightbox()">✕</button>
+  <button class="lb-nav prev" onclick="event.stopPropagation();lbStep(-1)">‹</button>
+  <img id="lbImg" alt="Foto kerusakan" onclick="event.stopPropagation()">
+  <button class="lb-nav next" onclick="event.stopPropagation();lbStep(1)">›</button>
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<div class="modal-bg" id="updateServiceModalBg">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>Update Service Kendaraan</h3>
+        <p class="sub" id="usSub">-</p>
+      </div>
+      <button class="x-btn" onclick="closeUpdateServiceModal()">✕</button>
+    </div>
+    <input type="hidden" id="us_id">
+    <div class="form-grid">
+      <div><label>Tanggal Terakhir Service</label><input id="us_lastdate" type="date" oninput="liveCalcUpdate()"></div>
+      <div><label>KM Service (terakhir)</label><input id="us_lastkm" type="number" oninput="liveCalcUpdate()"></div>
+      <div><label>KM Aktual Saat Ini</label><input id="us_currentkm" type="number"></div>
+      <div><label>Interval Service (30–360 hari)</label><input id="us_interval" type="number" min="30" max="360" oninput="liveCalcUpdate()"></div>
+      <div class="full"><label>Estimasi Jarak KM Berikutnya (+KM)</label><input id="us_kmstep" type="number" oninput="liveCalcUpdate()"></div>
+      <div class="full"><label>Keterangan</label><textarea id="us_note"></textarea></div>
+      <div class="calc-box full">
+        <div>Tanggal Service Berikutnya<b id="usCalcDate">—</b></div>
+        <div>KM Service Berikutnya<b id="usCalcKm">—</b></div>
+        <div>Status Saat Ini<b id="usCalcStatus">—</b></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeUpdateServiceModal()">Batal</button>
+      <button class="btn-green" onclick="saveUpdateService()">Simpan Update Service</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="historyModalBg">
+  <div class="modal">
+    <div class="modal-head"><div><h3 id="hModalTitle">Histori Service</h3><p class="sub">Riwayat pembaruan service kendaraan ini.</p></div><button class="x-btn" onclick="closeHistoryModal()">✕</button></div>
+    <div class="history-timeline" id="historyTimeline"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="dataImgModalBg">
+  <div class="modal" style="max-width:860px;">
+    <div class="modal-head"><div><h3>Foto Data Unit per PT</h3><p class="sub">Gambar tabel data unit untuk dikirim lewat WhatsApp. Klik <b>Salin Gambar</b>, lalu buka chat dan tekan <b>Ctrl+V</b> (atau simpan dulu lalu lampirkan).</p></div><button class="x-btn" onclick="closeDataImageModal()">✕</button></div>
+    <div id="dataImgList"></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="waBulkModalBg">
+  <div class="modal">
+    <div class="modal-head"><div><h3>Kirim Bulk WA Reminder</h3><p class="sub">Atur cara kirim untuk tiap PT. Ada PT yang cukup 1 pesan berisi semua unit, ada yang harus dikirim per unit.</p></div><button class="x-btn" onclick="closeWaBulkModal()">✕</button></div>
+    <div class="wa-quick" style="display:flex;gap:8px;margin:6px 0 12px;flex-wrap:wrap;">
+      <button class="btn-outline" onclick="setAllWaMode('group')">Semua: Gabung per PT</button>
+      <button class="btn-outline" onclick="setAllWaMode('single')">Semua: Per unit</button>
+    </div>
+    <div id="waBulkList"></div>
+    <div class="small-note" id="waBulkSummary" style="margin-top:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeWaBulkModal()">Batal</button>
+      <button class="btn-green" onclick="executeBulkWa()">💬 Buka WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====================================================================
+   KONFIGURASI DATABASE SUPABASE — GANTI DUA NILAI DI BAWAH INI
+   Panduan lengkap ada di file SETUP-DATABASE.md
+==================================================================== */
+const SUPABASE_URL = "https://duecforhbtoplbehuoxg.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_c7-ZUEFGufFp2lMT5CK7zQ_ZyRZShW-";
+/* ==================================================================== */
+
+const isConfigured = !SUPABASE_URL.includes('PASTE_') && !SUPABASE_ANON_KEY.includes('PASTE_');
+
+let DB = { vehicles:[], history:[], accounts:[], settings:{reminderDays:14}, loginlog:[], bengkel:[], kwitansi:[], sparepart:[] };
+let currentUser = null;
+let quickTab = 'all';
+let selectedIds = new Set();
+let dbOnline = false;
+
+/* ================= SUPABASE REST HELPERS ================= */
+async function sb(path, options={}){
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    method: options.method || 'GET',
+    headers: {
+      'apikey': SUPABASE_ANON_KEY,
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': options.prefer || 'return=representation',
+      ...(options.headers||{})
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined
+  });
+  if(!res.ok){
+    const t = await res.text().catch(()=> '');
+    throw new Error(`Supabase ${res.status}: ${t || res.statusText}`);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+const sbGet = (table, q='') => sb(`${table}?${q}`);
+const sbInsert = (table, rows) => sb(table, {method:'POST', body: Array.isArray(rows)?rows:[rows]});
+const sbUpdate = (table, id, patch) => sb(`${table}?id=eq.${id}`, {method:'PATCH', body: patch, prefer:'return=representation'});
+const sbDeleteIds = (table, ids) => sb(`${table}?id=in.(${ids.join(',')})`, {method:'DELETE', prefer:'return=minimal'});
+
+/* ================= MAPPERS (kolom DB <-> objek JS) ================= */
+const fromDbVehicle = r => ({ id:r.id, code:r.code, pt:r.pt, area:r.area, user:r.driver_name, phone:r.phone, nopol:r.nopol,
+  brand:r.brand||'', model:r.model||'', type:r.vehicle_type, color:r.color, year:r.year, lastdate:r.last_service_date, lastkm:r.last_service_km, currentkm:r.current_km,
+  interval:r.interval_days, kmstep:r.km_step, nextdate:r.next_service_date, nextkm:r.next_service_km, note:r.notes });
+const toDbVehicle = v => ({ code:v.code, pt:v.pt, area:v.area, driver_name:v.user, phone:v.phone, nopol:v.nopol, brand:v.brand||'', model:v.model||'', vehicle_type:v.type,
+  color:v.color, year:v.year, last_service_date:v.lastdate||null, last_service_km:v.lastkm||0, current_km:v.currentkm||0,
+  interval_days:v.interval||180, km_step:v.kmstep||10000, next_service_date:v.nextdate||null, next_service_km:v.nextkm||0, notes:v.note||'' });
+
+const fromDbHistory = r => ({ id:r.id, vehicleId:r.vehicle_id, pt:r.pt, nopol:r.nopol, type:r.vehicle_type, lastdate:r.service_date,
+  lastkm:r.service_km, currentkm:r.current_km, interval:r.interval_days, note:r.notes, by:r.updated_by, inputAt:r.input_at });
+const toDbHistory = h => ({ vehicle_id:h.vehicleId, pt:h.pt, nopol:h.nopol, vehicle_type:h.type, service_date:h.lastdate||null,
+  service_km:h.lastkm||0, current_km:h.currentkm||0, interval_days:h.interval||180, notes:h.note||'', updated_by:h.by, input_at:h.inputAt });
+
+const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active });
+const toDbAccount = a => ({ username:a.username, password:a.password, role:a.role, active:a.active });
+
+const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file), pic:r.pic||'', picPhone:r.pic_phone||'', picCol:('pic' in r) });
+const fromDbKwitansi = r => ({ id:r.id, tanggal:r.tanggal||(r.created_at?String(r.created_at).slice(0,10):''), toko:r.toko||'', nopol:r.nopol||'', pt:r.pt||'', note:r.keterangan||'', bayar:r.pembayaran||'Paid Bu Ika' });
+const toDbKwitansi = k => ({ tanggal:k.tanggal||null, toko:k.toko||'', nopol:k.nopol||'', pt:k.pt||'', keterangan:k.note||'', pembayaran:k.bayar||'Paid Bu Ika' });
+const fromDbSparepart = r => ({ id:r.id, nopol:r.nopol||'', pt:r.pt||'', name:r.sparepart||'', ready:!!r.ready, readyBy:r.ready_by||'', readyAt:r.ready_at||'', createdBy:r.created_by||'', createdAt:r.created_at||'', mekanik:r.mekanik||'', mekanikCol:('mekanik' in r) });
+const toDbBengkel = b => { const o = { vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' };
+  if(b.pic || b.picPhone || b.picCol){ o.pic = b.pic||''; o.pic_phone = b.picPhone||''; }
+  return o; };
+
+
+
+/* ================= LOAD & PERSIST ================= */
+async function loadAll(){
+  invalidateWaIdx();
+  try{
+    const [vRows, hRows, aRows, sRows, lRows] = await Promise.all([
+      sbGet('vehicles','select=*&order=created_at.desc'),
+      sbGet('service_history','select=*&order=created_at.desc'),
+      sbGet('accounts','select=*'),
+      sbGet('settings','select=*&id=eq.1'),
+      sbGet('login_log','select=*&order=logged_at.desc&limit=50')
+    ]);
+    DB.vehicles = (vRows||[]).map(fromDbVehicle);
+    DB.history = (hRows||[]).map(fromDbHistory);
+    DB.accounts = (aRows||[]).map(fromDbAccount);
+    DB.settings.reminderDays = (sRows && sRows[0]) ? sRows[0].reminder_days : 14;
+    DB.settings.waOpening = (sRows && sRows[0]) ? (sRows[0].wa_opening||'') : '';
+    DB.settings.waClosing = (sRows && sRows[0]) ? (sRows[0].wa_closing||'') : '';
+    DB.loginlog = (lRows||[]).map(r=>({user:r.username, time:new Date(r.logged_at).toLocaleString('id-ID')}));
+    dbOnline = true;
+    try{
+      const bRows = await sbGet('bengkel_log','select=*&order=tanggal_masuk.desc');
+      DB.bengkel = (bRows||[]).map(fromDbBengkel);
+    }catch(e){
+      console.warn('Tabel bengkel_log belum tersedia — jalankan SQL tambahan untuk fitur Keluar Masuk Bengkel.', e);
+      DB.bengkel = [];
+    }
+    try{
+      const kwRows = await sbGet('kwitansi_pengajuan','select=*&order=tanggal.desc,created_at.desc');
+      DB.kwitansi = (kwRows||[]).map(fromDbKwitansi);
+    }catch(e){
+      console.warn('Tabel kwitansi_pengajuan belum tersedia — jalankan SQL tambahan untuk fitur Kwitansi Pengajuan.', e);
+      DB.kwitansi = [];
+    }
+    try{
+      const spRows = await sbGet('sparepart_pending','select=*&order=created_at.desc');
+      DB.sparepart = (spRows||[]).map(fromDbSparepart);
+    }catch(e){
+      console.warn('Tabel sparepart_pending belum tersedia — jalankan SQL tambahan untuk fitur Pending Sparepart.', e);
+      DB.sparepart = [];
+    }
+  }catch(e){
+    console.error('Gagal memuat data dari Supabase:', e);
+    dbOnline = false;
+    showToast('Gagal tersambung ke database. Cek koneksi/konfigurasi Supabase Anda.', true);
+    const box = document.getElementById('loginDebugBox');
+    if(box){ box.style.display='block'; box.textContent = 'DEBUG — pesan error database:\n' + (e && e.message ? e.message : String(e)); }
+  }
+}
+
+/* ================= UTIL ================= */
+function uid(){ return 'tmp'+Date.now()+Math.random().toString(16).slice(2,7); }
+function fmtDate(d){ if(!d) return '-'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}); }
+function addDays(dateStr, days){ const dt=new Date(dateStr+'T00:00:00'); dt.setDate(dt.getDate()+Number(days)); return dt.toISOString().slice(0,10); }
+let _tdCache={t:0,v:''};
+function today(){ const n=Date.now(); if(n-_tdCache.t>30000){ _tdCache={t:n,v:new Date().toISOString().slice(0,10)}; } return _tdCache.v; }
+function daysBetween(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+function showToast(msg, isErr){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(isErr?' err':''); t.style.display='block'; clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3200); }
+function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function ptCode(pt, existingCount){ const letters = (pt||'PT').split(/\s+/).map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'PT'; return `PT-${letters}-${String(existingCount+1).padStart(3,'0')}`; }
+function vLabel(v){ return [v?.brand,v?.model,v?.type].filter(Boolean).join(' ') || '-'; }
+function waPhoneKey(v){ let ph=(v.phone||'').replace(/\D/g,''); if(ph.startsWith('0')) ph='62'+ph.slice(1); return ph; }
+function waPtKey(v){ return (v.pt||'').trim().toLowerCase(); }
+function waGroupKey(v){ return waPtKey(v)+'|'+waPhoneKey(v); }
+// Preferensi cara kirim per PT: 'group' (1 pesan semua unit) atau 'single' (per unit). Diingat di browser ini.
+let _waPrefsCache=null, _waIdx=null;
+function waPrefs(){ if(_waPrefsCache) return _waPrefsCache; try{ _waPrefsCache=JSON.parse(localStorage.getItem('fleetops_wa_prefs')||'{}'); }catch(e){ _waPrefsCache={}; } return _waPrefsCache; }
+function waPrefFor(v){ return waPrefs()[waPtKey(v)] || 'group'; }
+function saveWaPrefs(map){ try{ const cur=Object.assign({},waPrefs(),map); _waPrefsCache=cur; localStorage.setItem('fleetops_wa_prefs', JSON.stringify(cur)); }catch(e){} _waIdx=null; }
+function invalidateWaIdx(){ _waIdx=null; }
+// kendaraan yang sedang masuk bengkel (belum keluar) tidak perlu diingatkan lagi
+function inWorkshopNow(v){
+  const w = waIndex().ws;
+  return (v.id && w.ids.has(v.id)) || w.nopols.has((v.nopol||'').trim().toUpperCase());
+}
+// Indeks sekali bangun (murni O(n)) supaya tabel besar tetap ringan
+function waIndex(){
+  if(_waIdx) return _waIdx;
+  const ws = { ids:new Set(), nopols:new Set() };
+  (DB.bengkel||[]).forEach(b=>{ if(!b.tglKeluar){ if(b.vehicleId) ws.ids.add(b.vehicleId); ws.nopols.add((b.nopol||'').trim().toUpperCase()); } });
+  const groups = new Map();
+  DB.vehicles.forEach(x=>{
+    if(isStandby(x) || !waPhoneKey(x) || statusOf(x)==='ok') return;
+    if((x.id&&ws.ids.has(x.id)) || ws.nopols.has((x.nopol||'').trim().toUpperCase())) return;
+    const k=waGroupKey(x); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(x);
+  });
+  groups.forEach(arr=>arr.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||'')));
+  _waIdx = { ws, groups };
+  return _waIdx;
+}
+// Semua kendaraan dari PT yang sama + nomor WA yang sama yang memang perlu diingatkan (overdue / mendekati),
+// kecuali yang sudah aman atau sedang masuk service di bengkel. Kendaraan yang diklik selalu ikut.
+function waGroup(v){
+  if(isStandby(v) || !waPhoneKey(v) || waPrefFor(v)==='single') return [v];
+  const others = (waIndex().groups.get(waGroupKey(v))||[]).filter(x=>x.id!==v.id);
+  return [v, ...others];
+}
+// Pesan-pesan berikut ini menerima daftar kendaraan eksplisit (list[0] jadi acuan nama penerima)
+function waPtName(pt){ pt=(pt||'-').trim(); return /^(PT|CV|UD|PD)\b\.?/i.test(pt) ? pt : 'PT. '+pt; }
+function waVehicleBlock(v){
+  return `Nopol ${v.nopol||'-'} (${vLabel(v)})
+Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
+Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM`;
+}
+const WA_DEFAULT_OPENING = 'Mengingatkan untuk jadwal service berkala kendaraan {kendaraan} Anda:';
+const WA_DEFAULT_CLOSING = 'Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.\n\nTerima kasih!';
+function waFillTokens(tpl, v){
+  return String(tpl||'')
+    .replace(/\{nama\}/g, v?.user||'-')
+    .replace(/\{pt\}/g, waPtName(v?.pt))
+    .replace(/\{nopol\}/g, v?.nopol||'-')
+    .replace(/\{kendaraan\}/g, vLabel(v))
+    .replace(/\{tgl_terakhir\}/g, fmtDate(v?.lastdate))
+    .replace(/\{km_terakhir\}/g, (v?.lastkm||0).toLocaleString('id-ID'))
+    .replace(/\{tgl_berikutnya\}/g, fmtDate(v?.nextdate))
+    .replace(/\{km_berikutnya\}/g, (v?.nextkm||0).toLocaleString('id-ID'));
+}
+// Salam + perkenalan: "Halo Bpk/Ibu Nepi (PT. ...)" lalu "Saya Kila dari PT.Dokar Putra Mandiri" (nama pengirim diatur lewat tombol 👤 Pengirim WA)
+function waGreetLine(v){
+  const sender = (typeof waSender==='function') ? waSender() : '';
+  return `Halo Bpk/Ibu ${v.user||'-'} (${waPtName(v.pt)})` + (sender ? `\nSaya ${sender} dari ${WA_COMPANY}` : '');
+}
+function waMessageFor(list){
+  const v = list[0];
+  const opening = waFillTokens(DB.settings.waOpening || WA_DEFAULT_OPENING, v);
+  const closing = waFillTokens(DB.settings.waClosing || WA_DEFAULT_CLOSING, v);
+  if(list.length>1){
+    const blocks = list.map((x,i)=>`${i+1}) ${waVehicleBlock(x)}`).join('\n\n');
+    // baris pembuka untuk pesan gabungan: pakai kalimat custom tapi ganti sebutan ke jamak
+    const openingMulti = opening.replace(/kendaraan\s*\{kendaraan\}\s*anda/i, `${list.length} kendaraan Anda`).replace(/\{kendaraan\}/gi, `${list.length} unit`);
+    return `${waGreetLine(v)}
+${openingMulti}
+
+${blocks}
+
+${closing}`;
+  }
+  return `${waGreetLine(v)}
+Nopol ${v.nopol||'-'},
+${opening}
+
+Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID')} KM)
+Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM
+
+${closing}`;
+}
+function waMessage(v){ return waMessageFor(waGroup(v)); }
+function waLinkFor(list){ return `https://wa.me/${waPhoneKey(list[0])}?text=${encodeURIComponent(waMessageFor(list))}`; }
+function waLink(v){ return waLinkFor(waGroup(v)); }
+function openWaVehicle(id){ const v=DB.vehicles.find(x=>x.id===id); if(v) window.open(waLink(v),'_blank'); }
+function waBtnLabel(v, base){ const n=waGroup(v).length; return n>1 ? `${base} (${n} unit)` : base; }
+// untuk kirim massal dari dashboard: 1 chat per PT+nomor WA (tidak dobel), kecuali PT yang diatur "per unit"
+function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ const k=(waPhoneKey(v)&&waPrefFor(v)!=='single')?waGroupKey(v):'id:'+v.id; if(seen.has(k)) return false; seen.add(k); return true; }); }
+
+/* ===== Bulk WA: pilih cara kirim per PT ===== */
+let waBulkModes = {};
+function bulkWaReminder(){
+  const list = DB.vehicles.filter(v=>selectedIds.has(v.id));
+  if(list.length===0) return;
+  const byPt = {};
+  list.forEach(v=>{ const k=waPtKey(v)||('id:'+v.id); (byPt[k]=byPt[k]||[]).push(v); });
+  waBulkModes = {};
+  Object.entries(byPt).forEach(([k,arr])=>{ waBulkModes[k] = waPrefFor(arr[0]); });
+  window._waBulkGroups = byPt;
+  renderWaBulkModal();
+  document.getElementById('waBulkModalBg').classList.add('show');
+}
+function closeWaBulkModal(){ document.getElementById('waBulkModalBg').classList.remove('show'); }
+function setWaMode(k, mode){ waBulkModes[k]=mode; renderWaBulkModal(); }
+function setAllWaMode(mode){ Object.keys(waBulkModes).forEach(k=>waBulkModes[k]=mode); renderWaBulkModal(); }
+// susun rencana chat: array of list kendaraan (1 list = 1 chat WA)
+function buildWaBulkPlan(){
+  const plan = [];
+  Object.entries(window._waBulkGroups||{}).forEach(([k,arr])=>{
+    if(waBulkModes[k]==='single' || arr.length===1){ arr.forEach(v=>plan.push([v])); return; }
+    const byPhone = {};
+    arr.forEach(v=>{ const ph=waPhoneKey(v); if(!ph){ plan.push([v]); return; } (byPhone[ph]=byPhone[ph]||[]).push(v); });
+    Object.values(byPhone).forEach(g=>plan.push(g));
+  });
+  return plan;
+}
+function renderWaBulkModal(){
+  const box = document.getElementById('waBulkList');
+  const groups = window._waBulkGroups||{};
+  box.innerHTML = Object.entries(groups).map(([k,arr])=>{
+    const mode = waBulkModes[k];
+    const phones = [...new Set(arr.map(v=>v.user?`${v.user}`:'-'))].join(', ');
+    const choice = arr.length>1 ? `
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="tab-pill ${mode==='group'?'active':''}" style="padding:6px 12px;" onclick="setWaMode(decodeURIComponent('${encodeURIComponent(k)}'),'group')">Gabung: 1 pesan semua unit</button>
+        <button class="tab-pill ${mode==='single'?'active':''}" style="padding:6px 12px;" onclick="setWaMode(decodeURIComponent('${encodeURIComponent(k)}'),'single')">Per unit: 1 pesan tiap kendaraan</button>
+      </div>` : '';
+    return `<div class="panel" style="margin-bottom:10px;padding:14px 16px;">
+      <div style="font-weight:800;">${arr[0].pt||'(Tanpa PT)'} <span class="cell-sub">• ${arr.length} unit • ${phones}</span></div>
+      <div class="cell-sub" style="margin-top:4px;">${arr.map(v=>v.nopol).join(', ')}</div>
+      ${choice}
+      ${arr.length>1 ? `<div style="margin-top:8px;"><button class="btn-outline" style="padding:6px 12px;" onclick="openDataImageModal(decodeURIComponent('${encodeURIComponent(k)}'))">🖼 Foto data ${arr.length} unit</button></div>` : ''}
+    </div>`;
+  }).join('');
+  const n = buildWaBulkPlan().length;
+  document.getElementById('waBulkSummary').textContent = `Akan membuka ${n} chat WhatsApp. Pilihan cara kirim tiap PT akan diingat untuk pengiriman berikutnya.`;
+}
+/* ===== Foto Data Unit per PT (gambar tabel untuk dikirim via WA) ===== */
+function dataImgGroups(onlyKey){
+  const list = DB.vehicles.filter(v=>selectedIds.has(v.id));
+  const byPt = {};
+  list.forEach(v=>{ const k=waPtKey(v)||('id:'+v.id); (byPt[k]=byPt[k]||[]).push(v); });
+  if(onlyKey && byPt[onlyKey]) return {[onlyKey]:byPt[onlyKey]};
+  return byPt;
+}
+function drawDataImage(pt, arr){
+  const S = 2, W = 1100, rowH = 46, headH = 96, colHead = 44, footH = 56;
+  const H = headH + colHead + rowH*arr.length + footH;
+  const c = document.createElement('canvas'); c.width=W*S; c.height=H*S;
+  const x = c.getContext('2d'); x.scale(S,S);
+  const font = 'Segoe UI, Arial, sans-serif';
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  // header
+  x.fillStyle='#1f5fe0'; x.fillRect(0,0,W,headH);
+  x.fillStyle='#fff'; x.font=`800 24px ${font}`; x.fillText(pt||'-', 28, 44);
+  x.font=`600 14px ${font}`; x.fillStyle='rgba(255,255,255,.85)';
+  x.fillText(`Jadwal Service Berkala • ${arr.length} unit • per ${fmtDate(today())}`, 28, 72);
+  // columns
+  const cols = [
+    {t:'No',w:44,f:(v,i)=>String(i+1)},
+    {t:'Nopol',w:130,f:v=>v.nopol||'-',b:true},
+    {t:'Kendaraan',w:250,f:v=>vLabel(v)},
+    {t:'Terakhir Service',w:160,f:v=>`${fmtDate(v.lastdate)}`, sub:v=>`${(v.lastkm||0).toLocaleString('id-ID')} KM`},
+    {t:'KM Aktual',w:130,f:v=>v.currentkm ? `${Number(v.currentkm).toLocaleString('id-ID')} KM` : '-', b:true,
+      sub:v=>{ if(!v.currentkm || !v.nextkm) return ''; const d = Number(v.nextkm)-Number(v.currentkm); return d>=0 ? `sisa ${d.toLocaleString('id-ID')} KM` : `lewat ${Math.abs(d).toLocaleString('id-ID')} KM`; }},
+    {t:'Estimasi Berikutnya',w:175,f:v=>fmtDate(v.nextdate), sub:v=>`${(v.nextkm||0).toLocaleString('id-ID')} KM`},
+    {t:'Status',w:0,f:v=>statusLabel(statusOf(v)),status:true}
+  ];
+  const used = cols.reduce((a,c)=>a+c.w,0); cols[cols.length-1].w = W-56-used;
+  let y = headH;
+  x.fillStyle='#f3f5f9'; x.fillRect(0,y,W,colHead);
+  x.fillStyle='#5b6472'; x.font=`800 12px ${font}`;
+  let cx=28; cols.forEach(cl=>{ x.fillText(cl.t.toUpperCase(), cx, y+27); cx+=cl.w; });
+  y += colHead;
+  const colors = {bad:['#fdecec','#c62828'],warn:['#fff4e0','#b26a00'],ok:['#e6f6ec','#1b7a3e']};
+  arr.forEach((v,i)=>{
+    if(i%2===1){ x.fillStyle='#fafbfd'; x.fillRect(0,y,W,rowH); }
+    x.strokeStyle='#e8ebf1'; x.beginPath(); x.moveTo(0,y+rowH); x.lineTo(W,y+rowH); x.stroke();
+    let cx=28;
+    cols.forEach(cl=>{
+      const txt = cl.f(v,i);
+      if(cl.status){
+        const st = statusOf(v); const [bg,fg]=colors[st];
+        x.font=`800 12px ${font}`; const tw=x.measureText(txt).width+22;
+        x.fillStyle=bg; x.beginPath(); if(x.roundRect) x.roundRect(cx, y+12, tw, 22, 11); else x.rect(cx, y+12, tw, 22); x.fill();
+        x.fillStyle=fg; x.fillText(txt, cx+11, y+27);
+      } else {
+        x.fillStyle='#111'; x.font=`${cl.b?'800':'600'} 14px ${font}`;
+        let t=String(txt); while(x.measureText(t).width>cl.w-12 && t.length>3) t=t.slice(0,-2);
+        if(t!==String(txt)) t+='…';
+        if(cl.sub){ x.fillText(t, cx, y+20); x.fillStyle='#7a8494'; x.font=`600 12px ${font}`; x.fillText(cl.sub(v), cx, y+37); }
+        else x.fillText(t, cx, y+28);
+      }
+      cx+=cl.w;
+    });
+    y+=rowH;
+  });
+  x.fillStyle='#5b6472'; x.font=`600 13px ${font}`;
+  x.fillText('Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply. Terima kasih!', 28, y+34);
+  return c;
+}
+function openDataImageModal(onlyKey){
+  const groups = dataImgGroups(onlyKey);
+  const keys = Object.keys(groups);
+  if(keys.length===0){ showToast('Pilih kendaraan dulu (centang di tabel).'); return; }
+  window._dataImgCanvases = {};
+  const box = document.getElementById('dataImgList');
+  box.innerHTML = '';
+  keys.forEach((k,idx)=>{
+    const arr = groups[k];
+    arr.sort((a,b)=>(a.nextdate||'').localeCompare(b.nextdate||''));
+    const cv = drawDataImage(arr[0].pt||'(Tanpa PT)', arr);
+    window._dataImgCanvases[idx] = {cv, name:`data-unit-${(arr[0].pt||'pt').replace(/[^a-z0-9]+/gi,'-')}.png`, list:arr};
+    const wrap = document.createElement('div'); wrap.className='panel'; wrap.style.cssText='margin-bottom:14px;padding:14px;';
+    cv.style.cssText='width:100%;height:auto;border:1px solid #e3e7ee;border-radius:8px;';
+    wrap.appendChild(cv);
+    const bar = document.createElement('div'); bar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;';
+    bar.innerHTML = `<button class="btn-primary small" onclick="copyDataImage(${idx})">📋 Salin Gambar</button>
+      <button class="btn-outline" onclick="downloadDataImage(${idx})">⭳ Simpan PNG</button>
+      <button class="btn-green" onclick="openWaForDataImage(${idx})">💬 Buka Chat WA</button>`;
+    wrap.appendChild(bar);
+    box.appendChild(wrap);
+  });
+  document.getElementById('dataImgModalBg').classList.add('show');
+}
+function closeDataImageModal(){ document.getElementById('dataImgModalBg').classList.remove('show'); }
+function canvasBlob(cv){ return new Promise(res=>cv.toBlob(res,'image/png')); }
+async function copyDataImage(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  try{
+    const blob = await canvasBlob(it.cv);
+    await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+    showToast('Gambar disalin. Buka chat WhatsApp lalu tekan Ctrl+V.');
+  }catch(e){ console.error(e); showToast('Browser tidak mengizinkan salin gambar. Pakai "Simpan PNG" lalu lampirkan manual.', true); }
+}
+async function downloadDataImage(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  const blob = await canvasBlob(it.cv);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = it.name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+function openWaForDataImage(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  const v = it.list[0];
+  const msg = `${waGreetLine(v)}
+Berikut kami kirimkan data jadwal service berkala ${it.list.length} kendaraan Anda (lihat gambar).
+
+Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
+
+Terima kasih!`;
+  window.open(`https://wa.me/${waPhoneKey(v)}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function executeBulkWa(){
+  const plan = buildWaBulkPlan();
+  if(plan.length===0){ closeWaBulkModal(); return; }
+  const prefs = {};
+  Object.entries(window._waBulkGroups||{}).forEach(([k,arr])=>{ if(arr.length>1 && !k.startsWith('id:')) prefs[k]=waBulkModes[k]; });
+  saveWaPrefs(prefs);
+  plan.forEach((list,i)=>{ setTimeout(()=>window.open(waLinkFor(list),'_blank'), i*350); });
+  closeWaBulkModal();
+  renderTable();
+  showToast(`Membuka ${plan.length} chat WhatsApp reminder secara berurutan...`);
+}
+function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastdate? addDays(lastdate, interval||180):''; const nextkm=(Number(lastkm)||0)+(Number(kmstep)||10000); return {nextdate,nextkm}; }
+function statusOf(v){
+  if(!v.nextdate) return 'ok';
+  const rd = DB.settings.reminderDays||14, key = v.nextdate+'|'+rd+'|'+today();
+  if(v._stk===key) return v._st;
+  const d=daysBetween(today(), v.nextdate);
+  const st = d<0 ? 'bad' : (d<=rd ? 'warn' : 'ok');
+  v._stk=key; v._st=st; return st;
+}
+function statusLabel(s){ return s==='bad'?'Overdue':(s==='warn'?'Mendekati':'Aman'); }
+function isStandby(v){ const pt=(v.pt||'').trim().toLowerCase(); return pt==='' || pt==='standby' || pt==='stanby'; }
+
+/* ================= AUTH ================= */
+async function doLogin(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const acc = DB.accounts.find(a=>a.username===u && a.password===p && a.active!==false);
+  if(!acc){
+    const err = document.getElementById('loginError');
+    err.textContent = dbOnline ? 'Username atau password salah.' : 'Username atau password salah. (Kemungkinan penyebab: aplikasi belum berhasil tersambung ke database — lihat kotak debug di bawah ini.)';
+    err.style.display='block';
+    return;
+  }
+  await enterApp(acc);
+}
+async function enterApp(acc){
+  const u = acc.username;
+  currentUser = acc;
+  try{ await sbInsert('login_log', {username:u, logged_at:new Date().toISOString()}); DB.loginlog.unshift({user:u, time:new Date().toLocaleString('id-ID')}); }catch(e){ console.error(e); }
+  ['loginScreen','spkChoiceScreen','spkScreen'].forEach(i=>{const e=document.getElementById(i); if(e) e.style.display='none';});
+  document.getElementById('app').style.display='block';
+  document.getElementById('whoUser').textContent = acc.username;
+  document.getElementById('avatarInit').textContent = initials(acc.username);
+  {const st=document.getElementById('syncTime'); if(st) st.textContent = '• Hari Ini '+new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})+' WIB';}
+  updateDbStatusUI();
+  applyAccess();
+  renderAll();
+  goPage(homePage());
+}
+function doLogout(){
+  currentUser=null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginError').style.display='none';
+  document.getElementById('loginUser').value=''; document.getElementById('loginPass').value='';
+}
+function updateDbStatusUI(){
+  const dot = document.getElementById('dbLiveDot');
+  const chip = document.getElementById('syncChip');
+  if(dbOnline){ dot.textContent='Live'; dot.classList.remove('off'); chip.classList.remove('err'); }
+  else{ dot.textContent='Terputus'; dot.classList.add('off'); chip.classList.add('err'); chip.innerHTML = '⚠️ Gagal sambung ke database'; }
+}
+
+/* ================= NAV ================= */
+const titles = {
+  dashboard:['Dashboard Overview','Ringkasan status service seluruh unit'],
+  reminder:['Reminder & Data Kendaraan','Sistem Pengingat Jadwal Perawatan & Inventaris Armada Terpusat'],
+  histori:['Histori Service','Riwayat lengkap pembaruan service tiap kendaraan'],
+  bengkel:['Keluar Masuk Bengkel','Catat kendaraan yang masuk & keluar bengkel repair'],
+  sparepart:['Pending Sparepart','Sparepart mobil yang masih ditunggu — gudang mencentang jika sudah ready'],
+  kwitansi:['Kwitansi Pengajuan','Catat kwitansi pengajuan toko / bengkel & status pembayarannya'],
+  akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
+};
+/* ================= HAK AKSES (Maintenance / Staff / Gudang) ================= */
+// Maintenance = semua menu. Staff/Viewer = hanya Keluar Masuk Bengkel. Gudang = hanya Pending Sparepart (ceklis ready).
+// Akun bawaan DPM2026 selalu Maintenance supaya tidak bisa terkunci.
+const ROLE_PAGES = { staff:['bengkel'], gudang:['sparepart'] };
+function roleKind(a){
+  if(!a) return 'staff';
+  if(String(a.username||'').trim().toUpperCase()==='DPM2026') return 'maintenance';
+  const r = String(a.role||'').trim().toLowerCase();
+  if(r==='gudang') return 'gudang';
+  return (r==='staff' || r==='viewer') ? 'staff' : 'maintenance';
+}
+function isMaintenance(){ return roleKind(currentUser)==='maintenance'; }
+function isGudang(){ return roleKind(currentUser)==='gudang'; }
+function canAccess(p){ return isMaintenance() || (ROLE_PAGES[roleKind(currentUser)]||['bengkel']).includes(p); }
+function homePage(){ const k = roleKind(currentUser); return k==='maintenance' ? 'dashboard' : k==='gudang' ? 'sparepart' : 'bengkel'; }
+function applyAccess(){
+  const full = isMaintenance();
+  const allowed = ROLE_PAGES[roleKind(currentUser)] || ['bengkel'];
+  document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || allowed.includes(n.dataset.page)) ? '' : 'none'; });
+  ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
+  const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
+}
+function goPage(p){
+  if(!canAccess(p)) p = homePage();
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active', n.dataset.page===p));
+  document.querySelectorAll('.page').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.getElementById('topTitle').textContent = titles[p][0];
+  document.getElementById('topSub').textContent = titles[p][1];
+  if(p==='dashboard') renderDashboard();
+  if(p==='reminder') renderTable();
+  if(p==='histori') renderHistory();
+  if(p==='bengkel') renderBengkel();
+  if(p==='kwitansi') renderKwitansi();
+  if(p==='sparepart') renderSparepart();
+  if(p==='akun') renderAccountPage();
+}
+function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable(); renderHistory(); renderBengkel(); renderKwitansi(); renderSparepart(); renderAccountPage(); }
+
+/* ================= DASHBOARD ================= */
+function renderDashboard(){
+  invalidateWaIdx();
+  const vs = DB.vehicles;
+  document.getElementById('kpiTotal').textContent = vs.length;
+  document.getElementById('navReminderCount').textContent = vs.length;
+  document.getElementById('bellCount').textContent = vs.filter(v=>{ const s=statusOf(v); return s==='bad'||s==='warn'; }).length;
+  renderNotifPanel();
+  document.getElementById('kpiSoonLabel').textContent = `MENDEKATI (${DB.settings.reminderDays||14} HARI)`;
+  let bad=0,warn=0,ok=0;
+  vs.forEach(v=>{ const s=statusOf(v); if(s==='bad')bad++; else if(s==='warn')warn++; else ok++; });
+  document.getElementById('kpiOverdue').textContent = bad;
+  document.getElementById('kpiSoon').textContent = warn;
+  document.getElementById('kpiSafe').textContent = ok;
+  renderBarChart('chartArea', groupCount(vs,'area'));
+  renderBarChart('chartPT', groupCount(vs,'pt'));
+  renderBarChart('chartType', groupCount(vs,'brand'));
+  renderCritBanner(vs);
+  renderRecentActivity();
+}
+function renderCritBanner(vs){
+  const banner = document.getElementById('critBanner');
+  const overdue = vs.filter(v=>statusOf(v)==='bad')
+    .sort((a,b)=> (a.nextdate||'').localeCompare(b.nextdate||''));
+  if(overdue.length===0){ banner.classList.remove('show'); return; }
+  banner.classList.add('show');
+  document.getElementById('critBadge').textContent = `${overdue.length} Unit Overdue`;
+  const list = document.getElementById('critList');
+  list.innerHTML = overdue.slice(0,5).map(v=>{
+    const hariLewat = Math.abs(daysBetween(today(), v.nextdate));
+    const kmLebih = (Number(v.currentkm)||0) - (Number(v.nextkm)||0);
+    return `<div class="crit-card">
+      <div class="cv-ic">🚨</div>
+      <div class="cv-main">
+        <div class="l1">${v.nopol||'-'} <span class="cell-sub" style="font-weight:600;">${vLabel(v)}</span> <span class="status-badge bad">Overdue ${hariLewat} Hari</span></div>
+        <div class="l2">${v.pt||'-'} • ${v.user||'-'} (${v.phone||'-'})</div>
+      </div>
+      <div class="cv-km">Odometer Aktual / Target<b>${(v.currentkm||0).toLocaleString('id-ID')} / ${(v.nextkm||0).toLocaleString('id-ID')} KM</b>${kmLebih>0? `<span style="color:var(--bad);">+${kmLebih.toLocaleString('id-ID')} KM Melebihi Batas</span>`:''}</div>
+      <div class="cv-actions">
+        <a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WhatsApp')}</a>
+        <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Input Servis</button>
+      </div>
+    </div>`;
+  }).join('');
+  if(overdue.length>5){ list.innerHTML += `<div class="small-note" style="margin-top:10px;">+${overdue.length-5} unit overdue lainnya — klik "Lihat Semua Unit Kritis" di atas.</div>`; }
+}
+function broadcastCriticalWa(){
+  const overdueAll = DB.vehicles.filter(v=>statusOf(v)==='bad');
+  if(overdueAll.length===0){ showToast('Tidak ada unit overdue saat ini.'); return; }
+  const overdue = dedupeWaTargets(overdueAll);
+  overdue.forEach((v,i)=>{ setTimeout(()=>window.open(waLink(v),'_blank'), i*350); });
+  showToast(`Membuka ${overdue.length} chat WhatsApp reminder (unit dari PT & nomor yang sama digabung jadi 1 pesan)...`);
+}
+function renderRecentActivity(){
+  const el = document.getElementById('recentActivity');
+  if(!el) return;
+  const items = DB.history.slice(0,6);
+  if(items.length===0){ el.innerHTML = '<div class="small-note">Belum ada aktivitas update service.</div>'; return; }
+  el.innerHTML = items.map(h=>`
+    <div class="bar-row" style="align-items:flex-start;">
+      <div style="width:7px;height:7px;border-radius:50%;background:var(--brand);margin-top:6px;flex:none;"></div>
+      <div style="flex:1;">
+        <div style="font-weight:700;font-size:12.5px;">${h.nopol||'-'} — servis dicatat</div>
+        <div class="small-note" style="margin-top:1px;">${(h.lastkm||0).toLocaleString('id-ID')} KM • oleh ${h.by||'-'} • ${h.inputAt||'-'}</div>
+      </div>
+    </div>`).join('');
+}
+function groupCount(list, field){ const m={}; list.forEach(v=>{ const k=v[field]||'(kosong)'; m[k]=(m[k]||0)+1; }); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,8); }
+
+function renderNotifPanel(){
+  invalidateWaIdx();
+  const urgent = DB.vehicles.filter(v=>{ const s=statusOf(v); return s==='bad'||s==='warn'; })
+    .sort((a,b)=> (a.nextdate||'').localeCompare(b.nextdate||''));
+  document.getElementById('notifCountLabel').textContent = `${urgent.length} unit`;
+  maybeFireDesktopNotif(urgent);
+  const list = document.getElementById('notifList');
+  if(urgent.length===0){ list.innerHTML = '<div class="notif-empty">Tidak ada kendaraan yang overdue atau mendekati jatuh tempo. 👍</div>'; return; }
+  list.innerHTML = urgent.map(v=>{
+    const s = statusOf(v);
+    return `<div class="notif-item" onclick="jumpToVehicle('${v.id}')">
+      <div class="top-row"><span class="nopol">${v.nopol||'-'}</span><span class="status-badge ${s}">${statusLabel(s)}</span></div>
+      <div class="pt">${v.pt||'-'} • ${v.user||'-'}</div>
+      <div class="pt">Jatuh tempo: ${fmtDate(v.nextdate)} atau ${(v.nextkm||0).toLocaleString('id-ID')} KM</div>
+    </div>`;
+  }).join('');
+}
+function toggleNotifPanel(e){
+  e.stopPropagation();
+  document.getElementById('notifPanel').classList.toggle('show');
+}
+function jumpToVehicle(vehicleId){
+  document.getElementById('notifPanel').classList.remove('show');
+  goPage('reminder');
+  const v = DB.vehicles.find(x=>x.id===vehicleId);
+  if(v){ document.getElementById('q_search').value = v.nopol; document.getElementById('q_pt').value=''; document.getElementById('q_area').value=''; setQuickTab('all'); }
+}
+document.addEventListener('click', ()=>{ const p=document.getElementById('notifPanel'); if(p) p.classList.remove('show'); });
+function renderBarChart(elId, entries){
+  const el = document.getElementById(elId);
+  if(entries.length===0){ el.innerHTML='<div class="small-note">Belum ada data.</div>'; return; }
+  const max = Math.max(...entries.map(e=>e[1]));
+  el.innerHTML = entries.map(([label,val])=>`<div class="bar-row"><div class="label" title="${label}">${label}</div><div class="bar-track"><div class="bar-fill" style="width:${(val/max*100)}%"></div></div><div class="val">${val}</div></div>`).join('');
+}
+
+/* ================= REMINDER TABLE ================= */
+function populateFilterOptions(){
+  const pts=[...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort();
+  const areas=[...new Set(DB.vehicles.map(v=>v.area).filter(Boolean))].sort();
+  const selPt=document.getElementById('q_pt'), selArea=document.getElementById('q_area');
+  const curPt=selPt.value, curArea=selArea.value;
+  selPt.innerHTML='<option value="">Semua PT (Semua Tenant)</option>'+pts.map(p=>`<option value="${p}">${p}</option>`).join('');
+  selArea.innerHTML='<option value="">Semua Area</option>'+areas.map(a=>`<option value="${a}">${a}</option>`).join('');
+  selPt.value=curPt; selArea.value=curArea;
+}
+function setQuickTab(t){ quickTab=t; document.querySelectorAll('.tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderTable(); }
+function resetFilters(){ document.getElementById('q_search').value=''; document.getElementById('q_pt').value=''; document.getElementById('q_area').value=''; setQuickTab('all'); }
+let vSortKey = null, vSortDir = 1; // 1=naik(A-Z/lama ke baru), -1=turun
+function setVSort(key){
+  if(vSortKey===key) vSortDir = -vSortDir; else { vSortKey=key; vSortDir=1; }
+  document.querySelectorAll('.sort-ic').forEach(el=>{ el.classList.remove('active'); el.textContent=''; });
+  const ic = document.getElementById('sic_'+key);
+  if(ic){ ic.classList.add('active'); ic.textContent = vSortDir===1 ? '▲' : '▼'; }
+  renderTable();
+}
+function filteredVehicles(){
+  const q=document.getElementById('q_search').value.trim().toLowerCase();
+  const pt=document.getElementById('q_pt').value, area=document.getElementById('q_area').value;
+  let list = DB.vehicles.filter(v=>{
+    if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''} ${vLabel(v)}`.toLowerCase().includes(q))) return false;
+    if(pt && v.pt!==pt) return false;
+    if(area && v.area!==area) return false;
+    if(quickTab==='standby'){ if(!isStandby(v)) return false; }
+    else if(quickTab!=='all' && statusOf(v)!==quickTab) return false;
+    return true;
+  });
+  if(vSortKey){
+    list = [...list].sort((a,b)=>{
+      let av=a[vSortKey], bv=b[vSortKey];
+      if(vSortKey==='pt' || vSortKey==='nopol') { av=(av||'').toLowerCase(); bv=(bv||'').toLowerCase(); return vSortDir*av.localeCompare(bv); }
+      av = Number(av)||0; bv = Number(bv)||0;
+      if(vSortKey==='lastdate' || vSortKey==='nextdate'){ av=a[vSortKey]||''; bv=b[vSortKey]||''; return vSortDir*String(av).localeCompare(String(bv)); }
+      return vSortDir*(av-bv);
+    });
+  }
+  return list;
+}
+function renderTable(){
+  invalidateWaIdx();
+  populateTabCounts();
+  const list = filteredVehicles();
+  const body = document.getElementById('vehicleBody');
+  if(list.length===0){ body.innerHTML=`<tr class="empty-row"><td colspan="11">Tidak ada data kendaraan yang cocok. Coba ubah pencarian/filter, atau tambahkan data baru.</td></tr>`; renderBulkBar(); return; }
+  body.innerHTML = list.map(v=>{
+    const s = statusOf(v);
+    const code = v.code || ptCode(v.pt, 0);
+    const kmLeft = (Number(v.nextkm)||0) - (Number(v.currentkm)||0);
+    const kmLeftTxt = v.nextkm ? (kmLeft<=0 ? `<span style="color:var(--bad);font-weight:700;">sudah lewat ${Math.abs(kmLeft).toLocaleString('id-ID')} KM</span>` : `sisa ${kmLeft.toLocaleString('id-ID')} KM`) : '';
+    return `<tr>
+      <td><input type="checkbox" class="rowchk" data-id="${v.id}" ${selectedIds.has(v.id)?'checked':''} onchange="onRowCheck('${v.id}',this.checked)"></td>
+      <td><div class="cell-primary">${isStandby(v) ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Standby</span>' : v.pt}</div><div class="cell-sub">ID: ${code}</div></td>
+      <td><div class="cell-primary">${v.user||'-'}</div><div class="cell-phone-row"><span class="cell-sub">${v.phone||'-'}</span><button class="note-btn" title="Keterangan: ${(v.note||'-').replace(/"/g,'&quot;')}">💬</button></div></td>
+      <td><button class="nopol-badge" onclick="openHistoryModal('${v.id}')">${v.nopol||'-'}</button></td>
+      <td><div class="cell-primary">${v.type||vLabel(v)}</div><div class="cell-sub">${v.color||'-'} • ${v.year||'-'}</div></td>
+      <td><span class="area-badge">${v.area||'-'}</span></td>
+      <td><div class="cell-primary">${fmtDate(v.lastdate)}</div><div class="cell-sub">${(v.lastkm||0).toLocaleString('id-ID')} KM</div></td>
+      <td><div class="cell-primary">${(v.currentkm||0).toLocaleString('id-ID')} KM</div><div class="cell-sub">${kmLeftTxt}</div></td>
+      <td>${v.interval||'-'} Hari</td>
+      <td><span class="status-badge ${s}">${statusLabel(s)}</span>${inWorkshopNow(v) ? '<br><span class="status-badge" style="background:#fff4e0;color:#b26a00;margin-top:4px;">🔧 Di Bengkel</span>' : ''}</td>
+      <td><div class="aksi-cell">
+        <a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WA Reminder')}</a>
+        <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
+        <button class="edit-icon-btn" onclick="openVehicleModal('${v.id}')" title="Edit">✎</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  renderBulkBar();
+}
+function populateTabCounts(){
+  const base = DB.vehicles.filter(v=>{
+    const q=document.getElementById('q_search').value.trim().toLowerCase();
+    const pt=document.getElementById('q_pt').value, area=document.getElementById('q_area').value;
+    if(q && !(`${v.nopol||''} ${v.user||''} ${v.pt||''} ${vLabel(v)}`.toLowerCase().includes(q))) return false;
+    if(pt && v.pt!==pt) return false;
+    if(area && v.area!==area) return false;
+    return true;
+  });
+  let bad=0,warn=0,ok=0,standby=0; base.forEach(v=>{ if(isStandby(v)){ standby++; return; } const s=statusOf(v); if(s==='bad')bad++; else if(s==='warn')warn++; else ok++; });
+  document.getElementById('cnt_all').textContent=base.length;
+  document.getElementById('cnt_bad').textContent=bad;
+  document.getElementById('cnt_warn').textContent=warn;
+  document.getElementById('cnt_ok').textContent=ok;
+  document.getElementById('cnt_standby').textContent=standby;
+}
+function onRowCheck(id, checked){ if(checked) selectedIds.add(id); else selectedIds.delete(id); renderBulkBar(); }
+function toggleAll(box){ document.querySelectorAll('.rowchk').forEach(c=>{ c.checked=box.checked; if(box.checked) selectedIds.add(c.dataset.id); else selectedIds.delete(c.dataset.id); }); renderBulkBar(); }
+function clearSelection(){ selectedIds.clear(); renderTable(); }
+function renderBulkBar(){
+  const bar=document.getElementById('bulkBar');
+  if(selectedIds.size===0){ bar.classList.remove('show'); return; }
+  bar.classList.add('show');
+  document.getElementById('bulkCount').textContent=selectedIds.size;
+  const names=DB.vehicles.filter(v=>selectedIds.has(v.id)).map(v=>v.nopol).slice(0,4);
+  document.getElementById('bulkNames').textContent=`• (${names.join(', ')}${selectedIds.size>4?', ...':''})`;
+}
+async function deleteSelected(){
+  if(selectedIds.size===0){ showToast('Pilih minimal satu data untuk dihapus.'); return; }
+  if(!confirm(`Hapus ${selectedIds.size} data kendaraan terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbDeleteIds('vehicles', Array.from(selectedIds));
+    DB.vehicles = DB.vehicles.filter(v=>!selectedIds.has(v.id));
+    selectedIds.clear();
+    populateFilterOptions(); renderTable(); renderDashboard();
+    showToast('Data terpilih berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data. Cek koneksi database.', true); }
+}
+
+/* ================= MODAL KENDARAAN ================= */
+// Saran Brand / Model / Type diambil dari data kendaraan yang sudah ada (tidak ada master data terpisah)
+function populateVehicleTypeSelects(){
+  const fill = (listId, key)=>{
+    const vals = [...new Set(DB.vehicles.map(v=>String(v[key]||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y,'id'));
+    document.getElementById(listId).innerHTML = vals.map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
+  };
+  fill('vBrandList','brand'); fill('vModelList','model'); fill('vTypeList','type');
+}
+function guessVehicleTypeSelects(v){
+  document.getElementById('v_brand').value = v?.brand || '';
+  document.getElementById('v_model').value = v?.model || '';
+  document.getElementById('v_type').value = v?.type || '';
+}
+function openVehicleModal(id){
+  document.getElementById('vModalTitle').textContent = id? 'Edit / Update Kendaraan':'Tambah Kendaraan';
+  const v = id? DB.vehicles.find(x=>x.id===id):null;
+  document.getElementById('v_id').value = id||'';
+  const set=(k,val)=>document.getElementById(k).value = val||'';
+  set('v_pt', v?.pt); set('v_area', v?.area); set('v_user', v?.user); set('v_phone', v?.phone);
+  set('v_nopol', v?.nopol); set('v_color', v?.color); set('v_year', v?.year);
+  set('v_lastdate', v?.lastdate); set('v_lastkm', v?.lastkm); set('v_currentkm', v?.currentkm);
+  populateVehicleTypeSelects();
+  guessVehicleTypeSelects(v);
+  document.getElementById('v_interval').value = v?.interval || 180;
+  document.getElementById('v_kmstep').value = v?.kmstep || 10000;
+  set('v_note', v?.note);
+  liveCalc();
+  document.getElementById('vehicleModalBg').classList.add('show');
+}
+function closeVehicleModal(){ document.getElementById('vehicleModalBg').classList.remove('show'); }
+function liveCalc(){
+  const lastdate=document.getElementById('v_lastdate').value, interval=document.getElementById('v_interval').value,
+        lastkm=document.getElementById('v_lastkm').value, kmstep=document.getElementById('v_kmstep').value;
+  if(!lastdate){ document.getElementById('calcDate').textContent='—'; document.getElementById('calcKm').textContent='—'; document.getElementById('calcStatus').textContent='—'; return; }
+  const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
+  document.getElementById('calcDate').textContent = fmtDate(nextdate);
+  document.getElementById('calcKm').textContent = nextkm.toLocaleString('id-ID')+' KM';
+  document.getElementById('calcStatus').textContent = statusLabel(statusOf({nextdate}));
+}
+async function saveVehicle(logHistory){
+  const idVal = document.getElementById('v_id').value;
+  const isNew = !idVal;
+  const get = k=>document.getElementById(k).value.trim();
+  const nopol = get('v_nopol').toUpperCase();
+  if(isNew && DB.vehicles.some(x=>(x.nopol||'').toUpperCase()===nopol)){ showToast('Gagal: Nomor Polisi ini sudah terdaftar di sistem.'); return; }
+  const currentkm = Number(get('v_currentkm'))||0;
+  const lastdate=get('v_lastdate'), interval=Number(get('v_interval'))||180, lastkm=Number(get('v_lastkm'))||0, kmstep=Number(get('v_kmstep'))||10000;
+  const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
+  const pt = get('v_pt');
+  const sameCount = DB.vehicles.filter(x=>x.pt===pt).length;
+  const existing = isNew? null : DB.vehicles.find(x=>x.id===idVal);
+  const v = { id:idVal, code: existing?.code || ptCode(pt, sameCount), pt, area:get('v_area'), user:get('v_user'), phone:get('v_phone'),
+    nopol, brand:get('v_brand'), model:get('v_model'), type:get('v_type'), color:get('v_color'), year:get('v_year'), lastdate, lastkm, currentkm,
+    interval, kmstep, nextdate, nextkm, note:get('v_note') };
+  try{
+    if(isNew){
+      const rows = await sbInsert('vehicles', toDbVehicle(v));
+      const saved = fromDbVehicle(rows[0]);
+      DB.vehicles.push(saved);
+      if(logHistory) await recordHistory({...saved});
+    }else{
+      await sbUpdate('vehicles', idVal, toDbVehicle(v));
+      const idx = DB.vehicles.findIndex(x=>x.id===idVal);
+      DB.vehicles[idx] = v;
+      if(logHistory) await recordHistory(v);
+    }
+    closeVehicleModal(); populateFilterOptions(); renderTable(); renderDashboard(); renderHistory();
+    showToast(logHistory? 'Data tersimpan & dicatat sebagai update service.':'Data kendaraan tersimpan.');
+  }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
+}
+async function recordHistory(v){
+  const h = { vehicleId:v.id, pt:v.pt, nopol:v.nopol, type:v.type, lastdate:v.lastdate, lastkm:v.lastkm, currentkm:v.currentkm,
+    interval:v.interval, note:v.note, by: currentUser?.username||'-', inputAt: new Date().toLocaleString('id-ID') };
+  const rows = await sbInsert('service_history', toDbHistory(h));
+  DB.history.unshift(fromDbHistory(rows[0]));
+}
+
+/* ================= MODAL UPDATE SERVICE (RINGKAS) ================= */
+function openUpdateServiceModal(id){
+  const v = DB.vehicles.find(x=>x.id===id);
+  if(!v) return;
+  document.getElementById('us_id').value = id;
+  document.getElementById('usSub').textContent = `${v.nopol||'-'} • ${vLabel(v)} • ${v.pt||'-'} • ${v.user||'-'}`;
+  document.getElementById('us_lastdate').value = v.lastdate||'';
+  document.getElementById('us_lastkm').value = v.lastkm||0;
+  document.getElementById('us_currentkm').value = v.currentkm||0;
+  document.getElementById('us_interval').value = v.interval||180;
+  document.getElementById('us_kmstep').value = v.kmstep||10000;
+  document.getElementById('us_note').value = v.note||'';
+  liveCalcUpdate();
+  document.getElementById('updateServiceModalBg').classList.add('show');
+}
+function closeUpdateServiceModal(){ document.getElementById('updateServiceModalBg').classList.remove('show'); }
+function liveCalcUpdate(){
+  const lastdate=document.getElementById('us_lastdate').value, interval=document.getElementById('us_interval').value,
+        lastkm=document.getElementById('us_lastkm').value, kmstep=document.getElementById('us_kmstep').value;
+  if(!lastdate){ document.getElementById('usCalcDate').textContent='—'; document.getElementById('usCalcKm').textContent='—'; document.getElementById('usCalcStatus').textContent='—'; return; }
+  const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
+  document.getElementById('usCalcDate').textContent = fmtDate(nextdate);
+  document.getElementById('usCalcKm').textContent = nextkm.toLocaleString('id-ID')+' KM';
+  document.getElementById('usCalcStatus').textContent = statusLabel(statusOf({nextdate}));
+}
+async function saveUpdateService(){
+  const idVal = document.getElementById('us_id').value;
+  const existing = DB.vehicles.find(x=>x.id===idVal);
+  if(!existing) return;
+  const get = k=>document.getElementById(k).value.trim();
+  const lastdate=get('us_lastdate'), interval=Number(get('us_interval'))||180, lastkm=Number(get('us_lastkm'))||0, kmstep=Number(get('us_kmstep'))||10000;
+  const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, kmstep);
+  const v = { ...existing, lastdate, lastkm, currentkm:Number(get('us_currentkm'))||0, interval, kmstep, nextdate, nextkm, note:get('us_note') };
+  try{
+    await sbUpdate('vehicles', idVal, toDbVehicle(v));
+    const idx = DB.vehicles.findIndex(x=>x.id===idVal);
+    DB.vehicles[idx] = v;
+    await recordHistory(v);
+    closeUpdateServiceModal(); renderTable(); renderDashboard(); renderHistory();
+    showToast('Update service tersimpan & dicatat ke histori.');
+  }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
+}
+
+/* ================= HISTORI ================= */
+function renderHistory(){
+  const f=id=>document.getElementById(id).value.trim().toLowerCase();
+  const nopol=f('h_nopol'), pt=f('h_pt'), area=f('h_area'), from=document.getElementById('h_from').value, to=document.getElementById('h_to').value;
+  const list = DB.history.filter(h=>{
+    if(nopol && !(h.nopol||'').toLowerCase().includes(nopol)) return false;
+    if(pt && !(h.pt||'').toLowerCase().includes(pt)) return false;
+    if(area){ const veh=DB.vehicles.find(v=>v.id===h.vehicleId); if(!veh || !(veh.area||'').toLowerCase().includes(area)) return false; }
+    if(from && h.lastdate < from) return false;
+    if(to && h.lastdate > to) return false;
+    return true;
+  });
+  const body=document.getElementById('historyBody');
+  if(list.length===0){ body.innerHTML=`<tr class="empty-row"><td colspan="10">Belum ada riwayat service tercatat.</td></tr>`; return; }
+  body.innerHTML=list.map(h=>`<tr><td>${h.inputAt||'-'}</td><td>${h.pt||'-'}</td><td><button class="nopol-badge" onclick="openHistoryModal('${h.vehicleId}')">${h.nopol||'-'}</button></td><td>${h.type||'-'}</td>
+    <td>${fmtDate(h.lastdate)}</td><td>${(h.lastkm||0).toLocaleString('id-ID')}</td><td>${(h.currentkm||0).toLocaleString('id-ID')}</td>
+    <td>${h.interval||'-'} hari</td><td>${h.note||'-'}</td><td>${h.by||'-'}</td></tr>`).join('');
+}
+function openHistoryModal(vehicleId){
+  const v = DB.vehicles.find(x=>x.id===vehicleId);
+  document.getElementById('hModalTitle').textContent = `Histori Service — ${v?.nopol||''}`;
+  document.querySelector('#historyModalBg .modal p.sub').textContent = v ? `${vLabel(v)} • ${v.pt||'-'}` : 'Riwayat pembaruan service kendaraan ini.';
+  const items = DB.history.filter(h=>h.vehicleId===vehicleId);
+  const el = document.getElementById('historyTimeline');
+  el.innerHTML = items.length? items.map(h=>`<div class="h-item"><div class="d">${fmtDate(h.lastdate)} — ${(h.lastkm||0).toLocaleString('id-ID')} KM</div>
+    <div class="m">KM aktual saat itu: ${(h.currentkm||0).toLocaleString('id-ID')} • Interval: ${h.interval} hari • Oleh: ${h.by} • ${h.inputAt||''}</div>
+    ${h.note? `<div class="m">Catatan: ${h.note}</div>`:''}</div>`).join('') : '<div class="small-note">Belum ada riwayat untuk kendaraan ini.</div>';
+  document.getElementById('historyModalBg').classList.add('show');
+}
+function closeHistoryModal(){ document.getElementById('historyModalBg').classList.remove('show'); }
+
+/* ================= KELUAR MASUK BENGKEL ================= */
+let bengkelTab = 'all';
+function setBengkelTab(t){ bengkelTab=t; document.querySelectorAll('#page-bengkel .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderBengkel(); }
+function bengkelStatus(b){ return b.tglKeluar ? 'out' : 'in'; }
+function bayarLabel(v){ return v==='Sudah Bayar' ? 'Paid' : v==='PO' ? 'Pembayaran pakai PO' : v==='Invoice' ? 'Invoice' : 'Belum Bayar'; }
+function bayarClass(v){ return v==='Sudah Bayar' ? 'ok' : v==='PO' ? 'warn' : v==='Invoice' ? 'info' : 'bad'; }
+function orUnpaid(b){ return (b.statusBayar||'Belum Bayar')==='Belum Bayar'; }
+// OR baru ditagihkan setelah mobil keluar dari bengkel
+function orBillable(b){ return !!b.tglKeluar && orUnpaid(b); }
+function kwitansiSelectHtml(b){
+  const v = b.kwitansi==='Sudah' ? 'Sudah' : 'Belum';
+  return `<select class="inl-sel ${v==='Sudah'?'ok':'off'}" onchange="setBengkelField('${b.id}','kwitansi',this.value)" title="Ubah status kwitansi"><option value="Belum" ${v==='Belum'?'selected':''}>Belum</option><option value="Sudah" ${v==='Sudah'?'selected':''}>Sudah</option></select>`;
+}
+function bayarSelectHtml(b){
+  const v = b.statusBayar || 'Belum Bayar';
+  const opt = (val,label)=>`<option value="${val}" ${v===val?'selected':''}>${label}</option>`;
+  return `<select class="inl-sel ${bayarClass(v)}" onchange="setBengkelField('${b.id}','statusBayar',this.value)" title="Ubah status pembayaran">${opt('Belum Bayar','Belum Bayar')}${opt('Sudah Bayar','Paid')}${opt('PO','Pembayaran pakai PO')}${opt('Invoice','Invoice')}</select>`;
+}
+function orReminderCellHtml(b){
+  if(!b.tglKeluar) return `<span class="or-wait">Menunggu mobil keluar</span>`;
+  if(orUnpaid(b)) return `<a class="wa-btn" href="javascript:void(0)" onmouseenter="prefetchKw('${b.id}')" onclick="openWaOR('${b.id}')" title="Kirim reminder tagihan OR + file kwitansi via WhatsApp">💬 Reminder OR</a>`;
+  return `<span class="or-wait">-</span>`;
+}
+async function setBengkelField(id, field, value){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  const prev = b[field];
+  if(prev===value) return;
+  b[field] = value; renderBengkel();
+  try{
+    await sbUpdate('bengkel_log', id, field==='kwitansi' ? { kwitansi:value } : { status_bayar:value });
+    showToast(field==='kwitansi' ? `Kwitansi ${b.nopol}: ${value}` : `Pembayaran ${b.nopol}: ${bayarLabel(value)}`);
+  }catch(e){
+    console.error(e); b[field] = prev; renderBengkel(); showToast('Gagal menyimpan perubahan.', true);
+  }
+}
+/* --- Filter langsung di judul kolom (klik judul kolom) --- */
+const BF = {};
+const BF_OPT = {
+  lama:[['0-3','0–3 hari'],['4-7','4–7 hari'],['8-14','8–14 hari'],['15+','Lebih dari 14 hari']],
+  status:[['in','Masih di Bengkel'],['out','Sudah Keluar']],
+  or:[['ada','Ada harga OR'],['kosong','Belum ada harga']],
+  kw:[['belum','Belum'],['sudah','Sudah']],
+  bayar:[['Belum Bayar','Belum Bayar'],['Sudah Bayar','Paid'],['PO','Pembayaran pakai PO'],['Invoice','Invoice']],
+  file:[['ada','Sudah ada file'],['belum','Belum ada file']],
+  rem:[['siap','Siap ditagih'],['tunggu','Menunggu mobil keluar'],['none','Tidak perlu']],
+  foto:[['ada','Ada foto'],['belum','Belum ada foto']]
+};
+const BENGKEL_COLS = [
+  {k:'nopol',t:'NOPOL',type:'text',ph:'Ketik nopol...'},
+  {k:'pt',t:'NAMA PT',type:'text',ph:'Ketik nama PT / PIC...'},
+  {k:'bengkel',t:'BENGKEL',type:'list'},
+  {k:'masuk',t:'TANGGAL MASUK',type:'month'},
+  {k:'keluar',t:'TANGGAL KELUAR',type:'month'},
+  {k:'lama',t:'LAMA DI BENGKEL',type:'list'},
+  {k:'status',t:'STATUS',type:'list'},
+  {k:'or',t:'HARGA OR',type:'list'},
+  {k:'kw',t:'KWITANSI',type:'list'},
+  {k:'bayar',t:'PEMBAYARAN',type:'list'},
+  {k:'file',t:'FILE KWITANSI OR',type:'list'},
+  {k:'rem',t:'REMINDER TAGIHAN OR',type:'list'},
+  {k:'note',t:'KETERANGAN',type:'text',ph:'Ketik kata keterangan...'},
+  {k:'foto',t:'FOTO KERUSAKAN',type:'list'},
+  {k:null,t:'AKSI'}
+];
+function buildBengkelHead(){
+  const tr = document.getElementById('bengkelHeadRow'); if(!tr || tr.dataset.built) return;
+  tr.innerHTML = BENGKEL_COLS.map(c=> c.k
+    ? `<th class="th-filter" data-k="${c.k}" onclick="openColFilter(event,'${c.k}')" title="Klik untuk memfilter kolom ini"><span class="th-lab">${c.t}</span><span class="th-arrow">▾</span><div class="th-val" style="display:none"></div></th>`
+    : `<th>${c.t}</th>`).join('');
+  tr.dataset.built = '1';
+}
+function bfValueLabel(k, v){
+  if(!v) return '';
+  if(k==='masuk' || k==='keluar'){ const [y,m] = v.split('-'); return `${m}/${y}`; }
+  const o = (BF_OPT[k]||[]).find(x=>x[0]===v);
+  return o ? o[1] : v;
+}
+function updateBengkelHeadActive(){
+  document.querySelectorAll('#bengkelHeadRow th.th-filter').forEach(th=>{
+    const k = th.dataset.k, v = BF[k]||'', on = !!v;
+    th.classList.toggle('f-active', on);
+    th.querySelector('.th-arrow').textContent = on ? '●' : '▾';
+    const val = th.querySelector('.th-val'); val.textContent = bfValueLabel(k, v); val.style.display = on ? '' : 'none';
+  });
+}
+function closeColPop(){ const p=document.getElementById('colFilterPop'); if(p) p.remove(); }
+function setColFilter(k,val){ BF[k] = val || ''; closeColPop(); renderBengkel(); }
+function openColFilter(ev,k){
+  ev.stopPropagation();
+  const open = document.getElementById('colFilterPop');
+  if(open && open.dataset.k===k){ closeColPop(); return; }
+  closeColPop();
+  const col = BENGKEL_COLS.find(c=>c.k===k); if(!col) return;
+  const cur = BF[k]||'';
+  const pop = document.createElement('div'); pop.id = 'colFilterPop'; pop.className = 'col-pop'; pop.dataset.k = k;
+  pop.addEventListener('click', e=>e.stopPropagation());
+  let html = `<div class="cp-title">FILTER: ${col.t}</div>`;
+  if(col.type==='text'){
+    html += `<input class="fil-ctl" id="cp_input" placeholder="${escH(col.ph||'')}" value="${escH(cur)}">`;
+  } else if(col.type==='month'){
+    html += `<input class="fil-ctl" id="cp_input" type="month" value="${escH(cur)}">`;
+  } else {
+    const opts = k==='bengkel'
+      ? [...new Set(DB.bengkel.map(b=>b.bengkel).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id')).map(n=>[n,n])
+      : BF_OPT[k];
+    html += `<div class="cp-opt ${cur===''?'on':''}" data-v="">Semua</div>` + opts.map(([v,l])=>`<div class="cp-opt ${cur===v?'on':''}" data-v="${escH(v)}">${escH(l)}</div>`).join('');
+  }
+  if(cur && col.type!=='list') html += `<span class="cp-clear" data-clear="1">✕ Hapus filter kolom ini</span>`;
+  pop.innerHTML = html;
+  document.body.appendChild(pop);
+  const th = ev.currentTarget, r = th.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 12)) + 'px';
+  pop.style.top = (r.bottom + 4) + 'px';
+  pop.querySelectorAll('.cp-opt').forEach(el=> el.onclick = ()=> setColFilter(k, el.dataset.v));
+  const clr = pop.querySelector('[data-clear]'); if(clr) clr.onclick = ()=> setColFilter(k,'');
+  const inp = pop.querySelector('#cp_input');
+  if(inp){
+    if(col.type==='month') inp.onchange = ()=> setColFilter(k, inp.value);
+    else { inp.oninput = ()=>{ BF[k] = inp.value; debBengkel(); }; inp.onkeydown = e=>{ if(e.key==='Enter') closeColPop(); }; }
+    inp.focus();
+  }
+}
+document.addEventListener('click', closeColPop);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeColPop(); });
+window.addEventListener('resize', closeColPop);
+function bgLamaDays(b){ return b.tglKeluar ? daysBetween(b.tglMasuk, b.tglKeluar) : daysBetween(b.tglMasuk, today()); }
+function resetBengkelFilters(){
+  Object.keys(BF).forEach(k=>BF[k]='');
+  const q = document.getElementById('bg_search'); if(q) q.value='';
+  closeColPop(); renderBengkel();
+}
+function filteredBengkel(){
+  const q = (document.getElementById('bg_search')?.value||'').trim().toLowerCase();
+  const f = k => (BF[k]||'').trim();
+  const fNopol = normNopol(f('nopol')), fPt = f('pt').toLowerCase(), fNote = f('note').toLowerCase();
+  const fBengkel=f('bengkel'), fMasuk=f('masuk'), fKeluar=f('keluar'), fLama=f('lama'), fStatus=f('status'), fOr=f('or'), fKw=f('kw'), fBayar=f('bayar'), fFile=f('file'), fRem=f('rem'), fFoto=f('foto');
+  return DB.bengkel.filter(b=>{
+    if(q && !(`${b.nopol||''} ${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(q))) return false;
+    if(fNopol && !normNopol(b.nopol).includes(fNopol)) return false;
+    if(fPt && !(`${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(fPt))) return false;
+    if(fBengkel && b.bengkel!==fBengkel) return false;
+    if(fMasuk && !String(b.tglMasuk||'').startsWith(fMasuk)) return false;
+    if(fKeluar && !String(b.tglKeluar||'').startsWith(fKeluar)) return false;
+    if(fLama){
+      const d = bgLamaDays(b);
+      if(fLama==='0-3' && !(d<=3)) return false;
+      if(fLama==='4-7' && !(d>=4 && d<=7)) return false;
+      if(fLama==='8-14' && !(d>=8 && d<=14)) return false;
+      if(fLama==='15+' && !(d>=15)) return false;
+    }
+    if(fStatus && bengkelStatus(b)!==fStatus) return false;
+    if(fOr==='ada' && !Number(b.hargaOR)) return false;
+    if(fOr==='kosong' && Number(b.hargaOR)) return false;
+    if(fKw && (b.kwitansi==='Sudah' ? 'sudah' : 'belum')!==fKw) return false;
+    if(fBayar && (b.statusBayar||'Belum Bayar')!==fBayar) return false;
+    const hasFile = (b.kwFiles||[]).length>0;
+    if(fFile==='ada' && !hasFile) return false;
+    if(fFile==='belum' && hasFile) return false;
+    if(fRem){
+      const st = !b.tglKeluar ? 'tunggu' : (orUnpaid(b) ? 'siap' : 'none');
+      if(st!==fRem) return false;
+    }
+    if(fNote && !String(b.note||'').toLowerCase().includes(fNote)) return false;
+    const hasFoto = (b.foto||[]).length>0;
+    if(fFoto==='ada' && !hasFoto) return false;
+    if(fFoto==='belum' && hasFoto) return false;
+    if(bengkelTab==='or'){ if(!orBillable(b)) return false; }
+    else if(bengkelTab==='orpaid'){ if(b.statusBayar!=='Sudah Bayar') return false; }
+    else if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
+    return true;
+  });
+}
+function renderBengkel(){
+  updateWaSenderBtn();
+  const all = DB.bengkel;
+  document.getElementById('bg_cnt_all').textContent = all.length;
+  document.getElementById('bg_cnt_in').textContent = all.filter(b=>bengkelStatus(b)==='in').length;
+  document.getElementById('bg_cnt_out').textContent = all.filter(b=>bengkelStatus(b)==='out').length;
+  document.getElementById('bg_cnt_or').textContent = all.filter(orBillable).length;
+  document.getElementById('bg_cnt_orpaid').textContent = all.filter(b=>b.statusBayar==='Sudah Bayar').length;
+  const navCount = document.getElementById('navBengkelCount');
+  if(navCount) navCount.textContent = all.filter(b=>bengkelStatus(b)==='in').length;
+
+  buildBengkelHead(); updateBengkelHeadActive();
+  const list = filteredBengkel();
+  const info = document.getElementById('bgResultInfo'); if(info) info.textContent = `Menampilkan ${list.length} dari ${all.length} data`;
+  const body = document.getElementById('bengkelBody');
+  if(!body) return;
+  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="15">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
+  body.innerHTML = list.map(b=>{
+    const status = bengkelStatus(b);
+    const picName = bgPic(b).name;
+    const lama = status==='in' ? `${daysBetween(b.tglMasuk, today())} hari (berjalan)` : `${daysBetween(b.tglMasuk, b.tglKeluar)} hari`;
+    return `<tr>
+      <td><span class="nopol-badge" style="cursor:default;">${b.nopol||'-'}</span></td>
+      <td>${b.pt||'-'}${picName ? `<div class="small-note">PIC: ${escH(picName)}</div>` : ''}</td>
+      <td>${b.bengkel||'-'}</td>
+      <td>${fmtDate(b.tglMasuk)}</td>
+      <td>${b.tglKeluar? fmtDate(b.tglKeluar) : '-'}</td>
+      <td>${lama}</td>
+      <td><span class="status-badge ${status==='in'?'warn':'ok'}">${status==='in'?'Masih di Bengkel':'Sudah Keluar'}</span></td>
+      <td>${b.hargaOR? 'Rp '+Number(b.hargaOR).toLocaleString('id-ID') : '-'}</td>
+      <td>${kwitansiSelectHtml(b)}</td>
+      <td>${bayarSelectHtml(b)}</td>
+      <td>${kwFileCellHtml(b)}</td>
+      <td>${orReminderCellHtml(b)}</td>
+      <td class="row-note">${b.note||'-'}</td>
+      <td>${fotoCellHtml(b)}</td>
+      <td>
+        <div class="aksi-cell">
+          ${status==='in' ? `<button class="update-btn" onclick="openBengkelOutModal('${b.id}')">✅ Catat Keluar</button>` : ''}
+          <button class="edit-icon-btn" onclick="openBengkelEditModal('${b.id}')" title="Edit">✎</button>
+          <button class="edit-icon-btn" onclick="deleteBengkelEntry('${b.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+/* --- Reminder OR (Own Risk) belum dibayar via WhatsApp --- */
+function waGreeting(){
+  const h = new Date().getHours();
+  return h<4 ? 'malam' : h<11 ? 'pagi' : h<15 ? 'siang' : h<18 ? 'sore' : 'malam';
+}
+function orVehicleOf(b){
+  return DB.vehicles.find(v=>v.id===b.vehicleId)
+      || DB.vehicles.find(v=>(v.nopol||'').toUpperCase().replace(/\s+/g,'')===(b.nopol||'').toUpperCase().replace(/\s+/g,''));
+}
+const WA_COMPANY = 'PT.Dokar Putra Mandiri';
+function waSender(){ try{ return (localStorage.getItem('fleetops_wa_sender')||'').trim(); }catch(e){ return ''; } }
+function updateWaSenderBtn(){ document.querySelectorAll('.wa-sender-btn').forEach(el=>{ el.textContent = `👤 Pengirim WA: ${waSender()||'-'}`; }); }
+let waPendingId = null;
+function openWaSender(pendingId){
+  waPendingId = (typeof pendingId==='string') ? pendingId : null;
+  document.getElementById('waSenderInput').value = waSender();
+  document.getElementById('waSenderModalBg').classList.add('show');
+  setTimeout(()=>document.getElementById('waSenderInput').focus(), 50);
+}
+function closeWaSender(){ document.getElementById('waSenderModalBg').classList.remove('show'); waPendingId = null; }
+function saveWaSender(){
+  const n = document.getElementById('waSenderInput').value.trim();
+  if(!n){ showToast('Isi nama pengirim terlebih dahulu.'); return; }
+  try{ localStorage.setItem('fleetops_wa_sender', n); }catch(e){}
+  updateWaSenderBtn();
+  try{ renderTable(); }catch(e){}
+  const pid = waPendingId; closeWaSender();
+  if(pid) openWaOR(pid);
+}
+function fmtDateLong(d){
+  if(!d) return '';
+  const dt = new Date(d+'T00:00:00');
+  const bln = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  return `${dt.getDate()} ${bln[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+function orMessage(b, v, withEmoji){
+  const nm = bgPic(b).name;
+  const sapa = waGreeting().charAt(0).toUpperCase() + waGreeting().slice(1);
+  const tgl = b.tglMasuk ? ` (${fmtDateLong(b.tglMasuk)})` : '';
+  const msg = `${sapa} Bapak/Ibu${nm?' '+nm:''}, saya ${waSender()} dari ${WA_COMPANY} berikut saya lampirkan kwitansi ${b.pt||''} OR ${b.nopol||'-'}${tgl}`.replace(/\s+,/g,',').replace(/\s{2,}/g,' ');
+  return msg + `\n\nTerimakasih` + (withEmoji ? ' \u{1F64F}' : '');
+}
+/* --- File kwitansi dikirim sebagai file asli (bukan link) --- */
+const waFileCache = new Map(); // url -> File
+function kwFileMime(name, blobType){
+  const n = String(name||'').toLowerCase();
+  if(n.endsWith('.pdf')) return 'application/pdf';
+  if(/\.jpe?g$/.test(n)) return 'image/jpeg';
+  if(n.endsWith('.png')) return 'image/png';
+  if(n.endsWith('.webp')) return 'image/webp';
+  return blobType || 'application/octet-stream';
+}
+async function loadKwFileObjects(files){
+  const out = [];
+  for(const f of files){
+    if(!waFileCache.has(f.u)){
+      const res = await fetch(f.u);
+      if(!res.ok) throw new Error('Gagal mengambil file ('+res.status+')');
+      const blob = await res.blob();
+      let name = (f.n || decodeURIComponent(String(f.u).split('/').pop()||'kwitansi')).replace(/[\\/:*?"<>|]+/g,'-');
+      const type = kwFileMime(name, blob.type);
+      if(type==='application/pdf' && !/\.pdf$/i.test(name)) name += '.pdf';
+      waFileCache.set(f.u, new File([blob], name, { type }));
+    }
+    out.push(waFileCache.get(f.u));
+  }
+  return out;
+}
+function prefetchKw(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  const files = (b.kwFiles||[]).filter(f=>f&&f.u&&!waFileCache.has(f.u));
+  if(files.length) loadKwFileObjects(files).catch(()=>{});
+}
+function downloadFileObjs(list){
+  list.forEach((f,i)=> setTimeout(()=>{
+    const url = URL.createObjectURL(f);
+    const a = document.createElement('a'); a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 5000);
+  }, i*300));
+}
+function openWaChat(ph, text){ window.open(`https://wa.me/${ph}?text=${encodeURIComponent(text)}`, '_blank'); }
+async function openWaOR(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  if(!waSender()){ openWaSender(id); return; }
+  const v = orVehicleOf(b);
+  const ph = waPhoneKey({phone: bgPic(b).phone});
+  const files = (b.kwFiles||[]).filter(f=>f && f.u);
+  if(!files.length){
+    showToast('Belum ada file kwitansi OR di aplikasi — upload dulu di kolom FILE KWITANSI OR, atau lampirkan manual di WhatsApp.');
+    openWaChat(ph, orMessage(b, v, false)); return;
+  }
+  let objs;
+  try{ if(files.some(f=>!waFileCache.has(f.u))) showToast('Menyiapkan file kwitansi...'); objs = await loadKwFileObjects(files); }
+  catch(e){ console.error(e); showToast('Gagal mengambil file kwitansi. Periksa koneksi lalu coba lagi.', true); return; }
+  // 1) Kirim sebagai FILE lewat menu Bagikan (pilih WhatsApp lalu kontaknya)
+  if(navigator.canShare && navigator.canShare({ files: objs })){
+    const text = orMessage(b, v, true);
+    try{ if(navigator.clipboard) await navigator.clipboard.writeText(text); }catch(e){}
+    try{ await navigator.share({ files: objs, text }); return; }
+    catch(e){
+      if(e && e.name==='AbortError') return;
+      if(e && e.name==='NotAllowedError'){ showToast('File kwitansi sudah siap — klik Reminder OR sekali lagi untuk membuka menu Bagikan.'); return; }
+      console.error(e);
+    }
+  }
+  // 2) Cadangan: unduh file lalu buka chat WhatsApp, file tinggal dilampirkan
+  downloadFileObjs(objs);
+  showToast('File kwitansi diunduh — lampirkan ke chat WhatsApp yang terbuka.');
+  openWaChat(ph, orMessage(b, v, false));
+}
+function openBengkelInModal(){
+  const dl = document.getElementById('bgVehicleList');
+  dl.innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort()
+    .map(n=>`<option value="${n}">`).join('');
+  const ptdl = document.getElementById('bgPtList');
+  ptdl.innerHTML = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort()
+    .map(n=>`<option value="${n}">`).join('');
+  const bdl = document.getElementById('bgBengkelList');
+  const customNames = [...new Set(DB.bengkel.map(b=>b.bengkel).filter(Boolean))]
+    .filter(n=>!['Padimas','IRM','Lido','Kita','Layanan'].includes(n));
+  bdl.innerHTML = ['Padimas','IRM','Lido','Kita','Layanan', ...customNames].map(n=>`<option value="${n}">`).join('');
+  bgAuto = { pt:'', pic:'', phone:'' };
+  document.getElementById('bg_id').value = '';
+  document.getElementById('bgInModalTitle').textContent = 'Tambahkan Kendaraan ke Bengkel';
+  document.getElementById('bgInSaveBtn').textContent = 'Simpan';
+  document.getElementById('bg_vehicle').value = '';
+  document.getElementById('bg_pt').value = '';
+  document.getElementById('bg_pic').value = '';
+  document.getElementById('bg_pic_phone').value = '';
+  document.getElementById('bg_in_bengkel').value = 'Padimas';
+  document.getElementById('bg_in_date').value = today();
+  document.getElementById('bg_in_outdate').value = '';
+  document.getElementById('bg_in_or').value = '';
+  document.getElementById('bg_in_note').value = '';
+  bgInitFoto([]);
+  document.getElementById('bengkelInModalBg').classList.add('show');
+}
+let bgAuto = { pt:'', pic:'', phone:'' };
+function normNopol(n){ return String(n||'').toUpperCase().replace(/[\s\-\.]+/g,''); }
+// Isi otomatis Nama PT, PIC, dan No. WA dari data Reminder / Data Kendaraan (cocokkan lewat nopol).
+// Kolom hanya diisi kalau masih kosong, atau masih berisi hasil isi-otomatis sebelumnya (jadi ikut berganti saat nopol diganti).
+function bgAutofillFromVehicle(){
+  const k = normNopol(document.getElementById('bg_vehicle').value);
+  if(!k) return;
+  const v = DB.vehicles.find(x=>normNopol(x.nopol)===k);
+  if(!v) return;
+  const put = (id, key, val)=>{
+    if(!val) return;
+    const el = document.getElementById(id);
+    if(!el.value.trim() || el.value===bgAuto[key]){ el.value = val; bgAuto[key] = val; }
+  };
+  put('bg_pt','pt', v.pt||'');
+  put('bg_pic','pic', v.user||'');
+  put('bg_pic_phone','phone', v.phone||'');
+}
+// PIC & nomor WA yang dipakai di tabel / reminder: isian bengkel dulu, kalau kosong ambil dari data kendaraan.
+function bgPic(b){
+  const v = orVehicleOf(b);
+  return { name: ((b.pic||'').trim() || (v&&v.user) || '').trim(), phone: ((b.picPhone||'').trim() || (v&&v.phone) || '').trim() };
+}
+function openBengkelEditModal(id){
+  const b = DB.bengkel.find(x=>x.id===id);
+  if(!b) return;
+  const dl = document.getElementById('bgVehicleList');
+  dl.innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${n}">`).join('');
+  const ptdl = document.getElementById('bgPtList');
+  ptdl.innerHTML = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort().map(n=>`<option value="${n}">`).join('');
+  const bdl = document.getElementById('bgBengkelList');
+  const customNames = [...new Set(DB.bengkel.map(x=>x.bengkel).filter(Boolean))].filter(n=>!['Padimas','IRM','Lido','Kita','Layanan'].includes(n));
+  bdl.innerHTML = ['Padimas','IRM','Lido','Kita','Layanan', ...customNames].map(n=>`<option value="${n}">`).join('');
+  document.getElementById('bg_id').value = b.id;
+  document.getElementById('bgInModalTitle').textContent = 'Edit Data Bengkel';
+  document.getElementById('bgInSaveBtn').textContent = 'Simpan Perubahan';
+  document.getElementById('bg_vehicle').value = b.nopol||'';
+  document.getElementById('bg_pt').value = b.pt||'';
+  document.getElementById('bg_pic').value = b.pic||'';
+  document.getElementById('bg_pic_phone').value = b.picPhone||'';
+  document.getElementById('bg_in_bengkel').value = b.bengkel||'';
+  document.getElementById('bg_in_date').value = b.tglMasuk||'';
+  document.getElementById('bg_in_outdate').value = b.tglKeluar||'';
+  document.getElementById('bg_in_or').value = b.hargaOR||'';
+  document.getElementById('bg_in_note').value = b.note||'';
+  bgInitFoto(b.foto||[]);
+  bgAuto = { pt:'', pic:'', phone:'' };
+  bgAutofillFromVehicle();
+  document.getElementById('bengkelInModalBg').classList.add('show');
+}
+function closeBengkelInModal(){ document.getElementById('bengkelInModalBg').classList.remove('show'); bgResetFoto(); }
+async function saveBengkelIn(){
+  const id = document.getElementById('bg_id').value;
+  const nopol = document.getElementById('bg_vehicle').value.trim().toUpperCase();
+  const pt = document.getElementById('bg_pt').value.trim();
+  const pic = document.getElementById('bg_pic').value.trim();
+  const picPhone = document.getElementById('bg_pic_phone').value.trim();
+  if(!nopol){ showToast('Isi nomor polisi terlebih dahulu.'); return; }
+  const bengkelName = document.getElementById('bg_in_bengkel').value.trim();
+  if(!bengkelName){ showToast('Isi nama bengkel terlebih dahulu.'); return; }
+  const tglMasuk = document.getElementById('bg_in_date').value||today();
+  const tglKeluar = document.getElementById('bg_in_outdate').value || null;
+  const hargaOR = Number(document.getElementById('bg_in_or').value)||0;
+  const prevRow = id ? DB.bengkel.find(x=>x.id===id) : null;
+  const kwitansi = (prevRow && prevRow.kwitansi) || 'Belum';
+  const statusBayar = (prevRow && prevRow.statusBayar) || 'Belum Bayar';
+  const note = document.getElementById('bg_in_note').value.trim();
+  let rowId = id;
+  try{
+    if(id){
+      const existing = DB.bengkel.find(x=>x.id===id);
+      const updated = { ...existing, nopol, pt, pic, picPhone, bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
+      await sbUpdate('bengkel_log', id, toDbBengkel(updated));
+      const idx = DB.bengkel.findIndex(x=>x.id===id);
+      DB.bengkel[idx] = updated;
+      showToast(`${nopol} berhasil diperbarui.`);
+    } else {
+      const matched = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
+      const b = { vehicleId: matched?matched.id:null, nopol, pt: pt||matched?.pt||'', pic, picPhone, bengkel:bengkelName, tglMasuk, tglKeluar, hargaOR, kwitansi, statusBayar, note };
+      const rows = await sbInsert('bengkel_log', toDbBengkel(b));
+      DB.bengkel.unshift(fromDbBengkel(rows[0]));
+      rowId = rows[0].id;
+      showToast(`${nopol} tercatat masuk bengkel ${bengkelName}.`);
+    }
+    try{ await bgApplyPhotos(rowId); }
+    catch(e2){ console.error(e2); showToast('Data tersimpan, tetapi foto gagal diunggah. Pastikan SQL foto kerusakan sudah dijalankan di Supabase.', true); }
+    closeBengkelInModal(); renderBengkel();
+  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel bengkel_log sudah dibuat di Supabase.', true); }
+}
+async function deleteBengkelEntry(id){
+  const b = DB.bengkel.find(x=>x.id===id);
+  if(!b) return;
+  if(!confirm(`Hapus catatan bengkel untuk ${b.nopol} (${b.bengkel})? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbDeleteIds('bengkel_log', [id]);
+    deleteFotoFiles(b.foto||[]);
+    deleteFotoFiles((b.kwFiles||[]).map(f=>f.u));
+    DB.bengkel = DB.bengkel.filter(x=>x.id!==id);
+    renderBengkel();
+    showToast('Data berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
+}
+function openBengkelOutModal(id){
+  const b = DB.bengkel.find(x=>x.id===id);
+  if(!b) return;
+  document.getElementById('bg_out_id').value = id;
+  document.getElementById('bgOutSub').textContent = `${b.nopol||'-'} • ${b.bengkel||'-'} • Masuk ${fmtDate(b.tglMasuk)}`;
+  document.getElementById('bg_out_date').value = today();
+  document.getElementById('bg_out_note').value = '';
+  document.getElementById('bengkelOutModalBg').classList.add('show');
+}
+function closeBengkelOutModal(){ document.getElementById('bengkelOutModalBg').classList.remove('show'); }
+async function saveBengkelOut(){
+  const id = document.getElementById('bg_out_id').value;
+  const b = DB.bengkel.find(x=>x.id===id);
+  if(!b) return;
+  const tglKeluar = document.getElementById('bg_out_date').value || today();
+  const extraNote = document.getElementById('bg_out_note').value.trim();
+  const updated = { ...b, tglKeluar, note: extraNote ? `${b.note? b.note+' — ':''}${extraNote}` : b.note };
+  try{
+    await sbUpdate('bengkel_log', id, toDbBengkel(updated));
+    const idx = DB.bengkel.findIndex(x=>x.id===id);
+    DB.bengkel[idx] = updated;
+    closeBengkelOutModal(); renderBengkel(); renderDashboard();
+    showToast(`${b.nopol} tercatat keluar dari bengkel.`);
+  }catch(e){ console.error(e); showToast('Gagal menyimpan perubahan ke database.', true); }
+}
+function exportBengkel(){
+  const rows = filteredBengkel().map(b=>({
+    'Nopol':b.nopol,'Nama PT':b.pt,'Bengkel':b.bengkel,'Tanggal Masuk':b.tglMasuk,'Tanggal Keluar':b.tglKeluar||'',
+    'Status':bengkelStatus(b)==='in'?'Masih di Bengkel':'Sudah Keluar','Harga OR':b.hargaOR||0,'Kwitansi':b.kwitansi||'Belum',
+    'Status Pembayaran':bayarLabel(b.statusBayar),'PIC':bgPic(b).name,'No. WA PIC':bgPic(b).phone,'Keterangan':b.note||'','Jumlah Foto':(b.foto||[]).length,'Link Foto':(b.foto||[]).join('\n'),'Jumlah File Kwitansi OR':(b.kwFiles||[]).length,'Link Kwitansi OR':(b.kwFiles||[]).map(f=>f.u).join('\n')
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Keluar Masuk Bengkel'); XLSX.writeFile(wb, 'keluar-masuk-bengkel.xlsx');
+}
+
+/* ================= FOTO KERUSAKAN (Supabase Storage) ================= */
+const FOTO_BUCKET = 'foto-kerusakan';
+const BG_MAX_FOTO = 300;
+function parseFoto(v){
+  if(Array.isArray(v)) return v.filter(Boolean);
+  if(!v) return [];
+  try{ const a = JSON.parse(v); return Array.isArray(a) ? a.filter(Boolean) : []; }catch(e){ return []; }
+}
+function escH(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function compressImage(file, maxSide, quality){
+  maxSide = maxSide||1280; quality = quality||0.75;
+  return new Promise((resolve, reject)=>{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = ()=>{
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, maxSide/Math.max(w,h));
+      w = Math.round(w*sc); h = Math.round(h*sc);
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b=> b ? resolve(b) : reject(new Error('Gagal memproses gambar')), 'image/jpeg', quality);
+    };
+    img.onerror = ()=>{ URL.revokeObjectURL(url); reject(new Error('File bukan gambar yang valid')); };
+    img.src = url;
+  });
+}
+async function uploadFoto(blob, folder){
+  const path = `${folder}/${Date.now()}_${Math.random().toString(16).slice(2,8)}.jpg`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}/${path}`, {
+    method:'POST',
+    headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'image/jpeg', 'x-upsert':'false' },
+    body: blob
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error(`Upload foto gagal ${res.status}: ${t}`); }
+  return `${SUPABASE_URL}/storage/v1/object/public/${FOTO_BUCKET}/${path}`;
+}
+async function deleteFotoFiles(urls){
+  const prefix = `${SUPABASE_URL}/storage/v1/object/public/${FOTO_BUCKET}/`;
+  const paths = (urls||[]).filter(u=>String(u).startsWith(prefix)).map(u=>u.slice(prefix.length));
+  if(!paths.length) return;
+  try{
+    for(let i=0;i<paths.length;i+=100){
+      await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}`, {
+        method:'DELETE',
+        headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':'application/json' },
+        body: JSON.stringify({ prefixes: paths.slice(i,i+100) })
+      });
+    }
+  }catch(e){ console.warn('Gagal menghapus file foto dari storage', e); }
+}
+
+/* --- foto di modal tambah/edit bengkel --- */
+let bgPhotoState = { existing:[], added:[], removed:[] };
+function bgInitFoto(list){
+  bgResetFoto();
+  bgPhotoState.existing = (list||[]).slice();
+  bgRenderFotoGrid();
+}
+function bgResetFoto(){
+  (bgPhotoState.added||[]).forEach(a=>{ try{ URL.revokeObjectURL(a.preview); }catch(e){} });
+  bgPhotoState = { existing:[], added:[], removed:[] };
+  const g = document.getElementById('bgFotoGrid'); if(g) g.innerHTML = '';
+}
+function bgRenderFotoGrid(){
+  const g = document.getElementById('bgFotoGrid'); if(!g) return;
+  const ex = bgPhotoState.existing.map((u,i)=>`<div class="foto-prev"><img src="${escH(u)}" alt="Foto"><button type="button" onclick="bgRemoveFoto('e',${i})" title="Hapus foto">✕</button></div>`);
+  const ad = bgPhotoState.added.map((a,i)=>`<div class="foto-prev"><img src="${a.preview}" alt="Foto baru"><button type="button" onclick="bgRemoveFoto('a',${i})" title="Batalkan foto">✕</button></div>`);
+  g.innerHTML = ex.concat(ad).join('');
+}
+function bgFotoPicked(inp){
+  const files = [...(inp.files||[])];
+  inp.value = '';
+  for(const f of files){
+    if(bgPhotoState.existing.length + bgPhotoState.added.length >= BG_MAX_FOTO){ showToast(`Maksimal ${BG_MAX_FOTO} foto per kendaraan.`, true); break; }
+    if(!f.type.startsWith('image/')) continue;
+    bgPhotoState.added.push({ file:f, preview:URL.createObjectURL(f) });
+  }
+  bgRenderFotoGrid();
+}
+function bgRemoveFoto(kind, i){
+  if(kind==='e'){ const [u] = bgPhotoState.existing.splice(i,1); if(u) bgPhotoState.removed.push(u); }
+  else { const [a] = bgPhotoState.added.splice(i,1); if(a) try{ URL.revokeObjectURL(a.preview); }catch(e){} }
+  bgRenderFotoGrid();
+}
+async function bgApplyPhotos(rowId){
+  const st = bgPhotoState;
+  if(!rowId || (!st.added.length && !st.removed.length)) return;
+  const keep = st.existing.slice();
+  for(const a of st.added){ keep.push(await uploadFoto(await compressImage(a.file), rowId)); }
+  await sbUpdate('bengkel_log', rowId, { foto: JSON.stringify(keep) });
+  const idx = DB.bengkel.findIndex(x=>x.id===rowId);
+  if(idx>=0) DB.bengkel[idx].foto = keep;
+  deleteFotoFiles(st.removed);
+}
+
+/* --- kolom foto di tabel: cukup 1 tombol file, isi foto dibuka di galeri --- */
+function fotoCellHtml(b){
+  const n = (b.foto||[]).length;
+  return n
+    ? `<button class="foto-file-btn" onclick="openFotoGallery('${b.id}')" title="Buka foto kerusakan">📁 ${n} Foto</button>`
+    : `<button class="foto-add" onclick="openFotoGallery('${b.id}')" title="Tambah foto kerusakan">📷 Tambah</button>`;
+}
+let galId = null;
+function openFotoGallery(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  galId = id;
+  document.getElementById('galTitle').textContent = `Foto Kerusakan — ${b.nopol||'-'}`;
+  document.getElementById('galSub').textContent = `${b.pt||'-'} • ${b.bengkel||'-'}`;
+  renderFotoGallery();
+  document.getElementById('fotoGalleryModalBg').classList.add('show');
+}
+function closeFotoGallery(){ document.getElementById('fotoGalleryModalBg').classList.remove('show'); galId = null; renderBengkel(); }
+function renderFotoGallery(){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  const f = b.foto||[];
+  document.getElementById('galCount').textContent = `${f.length} foto`;
+  document.getElementById('galDelAllBtn').style.display = f.length ? '' : 'none';
+  document.getElementById('galGrid').innerHTML = f.length
+    ? f.map((u,i)=>`<div class="gal-item"><img src="${escH(u)}" loading="lazy" alt="Foto ${i+1}" onclick="openLightbox('${b.id}',${i})"><button type="button" onclick="galRemoveFoto(${i})" title="Hapus foto">✕</button></div>`).join('')
+    : `<div class="gal-empty">Belum ada foto kerusakan. Klik "Tambah Foto" untuk mengunggah.</div>`;
+}
+function galAddFoto(){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.onchange = async ()=>{
+    const files = [...inp.files].filter(f=>f.type.startsWith('image/'));
+    if(!files.length) return;
+    const cur = (b.foto||[]).slice();
+    if(cur.length + files.length > BG_MAX_FOTO){ showToast(`Maksimal ${BG_MAX_FOTO} foto per kendaraan (sekarang ${cur.length}).`, true); return; }
+    const btn = document.getElementById('galAddBtn'); btn.disabled = true;
+    try{
+      let done = 0;
+      for(let i=0;i<files.length;i+=3){
+        const batch = files.slice(i,i+3);
+        const urls = await Promise.all(batch.map(async f=> uploadFoto(await compressImage(f), galId)));
+        cur.push(...urls); done += batch.length;
+        showToast(`Mengunggah foto ${done}/${files.length}...`);
+      }
+      await sbUpdate('bengkel_log', galId, { foto: JSON.stringify(cur) });
+      b.foto = cur; renderFotoGallery(); showToast(`${files.length} foto berhasil ditambahkan.`);
+    }catch(e){
+      console.error(e);
+      if(cur.length !== (b.foto||[]).length){ try{ await sbUpdate('bengkel_log', galId, { foto: JSON.stringify(cur) }); b.foto = cur; renderFotoGallery(); }catch(e2){} }
+      showToast('Gagal mengunggah foto. Pastikan SQL foto kerusakan sudah dijalankan di Supabase.', true);
+    }
+    btn.disabled = false;
+  };
+  inp.click();
+}
+async function galRemoveAll(){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  const old = (b.foto||[]).slice();
+  if(!old.length) return;
+  if(!confirm(`Hapus SEMUA ${old.length} foto kerusakan ${b.nopol||''}? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbUpdate('bengkel_log', galId, { foto: '[]' });
+    b.foto = [];
+    deleteFotoFiles(old);
+    renderFotoGallery(); showToast(`${old.length} foto berhasil dihapus.`);
+  }catch(e){ console.error(e); showToast('Gagal menghapus foto.', true); }
+}
+async function galRemoveFoto(i){
+  const b = DB.bengkel.find(x=>x.id===galId); if(!b) return;
+  if(!confirm('Hapus foto ini?')) return;
+  const cur = (b.foto||[]).slice();
+  const [u] = cur.splice(i,1);
+  try{
+    await sbUpdate('bengkel_log', galId, { foto: JSON.stringify(cur) });
+    b.foto = cur; deleteFotoFiles([u]); renderFotoGallery(); showToast('Foto dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus foto.', true); }
+}
+
+/* --- lightbox --- */
+let lb = { list:[], i:0, title:'' };
+function openLightbox(id, i){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b || !(b.foto||[]).length) return;
+  lb = { list:b.foto, i:i||0, title:`${b.nopol||''} • ${b.bengkel||''}` };
+  lbShow();
+  document.getElementById('lightbox').classList.add('show');
+}
+function openLightboxUrls(urls, i, title){
+  if(!urls.length) return;
+  lb = { list:urls, i:i||0, title:title||'' };
+  lbShow();
+  document.getElementById('lightbox').classList.add('show');
+}
+function lbShow(){
+  document.getElementById('lbImg').src = lb.list[lb.i];
+  document.getElementById('lbCap').textContent = `${lb.title}  (${lb.i+1}/${lb.list.length})`;
+}
+function lbStep(d){ if(!lb.list.length) return; lb.i = (lb.i + d + lb.list.length) % lb.list.length; lbShow(); }
+function closeLightbox(){ document.getElementById('lightbox').classList.remove('show'); }
+document.addEventListener('keydown', e=>{
+  if(!document.getElementById('lightbox').classList.contains('show')) return;
+  if(e.key==='Escape') closeLightbox();
+  if(e.key==='ArrowLeft') lbStep(-1);
+  if(e.key==='ArrowRight') lbStep(1);
+});
+
+/* ================= FILE KWITANSI OR (gambar / PDF) ================= */
+const KWOR_MAX = 30;
+function parseKwFiles(v){
+  let a = v;
+  if(typeof v==='string'){ try{ a = JSON.parse(v); }catch(e){ a = []; } }
+  if(!Array.isArray(a)) return [];
+  return a.map(x=> typeof x==='string' ? { u:x, n:decodeURIComponent(String(x).split('/').pop()||'file') } : x).filter(x=>x && x.u);
+}
+function isImgUrl(u){ return /\.(jpe?g|png|gif|webp|bmp)(\?|$)/i.test(u||''); }
+async function uploadKwFile(file, folder){
+  let blob = file, ext, ctype = file.type || 'application/octet-stream';
+  if((file.type||'').startsWith('image/')){ blob = await compressImage(file, 1600, 0.8); ext = 'jpg'; ctype = 'image/jpeg'; }
+  else ext = ((file.name.split('.').pop()||'bin').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)) || 'bin';
+  const path = `kwitansi-or/${folder}/${Date.now()}_${Math.random().toString(16).slice(2,8)}.${ext}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${FOTO_BUCKET}/${path}`, {
+    method:'POST',
+    headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':`Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type':ctype, 'x-upsert':'false' },
+    body: blob
+  });
+  if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error(`Upload file gagal ${res.status}: ${t}`); }
+  return { u:`${SUPABASE_URL}/storage/v1/object/public/${FOTO_BUCKET}/${path}`, n:file.name };
+}
+function kwFileCellHtml(b){
+  const n = (b.kwFiles||[]).length;
+  return n
+    ? `<button class="foto-file-btn" onclick="openKwFiles('${b.id}')" title="Buka file kwitansi OR">📎 ${n} File</button>`
+    : `<button class="foto-add" onclick="openKwFiles('${b.id}')" title="Upload kwitansi OR">📎 Upload</button>`;
+}
+let kwfId = null;
+function openKwFiles(id){
+  const b = DB.bengkel.find(x=>x.id===id); if(!b) return;
+  kwfId = id;
+  document.getElementById('kwfTitle').textContent = `Kwitansi OR — ${b.nopol||'-'}`;
+  document.getElementById('kwfSub').textContent = `${b.pt||'-'} • ${b.bengkel||'-'}`;
+  renderKwFiles();
+  document.getElementById('kwFileModalBg').classList.add('show');
+}
+function closeKwFiles(){ document.getElementById('kwFileModalBg').classList.remove('show'); kwfId = null; renderBengkel(); }
+function renderKwFiles(){
+  const b = DB.bengkel.find(x=>x.id===kwfId); if(!b) return;
+  const f = b.kwFiles||[];
+  document.getElementById('kwfCount').textContent = `${f.length} file`;
+  document.getElementById('kwfDelAllBtn').style.display = f.length ? '' : 'none';
+  document.getElementById('kwfGrid').innerHTML = f.length
+    ? f.map((x,i)=> isImgUrl(x.u)
+        ? `<div class="gal-item"><img src="${escH(x.u)}" loading="lazy" alt="${escH(x.n)}" onclick="kwfOpenImg(${i})"><button type="button" onclick="kwfRemove(${i})" title="Hapus file">✕</button></div>`
+        : `<div class="gal-item kwf-doc" onclick="window.open('${escH(x.u)}','_blank')" title="Buka ${escH(x.n)}"><div class="ic">📄</div><div class="nm">${escH(x.n)}</div><button type="button" onclick="event.stopPropagation();kwfRemove(${i})" title="Hapus file">✕</button></div>`
+      ).join('')
+    : `<div class="gal-empty">Belum ada file kwitansi OR. Klik "Tambah File" untuk upload (gambar atau PDF).</div>`;
+}
+function kwfOpenImg(i){
+  const b = DB.bengkel.find(x=>x.id===kwfId); if(!b) return;
+  const imgs = (b.kwFiles||[]).filter(x=>isImgUrl(x.u));
+  const idx = imgs.findIndex(x=>x.u===b.kwFiles[i].u);
+  openLightboxUrls(imgs.map(x=>x.u), Math.max(0,idx), `Kwitansi OR • ${b.nopol||''}`);
+}
+function kwfAdd(){
+  const b = DB.bengkel.find(x=>x.id===kwfId); if(!b) return;
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'image/*,application/pdf'; inp.multiple = true;
+  inp.onchange = async ()=>{
+    const files = [...inp.files];
+    if(!files.length) return;
+    const cur = (b.kwFiles||[]).slice();
+    if(cur.length + files.length > KWOR_MAX){ showToast(`Maksimal ${KWOR_MAX} file kwitansi OR per kendaraan (sekarang ${cur.length}).`, true); return; }
+    const big = files.find(f=>f.size > 15*1024*1024);
+    if(big){ showToast(`File "${big.name}" lebih dari 15 MB.`, true); return; }
+    const btn = document.getElementById('kwfAddBtn'); btn.disabled = true;
+    try{
+      let done = 0;
+      for(let i=0;i<files.length;i+=3){
+        const batch = files.slice(i,i+3);
+        const ups = await Promise.all(batch.map(f=> uploadKwFile(f, kwfId)));
+        cur.push(...ups); done += batch.length;
+        showToast(`Mengunggah file ${done}/${files.length}...`);
+      }
+      await sbUpdate('bengkel_log', kwfId, { kwitansi_file: JSON.stringify(cur) });
+      b.kwFiles = cur; renderKwFiles(); showToast(`${files.length} file kwitansi OR berhasil ditambahkan.`);
+    }catch(e){
+      console.error(e);
+      if(cur.length !== (b.kwFiles||[]).length){ try{ await sbUpdate('bengkel_log', kwfId, { kwitansi_file: JSON.stringify(cur) }); b.kwFiles = cur; renderKwFiles(); }catch(e2){} }
+      showToast('Gagal mengunggah file. Pastikan SQL kolom kwitansi_file sudah dijalankan di Supabase.', true);
+    }
+    btn.disabled = false;
+  };
+  inp.click();
+}
+async function kwfRemove(i){
+  const b = DB.bengkel.find(x=>x.id===kwfId); if(!b) return;
+  if(!confirm('Hapus file ini?')) return;
+  const cur = (b.kwFiles||[]).slice();
+  const [x] = cur.splice(i,1);
+  try{
+    await sbUpdate('bengkel_log', kwfId, { kwitansi_file: JSON.stringify(cur) });
+    b.kwFiles = cur; deleteFotoFiles([x.u]); renderKwFiles(); showToast('File dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus file.', true); }
+}
+async function kwfRemoveAll(){
+  const b = DB.bengkel.find(x=>x.id===kwfId); if(!b) return;
+  const old = (b.kwFiles||[]).slice();
+  if(!old.length) return;
+  if(!confirm(`Hapus SEMUA ${old.length} file kwitansi OR ${b.nopol||''}? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbUpdate('bengkel_log', kwfId, { kwitansi_file: '[]' });
+    b.kwFiles = []; deleteFotoFiles(old.map(f=>f.u)); renderKwFiles(); showToast(`${old.length} file berhasil dihapus.`);
+  }catch(e){ console.error(e); showToast('Gagal menghapus file.', true); }
+}
+
+/* ================= KWITANSI PENGAJUAN ================= */
+let kwTab = 'all';
+const KW_IKA = 'Paid Bu Ika', KW_BELLA = 'Pengajuan Mba Bella';
+function setKwTab(t){ kwTab=t; document.querySelectorAll('#page-kwitansi .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderKwitansi(); }
+function filteredKwitansi(){
+  const q = (document.getElementById('kw_search')?.value||'').trim().toLowerCase();
+  return DB.kwitansi.filter(k=>{
+    if(kwTab==='ika' && k.bayar!==KW_IKA) return false;
+    if(kwTab==='bella' && k.bayar!==KW_BELLA) return false;
+    if(q && !`${k.toko} ${k.nopol} ${k.pt} ${k.note}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function renderKwitansi(){
+  const all = DB.kwitansi;
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('kw_cnt_all', all.length);
+  set('kw_cnt_ika', all.filter(k=>k.bayar===KW_IKA).length);
+  set('kw_cnt_bella', all.filter(k=>k.bayar===KW_BELLA).length);
+  set('navKwitansiCount', all.length);
+  const body = document.getElementById('kwitansiBody'); if(!body) return;
+  const list = filteredKwitansi();
+  if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="7">Belum ada kwitansi pengajuan yang cocok.</td></tr>`; return; }
+  body.innerHTML = list.map(k=>`<tr>
+    <td>${fmtDate(k.tanggal)}</td>
+    <td>${escH(k.toko)||'-'}</td>
+    <td><span class="nopol-badge" style="cursor:default;">${escH(k.nopol)||'-'}</span></td>
+    <td>${escH(k.pt)||'-'}</td>
+    <td class="row-note">${escH(k.note)||'-'}</td>
+    <td><span class="status-badge ${k.bayar===KW_IKA?'ok':'warn'}">${escH(k.bayar)}</span></td>
+    <td>
+      <div class="aksi-cell">
+        <button class="edit-icon-btn" onclick="openKwitansiModal('${k.id}')" title="Edit">✎</button>
+        <button class="edit-icon-btn" onclick="deleteKwitansi('${k.id}')" title="Hapus" style="color:var(--bad);border-color:var(--bad-line);">🗑</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+function kwFillLists(){
+  document.getElementById('kwVehicleList').innerHTML = [...new Set(DB.vehicles.map(v=>v.nopol).filter(Boolean))].sort().map(n=>`<option value="${escH(n)}">`).join('');
+  const pts = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort();
+  document.getElementById('kwPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
+  const tokos = [...new Set(['Padimas','IRM','Lido','Kita','Layanan', ...DB.bengkel.map(b=>b.bengkel), ...DB.kwitansi.map(k=>k.toko)].filter(Boolean))];
+  document.getElementById('kwTokoList').innerHTML = tokos.map(n=>`<option value="${escH(n)}">`).join('');
+}
+function kwAutofillFromVehicle(){
+  const nopol = document.getElementById('kw_nopol').value.trim().toUpperCase();
+  const v = DB.vehicles.find(x=>(x.nopol||'').toUpperCase().trim()===nopol);
+  if(v && !document.getElementById('kw_pt').value) document.getElementById('kw_pt').value = v.pt||'';
+}
+function openKwitansiModal(id){
+  kwFillLists();
+  const k = id ? DB.kwitansi.find(x=>x.id===id) : null;
+  document.getElementById('kw_id').value = k ? k.id : '';
+  document.getElementById('kwModalTitle').textContent = k ? 'Edit Kwitansi Pengajuan' : 'Tambah Kwitansi Pengajuan';
+  document.getElementById('kwSaveBtn').textContent = k ? 'Simpan Perubahan' : 'Simpan';
+  document.getElementById('kw_tanggal').value = k ? (k.tanggal||today()) : today();
+  document.getElementById('kw_toko').value = k ? k.toko : '';
+  document.getElementById('kw_nopol').value = k ? k.nopol : '';
+  document.getElementById('kw_pt').value = k ? k.pt : '';
+  document.getElementById('kw_note').value = k ? k.note : '';
+  document.getElementById('kw_pay').value = k ? k.bayar : KW_IKA;
+  document.getElementById('kwitansiModalBg').classList.add('show');
+}
+function closeKwitansiModal(){ document.getElementById('kwitansiModalBg').classList.remove('show'); }
+async function saveKwitansi(){
+  const id = document.getElementById('kw_id').value;
+  const data = {
+    tanggal: document.getElementById('kw_tanggal').value || today(),
+    toko: document.getElementById('kw_toko').value.trim(),
+    nopol: document.getElementById('kw_nopol').value.trim().toUpperCase(),
+    pt: document.getElementById('kw_pt').value.trim(),
+    note: document.getElementById('kw_note').value.trim(),
+    bayar: document.getElementById('kw_pay').value
+  };
+  if(!data.toko){ showToast('Isi nama toko / bengkel terlebih dahulu.'); return; }
+  if(!data.nopol){ showToast('Isi nopol terlebih dahulu.'); return; }
+  try{
+    if(id){
+      const rows = await sbUpdate('kwitansi_pengajuan', id, toDbKwitansi(data));
+      const idx = DB.kwitansi.findIndex(x=>x.id===id);
+      DB.kwitansi[idx] = fromDbKwitansi((rows&&rows[0]) || { id, ...toDbKwitansi(data) });
+      showToast('Kwitansi pengajuan berhasil diperbarui.');
+    } else {
+      const rows = await sbInsert('kwitansi_pengajuan', toDbKwitansi(data));
+      DB.kwitansi.unshift(fromDbKwitansi(rows[0]));
+      showToast(`Kwitansi pengajuan ${data.nopol} tersimpan.`);
+    }
+    closeKwitansiModal(); renderKwitansi();
+  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan tabel kwitansi_pengajuan sudah dibuat di Supabase.', true); }
+}
+async function deleteKwitansi(id){
+  const k = DB.kwitansi.find(x=>x.id===id); if(!k) return;
+  if(!confirm(`Hapus kwitansi pengajuan ${k.nopol} (${k.toko})? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbDeleteIds('kwitansi_pengajuan', [id]);
+    DB.kwitansi = DB.kwitansi.filter(x=>x.id!==id);
+    renderKwitansi(); showToast('Data berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
+}
+function exportKwitansi(){
+  const rows = filteredKwitansi().map(k=>({ 'Tanggal Pengajuan':k.tanggal, 'Nama Toko / Bengkel':k.toko, 'Nopol':k.nopol, 'Nama PT / Standby':k.pt, 'Keterangan':k.note, 'Pembayaran':k.bayar }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Kwitansi Pengajuan'); XLSX.writeFile(wb, 'kwitansi-pengajuan.xlsx');
+}
+
+/* ================= PENDING SPAREPART ================= */
+let spTab = 'all';
+function setSpTab(t){ spTab=t; document.querySelectorAll('#page-sparepart .tab-pill').forEach(p=>p.classList.toggle('active', p.dataset.tab===t)); renderSparepart(); }
+function filteredSparepart(){
+  const q = (document.getElementById('sp_search')?.value||'').trim().toLowerCase();
+  return DB.sparepart.filter(it=>{
+    if(spTab==='pending' && it.ready) return false;
+    if(spTab==='ready' && !it.ready) return false;
+    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function spTimeLabel(iso){
+  if(!iso) return '';
+  const d = new Date(iso); if(isNaN(d)) return '';
+  return d.toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+}
+function renderSparepart(){
+  const all = DB.sparepart, canEdit = isMaintenance();
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  const pend = all.filter(x=>!x.ready).length;
+  set('sp_cnt_all', all.length); set('sp_cnt_pending', pend); set('sp_cnt_ready', all.length-pend); set('navSparepartCount', pend);
+  const show = (id,on)=>{ const el=document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
+  show('spAddBtn', canEdit); show('spExportBtn', canEdit); show('spGudangHint', !canEdit);
+  const body = document.getElementById('sparepartBody'); if(!body) return;
+  const list = filteredSparepart();
+  if(!list.length){ body.innerHTML = `<div class="gal-empty" style="grid-column:1/-1;">Belum ada data pending sparepart yang cocok.</div>`; return; }
+  const groups = new Map();
+  list.forEach(it=>{
+    const k = normNopol(it.nopol) || it.id;
+    if(!groups.has(k)) groups.set(k, { nopol:it.nopol, pt:it.pt, items:[], newest:'', meks:new Set() });
+    const g = groups.get(k); g.items.push(it);
+    if(it.mekanik) g.meks.add(it.mekanik);
+    if(!g.pt && it.pt) g.pt = it.pt;
+    if((it.createdAt||'') > g.newest) g.newest = it.createdAt||'';
+  });
+  const arr = [...groups.values()].sort((a,b)=>{
+    const pa = a.items.some(i=>!i.ready) ? 0 : 1, pb = b.items.some(i=>!i.ready) ? 0 : 1;
+    return pa-pb || (b.newest||'').localeCompare(a.newest||'');
+  });
+  body.innerHTML = arr.map(g=>{
+    const done = g.items.filter(i=>i.ready).length, total = g.items.length, allDone = done===total;
+    const items = g.items.slice().sort((a,b)=>(a.ready-b.ready) || (a.createdAt||'').localeCompare(b.createdAt||'')).map(it=>`
+      <div class="sp-item ${it.ready?'done':''}">
+        <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-name">${escH(it.name)}</span></label>
+        <span class="sp-badge ${it.ready?'ready':'belum'}">${it.ready?'READY':'BELUM'}</span>
+        <span class="sp-meta">${it.ready ? `${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang'}</span>
+        ${canEdit ? `<button class="edit-icon-btn" onclick="openSparepartModal({editId:'${it.id}'})" title="Edit">✎</button><button class="edit-icon-btn" style="color:var(--bad);border-color:var(--bad-line);" onclick="deleteSparepart('${it.id}')" title="Hapus">🗑</button>` : ''}
+      </div>`).join('');
+    return `<div class="sp-card ${allDone?'all-ready':''}">
+      <div class="sp-head">
+        <span class="nopol-badge" style="cursor:default;">${escH(g.nopol)||'-'}</span>
+        <span class="sp-pt">${escH(g.pt)||'-'}</span>
+        <span class="sp-prog ${allDone?'ok':''}">${done}/${total} ready</span>
+        ${canEdit ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}'})">＋</button>` : ''}
+      </div>${g.meks.size ? `<div class="sp-mek">🔧 Mekanik: ${escH([...g.meks].join(', '))}</div>` : ''}${items}</div>`;
+  }).join('');
+}
+async function toggleSparepartReady(id, checked){
+  if(!(isMaintenance() || isGudang())) return;
+  const it = DB.sparepart.find(x=>x.id===id); if(!it) return;
+  const prev = { ready:it.ready, readyBy:it.readyBy, readyAt:it.readyAt };
+  it.ready = checked; it.readyBy = checked ? (currentUser?.username||'') : ''; it.readyAt = checked ? new Date().toISOString() : '';
+  renderSparepart();
+  try{
+    await sbUpdate('sparepart_pending', id, { ready:it.ready, ready_by:it.readyBy||null, ready_at:it.readyAt||null });
+    showToast(checked ? `${it.name} (${it.nopol}) ditandai ready.` : `${it.name} (${it.nopol}) dikembalikan ke belum ready.`);
+  }catch(e){ console.error(e); Object.assign(it, prev); renderSparepart(); showToast('Gagal menyimpan. Pastikan tabel sparepart_pending sudah dibuat di Supabase.', true); }
+}
+function spFillLists(){
+  const nopols = [...new Set([...DB.vehicles.map(v=>v.nopol), ...DB.bengkel.map(b=>b.nopol), ...DB.sparepart.map(x=>x.nopol)].filter(Boolean))].sort();
+  document.getElementById('spVehicleList').innerHTML = nopols.map(n=>`<option value="${escH(n)}">`).join('');
+  const pts = [...new Set(DB.vehicles.map(v=>v.pt).filter(Boolean))].sort();
+  document.getElementById('spPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
+  const meks = [...new Set(DB.sparepart.map(x=>x.mekanik).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+  document.getElementById('spMekList').innerHTML = meks.map(n=>`<option value="${escH(n)}">`).join('');
+}
+function spAutofill(){
+  const k = normNopol(document.getElementById('sp_nopol').value); if(!k) return;
+  const ptEl = document.getElementById('sp_pt');
+  if(ptEl.value.trim() && ptEl.dataset.auto!=='1') return;
+  const v = DB.vehicles.find(x=>normNopol(x.nopol)===k);
+  const b = !v && DB.bengkel.find(x=>normNopol(x.nopol)===k);
+  const pt = (v && v.pt) || (b && b.pt) || '';
+  if(pt){ ptEl.value = pt; ptEl.dataset.auto = '1'; }
+}
+function spAddItemRow(val, ready){
+  const wrap = document.getElementById('spItems');
+  const row = document.createElement('div'); row.className = 'sp-row';
+  row.innerHTML = `<input class="sp-item-input" placeholder="Contoh: Kampas rem depan"><select class="sp-status" title="Status sparepart"><option value="belum">BELUM</option><option value="ready">READY</option></select><button type="button" class="sp-x" title="Hapus baris">✕</button>`;
+  const inp = row.querySelector('input'); inp.value = val||'';
+  row.querySelector('.sp-status').value = ready ? 'ready' : 'belum';
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); if(!document.getElementById('spAddItemBtn').style.display) { spAddItemRow(); } } });
+  row.querySelector('.sp-x').onclick = ()=>{ if(wrap.children.length>1) row.remove(); else { inp.value=''; row.querySelector('.sp-status').value='belum'; } };
+  wrap.appendChild(row); inp.focus();
+}
+function openSparepartModal(opt){
+  if(!isMaintenance()){ showToast('Hanya admin maintenance yang bisa menambah data pending sparepart.', true); return; }
+  opt = opt || {};
+  spFillLists();
+  const edit = opt.editId ? DB.sparepart.find(x=>x.id===opt.editId) : null;
+  document.getElementById('sp_edit_id').value = edit ? edit.id : '';
+  document.getElementById('spModalTitle').textContent = edit ? 'Edit Pending Sparepart' : 'Tambah Pending Sparepart';
+  document.getElementById('spItemsLabel').textContent = edit ? 'Nama sparepart' : 'Sparepart yang pending';
+  document.getElementById('spAddItemBtn').style.display = edit ? 'none' : '';
+  document.getElementById('spSaveBtn').textContent = edit ? 'Simpan Perubahan' : 'Simpan';
+  document.getElementById('sp_nopol').value = edit ? edit.nopol : (opt.nopol||'');
+  const ptEl = document.getElementById('sp_pt'); ptEl.value = edit ? edit.pt : (opt.pt||''); ptEl.dataset.auto = '';
+  document.getElementById('sp_mekanik').value = edit ? edit.mekanik : (opt.mekanik||'');
+  document.getElementById('spItems').innerHTML = '';
+  spAddItemRow(edit ? edit.name : '', edit ? edit.ready : false);
+  document.getElementById('spModalBg').classList.add('show');
+}
+function closeSparepartModal(){ document.getElementById('spModalBg').classList.remove('show'); }
+async function saveSparepart(){
+  if(!isMaintenance()) return;
+  const id = document.getElementById('sp_edit_id').value;
+  const nopol = document.getElementById('sp_nopol').value.trim().toUpperCase();
+  const pt = document.getElementById('sp_pt').value.trim();
+  const mekanik = document.getElementById('sp_mekanik').value.trim();
+  const items = [...document.querySelectorAll('#spItems .sp-row')].map(r=>({ name:r.querySelector('.sp-item-input').value.trim(), ready:r.querySelector('.sp-status').value==='ready' })).filter(x=>x.name);
+  if(!nopol){ showToast('Isi nopol terlebih dahulu.'); return; }
+  if(!items.length){ showToast('Isi minimal satu sparepart.'); return; }
+  const user = currentUser?.username||'', nowIso = new Date().toISOString();
+  try{
+    if(id){
+      const prev = DB.sparepart.find(x=>x.id===id); if(!prev) return;
+      const it = items[0];
+      const patch = { nopol, pt, sparepart:it.name };
+      if(mekanik || prev.mekanik || prev.mekanikCol) patch.mekanik = mekanik;
+      if(it.ready !== prev.ready){ patch.ready = it.ready; patch.ready_by = it.ready ? user : null; patch.ready_at = it.ready ? nowIso : null; }
+      const rows = await sbUpdate('sparepart_pending', id, patch);
+      const idx = DB.sparepart.findIndex(x=>x.id===id);
+      DB.sparepart[idx] = fromDbSparepart((rows&&rows[0]) || { id, nopol, pt, sparepart:it.name, mekanik:('mekanik' in patch)?patch.mekanik:prev.mekanik,
+        ready:('ready' in patch)?patch.ready:prev.ready, ready_by:('ready' in patch)?patch.ready_by:prev.readyBy, ready_at:('ready' in patch)?patch.ready_at:prev.readyAt,
+        created_by:prev.createdBy, created_at:prev.createdAt });
+      showToast('Pending sparepart diperbarui.');
+    } else {
+      const rows = await sbInsert('sparepart_pending', items.map(it=>({ nopol, pt, ...(mekanik ? { mekanik } : {}), sparepart:it.name, ready:it.ready, ready_by:it.ready?user:null, ready_at:it.ready?nowIso:null, created_by:user })));
+      DB.sparepart = (rows||[]).map(fromDbSparepart).concat(DB.sparepart);
+      showToast(`${items.length} sparepart untuk ${nopol} tersimpan.`);
+    }
+    closeSparepartModal(); renderSparepart();
+  }catch(e){ console.error(e); showToast(mekanik ? 'Gagal menyimpan. Pastikan SQL sparepart (termasuk kolom mekanik) sudah dijalankan di Supabase.' : 'Gagal menyimpan. Pastikan tabel sparepart_pending sudah dibuat di Supabase.', true); }
+}
+async function deleteSparepart(id){
+  if(!isMaintenance()) return;
+  const it = DB.sparepart.find(x=>x.id===id); if(!it) return;
+  if(!confirm(`Hapus pending sparepart "${it.name}" untuk ${it.nopol}?`)) return;
+  try{
+    await sbDeleteIds('sparepart_pending', [id]);
+    DB.sparepart = DB.sparepart.filter(x=>x.id!==id);
+    renderSparepart(); showToast('Data berhasil dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
+}
+function exportSparepart(){
+  if(!isMaintenance()) return;
+  const rows = filteredSparepart().map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, 'pending-sparepart.xlsx');
+}
+
+/* ================= EXCEL ================= */
+const EXCEL_HEADERS = ['Nama PT','Nama User','Nomor Telepon','Nomor Polisi','Type','Warna','Tahun','Area','Tanggal Terakhir Service (YYYY-MM-DD)','KM Service','Interval (hari)','KM Aktual Saat Ini','Keterangan'];
+function exportExcel(){
+  const rows = filteredVehicles().map(v=>({'Nama PT':v.pt,'Nama User':v.user,'Nomor Telepon':v.phone,'Nomor Polisi':v.nopol,'Type':v.type||'',
+    'Warna':v.color,'Tahun':v.year,'Area':v.area,'Tanggal Terakhir Service':v.lastdate,'KM Service':v.lastkm,'KM Aktual Saat Ini':v.currentkm,
+    'Interval (hari)':v.interval,'Tanggal Service Berikutnya':v.nextdate,'KM Service Berikutnya':v.nextkm,'Keterangan':v.note}));
+  const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Data Kendaraan'); XLSX.writeFile(wb, 'data-kendaraan.xlsx');
+}
+function exportHistory(){
+  const rows = DB.history.map(h=>({'Tanggal Input':h.inputAt,'Nama PT':h.pt,'Nopol':h.nopol,'Tipe Mobil':h.type,'Tanggal Service':h.lastdate,
+    'KM Service':h.lastkm,'KM Aktual':h.currentkm,'Interval (hari)':h.interval,'Keterangan':h.note,'Oleh':h.by}));
+  const ws = XLSX.utils.json_to_sheet(rows); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Histori Service'); XLSX.writeFile(wb, 'histori-service.xlsx');
+}
+function downloadTemplate(){
+  const ws = XLSX.utils.aoa_to_sheet([EXCEL_HEADERS]); const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template'); XLSX.writeFile(wb, 'template-import-kendaraan.xlsx');
+}
+async function importExcel(evt){
+  const file = evt.target.files[0]; if(!file) return;
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, {type:'array'});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+  const toInsert = []; let skipped=0, skippedList=[];
+  const seen = new Set(DB.vehicles.map(v=>(v.nopol||'').toUpperCase()));
+  rows.forEach(r=>{
+    const nopol = String(r['Nomor Polisi']||'').trim().toUpperCase();
+    if(!nopol) return;
+    if(seen.has(nopol)){ skipped++; skippedList.push(nopol); return; }
+    seen.add(nopol);
+    const lastdate = normalizeDate(r['Tanggal Terakhir Service (YYYY-MM-DD)'] || r['Tanggal Terakhir Service'] || '');
+    const interval = Number(r['Interval (hari)'])||180;
+    const lastkm = Number(r['KM Service'])||0;
+    const pt = r['Nama PT']||'';
+    // dukung file lama yang masih pakai kolom "Tipe Mobil" gabungan
+    const brand = r['Brand']||''; const model = r['Model']||''; const type = r['Type']||r['Tipe Mobil']||'';
+    const {nextdate,nextkm} = computeNext(lastdate, interval, lastkm, 10000);
+    toInsert.push(toDbVehicle({ code:ptCode(pt, DB.vehicles.filter(x=>x.pt===pt).length), pt, area:r['Area']||'', user:r['Nama User']||'',
+      phone:String(r['Nomor Telepon']||''), nopol, brand, model, type, color:r['Warna']||'', year:r['Tahun']||'', lastdate, lastkm,
+      currentkm:Number(r['KM Aktual Saat Ini'])||0, interval, kmstep:10000, nextdate, nextkm, note:r['Keterangan']||'' }));
+  });
+  try{
+    if(toInsert.length){ const rowsSaved = await sbInsert('vehicles', toInsert); DB.vehicles.push(...rowsSaved.map(fromDbVehicle)); }
+    populateFilterOptions(); renderTable(); renderDashboard();
+    showToast(`Import selesai: ${toInsert.length} data ditambahkan, ${skipped} dilewati (nopol duplikat)${skippedList.length?': '+skippedList.slice(0,5).join(', '):''}.`);
+  }catch(e){ console.error(e); showToast('Gagal mengimpor ke database. Cek koneksi Supabase.', true); }
+  evt.target.value='';
+}
+function normalizeDate(v){
+  if(!v) return '';
+  if(typeof v === 'number'){ const d = XLSX.SSF.parse_date_code(v); return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }
+  const s = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const parts = s.split(/[\/\-]/);
+  if(parts.length===3){ if(parts[0].length===4) return `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`; return `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`; }
+  return '';
+}
+
+/* ================= AKUN ================= */
+function renderAccountPage(){
+  document.getElementById('acc_username').value = currentUser?.username||'';
+  document.getElementById('acc_reminderdays').value = DB.settings.reminderDays||14;
+  document.getElementById('wa_opening').value = DB.settings.waOpening || WA_DEFAULT_OPENING;
+  document.getElementById('wa_closing').value = DB.settings.waClosing || WA_DEFAULT_CLOSING;
+  updateDesktopNotifBtnUI();
+  const list = document.getElementById('acctList');
+  list.innerHTML = DB.accounts.map((a,i)=>{
+    const kind = roleKind(a);
+    const locked = String(a.username||'').trim().toUpperCase()==='DPM2026' || (currentUser && a.username===currentUser.username);
+    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':(kind==='gudang'?'Hanya Pending Sparepart (ceklis ready)':'Hanya Keluar Masuk Bengkel')}</div></div>
+    <div style="display:flex;align-items:center;gap:8px;">
+    <select class="filter-select" style="padding:5px 8px;font-size:11.5px;min-width:0;" ${locked?'disabled title="Akun ini tidak bisa diubah perannya"':''} onchange="changeAccountRole(${i}, this.value)"><option value="Maintenance" ${kind==='maintenance'?'selected':''}>Maintenance</option><option value="Staff" ${kind==='staff'?'selected':''}>Staff</option><option value="Gudang" ${kind==='gudang'?'selected':''}>Gudang</option></select><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
+    <button class="edit-icon-btn" style="width:auto;padding:5px 10px;font-size:11px;" onclick="toggleAccount(${i})">${a.active!==false?'Nonaktifkan':'Aktifkan'}</button></div></div>`;
+  }).join('');
+  const log = document.getElementById('loginLog');
+  log.innerHTML = DB.loginlog.length? DB.loginlog.map(l=>`<div>• ${l.user} — ${l.time}</div>`).join('') : '<div>Belum ada aktivitas.</div>';
+}
+async function saveProfile(){
+  const newUser = document.getElementById('acc_username').value.trim();
+  const oldPass = document.getElementById('acc_oldpass').value;
+  const newPass = document.getElementById('acc_newpass').value;
+  const confirmPass = document.getElementById('acc_confirmpass').value;
+  const idx = DB.accounts.findIndex(a=>a.username===currentUser.username);
+  if(idx<0) return;
+  const patch = {};
+  if(newPass || confirmPass || oldPass){
+    if(oldPass !== DB.accounts[idx].password){ showToast('Password lama tidak sesuai.'); return; }
+    if(newPass !== confirmPass){ showToast('Konfirmasi password baru tidak cocok.'); return; }
+    if(newPass) patch.password = newPass;
+  }
+  if(newUser && newUser !== DB.accounts[idx].username) patch.username = newUser;
+  if(Object.keys(patch).length===0){ showToast('Tidak ada perubahan untuk disimpan.'); return; }
+  try{
+    await sbUpdate('accounts', DB.accounts[idx].id, patch);
+    DB.accounts[idx] = {...DB.accounts[idx], ...patch};
+    currentUser = DB.accounts[idx];
+    document.getElementById('whoUser').textContent = currentUser.username;
+    document.getElementById('avatarInit').textContent = initials(currentUser.username);
+    document.getElementById('acc_oldpass').value=''; document.getElementById('acc_newpass').value=''; document.getElementById('acc_confirmpass').value='';
+    showToast('Profil berhasil diperbarui.'); renderAccountPage();
+  }catch(e){ console.error(e); showToast('Gagal menyimpan profil ke database.', true); }
+}
+async function saveReminderSetting(){
+  const days = Number(document.getElementById('acc_reminderdays').value)||14;
+  try{ await sbUpdate('settings', 1, {reminder_days:days}); DB.settings.reminderDays = days; renderTable(); renderDashboard(); showToast('Pengaturan reminder disimpan.'); }
+  catch(e){ console.error(e); showToast('Gagal menyimpan pengaturan.', true); }
+}
+async function saveWaTemplate(){
+  const opening = document.getElementById('wa_opening').value.trim();
+  const closing = document.getElementById('wa_closing').value.trim();
+  try{
+    await sbUpdate('settings', 1, {wa_opening:opening, wa_closing:closing});
+    DB.settings.waOpening = opening; DB.settings.waClosing = closing;
+    showToast('Template pesan WA Reminder disimpan.');
+  }catch(e){ console.error(e); showToast('Gagal menyimpan. Pastikan kolom wa_opening/wa_closing sudah ditambahkan di tabel settings.', true); }
+}
+function resetWaTemplate(){
+  document.getElementById('wa_opening').value = WA_DEFAULT_OPENING;
+  document.getElementById('wa_closing').value = WA_DEFAULT_CLOSING;
+  showToast('Dikembalikan ke teks default — klik Simpan Template untuk menerapkan.');
+}
+async function addAccount(){
+  const u = document.getElementById('new_acc_user').value.trim();
+  const p = document.getElementById('new_acc_pass').value;
+  const r = document.getElementById('new_acc_role').value;
+  if(!u || !p){ showToast('Isi username dan password akun baru.'); return; }
+  if(DB.accounts.some(a=>a.username===u)){ showToast('Username sudah digunakan.'); return; }
+  try{
+    const rows = await sbInsert('accounts', toDbAccount({username:u, password:p, role:r, active:true}));
+    DB.accounts.push(fromDbAccount(rows[0]));
+    document.getElementById('new_acc_user').value=''; document.getElementById('new_acc_pass').value='';
+    renderAccountPage(); showToast('Akun baru ditambahkan.');
+  }catch(e){ console.error(e); showToast('Gagal menambah akun ke database.', true); }
+}
+async function changeAccountRole(i, role){
+  const a = DB.accounts[i]; if(!a) return;
+  try{ await sbUpdate('accounts', a.id, {role}); a.role = role; renderAccountPage(); showToast(`Peran ${a.username} diubah menjadi ${role}.`); }
+  catch(e){ console.error(e); showToast('Gagal mengubah peran akun.', true); renderAccountPage(); }
+}
+async function toggleAccount(i){
+  const newActive = DB.accounts[i].active===false ? true : false;
+  try{ await sbUpdate('accounts', DB.accounts[i].id, {active:newActive}); DB.accounts[i].active = newActive; renderAccountPage(); }
+  catch(e){ console.error(e); showToast('Gagal memperbarui status akun.', true); }
+}
+
+/* ===== Semua jendela (modal) bisa digeser: tarik bagian judul ===== */
+(function enableModalDrag(){
+  let drag=null;
+  document.addEventListener('pointerdown', e=>{
+    const head = e.target.closest('.modal-head');
+    if(!head || e.target.closest('button,input,select,textarea,a')) return;
+    const modal = head.closest('.modal'); if(!modal) return;
+    drag = { modal, sx:e.clientX, sy:e.clientY, tx:parseFloat(modal.dataset.tx||0), ty:parseFloat(modal.dataset.ty||0) };
+    modal.classList.add('dragging');
+    try{ head.setPointerCapture(e.pointerId); }catch(_){}
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', e=>{
+    if(!drag) return;
+    let nx = drag.tx + (e.clientX-drag.sx), ny = drag.ty + (e.clientY-drag.sy);
+    const m = drag.modal, r = m.getBoundingClientRect();
+    // jaga supaya bagian judul tidak keluar layar
+    const dx = nx - parseFloat(m.dataset.tx||0), dy = ny - parseFloat(m.dataset.ty||0);
+    if(r.left+dx > innerWidth-80) nx -= (r.left+dx) - (innerWidth-80);
+    if(r.right+dx < 80) nx += 80 - (r.right+dx);
+    if(r.top+dy < 0) ny -= (r.top+dy);
+    if(r.top+dy > innerHeight-50) ny -= (r.top+dy) - (innerHeight-50);
+    m.dataset.tx=nx; m.dataset.ty=ny;
+    m.style.transform = `translate(${nx}px,${ny}px)`;
+  });
+  const end = ()=>{ if(drag){ drag.modal.classList.remove('dragging'); drag=null; } };
+  document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
+  // kembalikan ke tengah setiap kali jendela dibuka lagi
+  const reset = bg=>{ const m=bg.querySelector('.modal'); if(m){ m.dataset.tx=0; m.dataset.ty=0; m.style.transform=''; } };
+  document.querySelectorAll('.modal-bg').forEach(bg=>{
+    new MutationObserver(()=>{ if(!bg.classList.contains('show')) reset(bg); }).observe(bg,{attributes:true,attributeFilter:['class']});
+  });
+})();
+
+/* Tunda render sesaat saat mengetik di kolom cari, supaya tidak berat di setiap huruf */
+function deb(fn, ms){ let t; return function(){ clearTimeout(t); t=setTimeout(fn, ms||180); }; }
+const debTable = deb(()=>renderTable());
+const debBengkel = deb(()=>renderBengkel());
+const debKwitansi = deb(()=>renderKwitansi());
+const debSparepart = deb(()=>renderSparepart());
+const debHistory = deb(()=>renderHistory());
+
+/* ================= NOTIFIKASI DESKTOP ================= */
+function desktopNotifSupported(){ return 'Notification' in window; }
+function desktopNotifEnabled(){ return desktopNotifSupported() && Notification.permission==='granted' && localStorage.getItem('fleetops_desktop_notif')==='on'; }
+function updateDesktopNotifBtnUI(){
+  const topBtn = document.getElementById('desktopNotifBtn');
+  const setBtn = document.getElementById('desktopNotifBtnSettings');
+  const status = document.getElementById('desktopNotifStatus');
+  if(!desktopNotifSupported()){
+    if(topBtn) topBtn.style.display='none';
+    if(setBtn){ setBtn.disabled=true; setBtn.textContent='Browser tidak mendukung'; }
+    return;
+  }
+  const on = desktopNotifEnabled();
+  if(topBtn){ topBtn.classList.toggle('active', on); topBtn.title = on ? 'Notifikasi desktop: AKTIF (klik untuk matikan)' : 'Klik untuk aktifkan notifikasi desktop'; }
+  if(setBtn) setBtn.textContent = on ? '🔕 Matikan Notifikasi Desktop' : '🔔 Aktifkan Notifikasi Desktop';
+  if(status) status.textContent = on ? 'Status: AKTIF — Anda akan diberi tahu lewat notifikasi komputer.' : 'Status: belum aktif.';
+}
+async function toggleDesktopNotif(){
+  if(!desktopNotifSupported()){ showToast('Browser ini tidak mendukung notifikasi desktop.', true); return; }
+  if(desktopNotifEnabled()){
+    localStorage.setItem('fleetops_desktop_notif','off');
+    updateDesktopNotifBtnUI();
+    showToast('Notifikasi desktop dimatikan.');
+    return;
+  }
+  const perm = Notification.permission==='granted' ? 'granted' : await Notification.requestPermission();
+  if(perm!=='granted'){ showToast('Izin notifikasi ditolak. Aktifkan lewat pengaturan browser kalau berubah pikiran.', true); updateDesktopNotifBtnUI(); return; }
+  localStorage.setItem('fleetops_desktop_notif','on');
+  updateDesktopNotifBtnUI();
+  new Notification('FleetOps', { body:'Notifikasi desktop aktif. Anda akan diingatkan kalau ada kendaraan yang jatuh tempo service.', icon:'icon-192.png' });
+  showToast('Notifikasi desktop diaktifkan.');
+}
+// Kirim notifikasi desktop kalau ada unit overdue/mendekati BARU dibanding pengecekan terakhir,
+// dan paling sering sekali per jam supaya tidak spam.
+function maybeFireDesktopNotif(urgent){
+  if(!isMaintenance()) return;
+  if(!desktopNotifEnabled()) return;
+  const now = Date.now();
+  const last = Number(localStorage.getItem('fleetops_notif_last_ts')||0);
+  const lastIds = (localStorage.getItem('fleetops_notif_last_ids')||'').split(',').filter(Boolean);
+  const curIds = urgent.map(v=>v.id);
+  const isNew = curIds.some(id=>!lastIds.includes(id));
+  if(urgent.length>0 && (isNew || now-last>60*60*1000)){
+    const overdueCount = urgent.filter(v=>statusOf(v)==='bad').length;
+    const soonCount = urgent.length-overdueCount;
+    const n = new Notification('FleetOps — Pengingat Service', {
+      body:`${urgent.length} unit perlu perhatian (${overdueCount} overdue, ${soonCount} mendekati jatuh tempo).`,
+      icon:'icon-192.png', tag:'fleetops-reminder'
+    });
+    n.onclick = ()=>{ window.focus(); goPage('reminder'); setQuickTab('bad'); n.close(); };
+    localStorage.setItem('fleetops_notif_last_ts', String(now));
+    localStorage.setItem('fleetops_notif_last_ids', curIds.join(','));
+  }
+}
+setInterval(()=>{ if(DB.vehicles && DB.vehicles.length) renderNotifPanel(); }, 15*60*1000); // cek ulang tiap 15 menit selagi app terbuka
+
+/* ================= DATA SISTEM SPK ================= */
+const SPK_USER = 'DokarMaintenance', SPK_PASS = '2027', SPK_KEY = 'fleetops_spk_v1';
+let spkEditId = null;
+const $id = i=>document.getElementById(i);
+const spkEsc = t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let SPK_LIST = [];
+const spkFromDb = r => ({ id:String(r.id), no:r.spk_no, date:r.spk_date, nopol:r.nopol||'', pt:r.pt||'', job:r.job||'', bengkel:r.bengkel||'', cost:Number(r.cost)||0, status:r.status||'draft', by:r.made_by||'', note:r.note||'' });
+const spkToDb = r => ({ spk_no:r.no, spk_date:r.date||null, nopol:r.nopol, pt:r.pt, job:r.job, bengkel:r.bengkel, cost:r.cost, status:r.status, made_by:r.by, note:r.note });
+function spkLoad(){ return SPK_LIST; }
+async function spkReload(){
+  try{ SPK_LIST = (await sbGet('spk','select=*&order=created_at.desc')).map(spkFromDb); }
+  catch(e){ console.error(e); SPK_LIST=[]; showToast('Gagal memuat data SPK dari database. Pastikan tabel "spk" sudah dibuat (lihat SETUP-SPK.sql).', true); }
+  renderSpk();
+  // impor data lama yang tersimpan di browser (versi sebelumnya), sekali saja
+  try{
+    const old = JSON.parse(localStorage.getItem(SPK_KEY)||'[]');
+    if(old.length && !localStorage.getItem(SPK_KEY+'_migrated') && confirm(`Ada ${old.length} SPK lama di browser ini. Pindahkan ke database?`)){
+      await sbInsert('spk', old.map(spkToDb)); localStorage.setItem(SPK_KEY+'_migrated','1'); await spkReload();
+    }
+  }catch(e){ console.error(e); showToast('Gagal memindahkan SPK lama: '+e.message, true); }
+}
+function spkShowOnly(id){ ['loginScreen','spkChoiceScreen','spkScreen','app'].forEach(i=>{ const e=$id(i); if(e) e.style.display = (i===id) ? (i==='app'?'block':(i==='spkScreen'?'block':'flex')) : 'none'; }); window.scrollTo(0,0); }
+function openSpkGate(){ $id('spkGateErr').style.display='none'; $id('spkGateUser').value=''; $id('spkGatePass').value=''; $id('spkGateBg').classList.add('show'); setTimeout(()=>$id('spkGateUser').focus(),50); }
+function closeSpkGate(){ $id('spkGateBg').classList.remove('show'); }
+function submitSpkGate(){
+  const u = $id('spkGateUser').value.trim(), p = $id('spkGatePass').value;
+  if(u.toLowerCase()!==SPK_USER.toLowerCase() || p!==SPK_PASS){ $id('spkGateErr').style.display='block'; return; }
+  closeSpkGate(); spkShowOnly('spkChoiceScreen');
+}
+function leaveSpk(){ spkShowOnly('loginScreen'); }
+function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
+async function openReminderFromSpk(){ await enterApp({username:SPK_USER, role:'maintenance', active:true}); }
+function openSpkWork(){ spkShowOnly('spkScreen'); renderSpk(); spkReload(); }
+function spkNextNo(list){
+  const d=new Date(), pre=`SPK/${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/`;
+  const n = list.filter(x=>String(x.no).startsWith(pre)).map(x=>parseInt(String(x.no).slice(pre.length))||0);
+  return pre+String((n.length?Math.max(...n):0)+1).padStart(3,'0');
+}
+function spkToday(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function spkFmtDate(x){ if(!x) return '-'; const p=String(x).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:x; }
+function spkRp(n){ return n? 'Rp '+Number(n).toLocaleString('id-ID') : '-'; }
+function spkFillFromNopol(){
+  const v=(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===$id('spk_nopol').value.trim().toUpperCase());
+  if(v && !$id('spk_pt').value) $id('spk_pt').value = v.pt||'';
+}
+function openSpkForm(id){
+  const list=spkLoad(), x = id ? list.find(a=>a.id===id) : null;
+  spkEditId = x ? x.id : null;
+  $id('spkFormTitle').textContent = x ? 'Ubah SPK' : 'Buat SPK Baru';
+  $id('spkNopolList').innerHTML = (DB.vehicles||[]).map(v=>`<option value="${spkEsc(v.nopol)}">${spkEsc(v.pt||'')}</option>`).join('');
+  $id('spk_no').value = x? x.no : spkNextNo(list);
+  $id('spk_date').value = x? x.date : spkToday();
+  $id('spk_nopol').value = x? x.nopol : ''; $id('spk_pt').value = x? x.pt : '';
+  $id('spk_job').value = x? x.job : ''; $id('spk_bengkel').value = x? x.bengkel : '';
+  $id('spk_cost').value = x? x.cost : ''; $id('spk_status').value = x? x.status : 'draft';
+  $id('spk_by').value = x? x.by : (currentUser? currentUser.username : SPK_USER); $id('spk_note').value = x? x.note : '';
+  $id('spkFormBg').classList.add('show');
+}
+function closeSpkForm(){ $id('spkFormBg').classList.remove('show'); }
+async function saveSpk(){
+  const rec = { id: spkEditId, no:$id('spk_no').value.trim(), date:$id('spk_date').value, nopol:$id('spk_nopol').value.trim().toUpperCase(),
+    pt:$id('spk_pt').value.trim(), job:$id('spk_job').value.trim(), bengkel:$id('spk_bengkel').value.trim(), cost:Number($id('spk_cost').value)||0,
+    status:$id('spk_status').value, by:$id('spk_by').value.trim(), note:$id('spk_note').value.trim() };
+  if(!rec.no || !rec.nopol || !rec.job){ showToast('No. SPK, Nopol, dan Jenis Pekerjaan wajib diisi.', true); return; }
+  if(SPK_LIST.some(a=>a.no===rec.no && a.id!==rec.id)){ showToast('No. SPK sudah dipakai.', true); return; }
+  try{
+    if(rec.id) await sbUpdate('spk', rec.id, spkToDb(rec)); else await sbInsert('spk', spkToDb(rec));
+    closeSpkForm(); await spkReload(); showToast('SPK disimpan.');
+  }catch(e){ showToast('Gagal menyimpan: '+e.message, true); }
+}
+async function deleteSpk(id){ if(!confirm('Hapus SPK ini?')) return; try{ await sbDeleteIds('spk',[id]); await spkReload(); showToast('SPK dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
+async function spkCycle(id){ const order=['draft','proses','selesai']; const x=SPK_LIST.find(a=>a.id===id); if(!x) return; try{ await sbUpdate('spk', id, {status:order[(order.indexOf(x.status)+1)%3]}); await spkReload(); }catch(e){ showToast('Gagal mengubah status: '+e.message, true); } }
+const SPK_LBL={draft:'Draft',proses:'Dikerjakan',selesai:'Selesai'};
+function renderSpk(){
+  const all=spkLoad(), q=($id('spkSearch').value||'').toLowerCase(), f=$id('spkFilter').value;
+  $id('spkKTotal').textContent=all.length;
+  ['draft','proses','selesai'].forEach(k=>{ $id('spkK'+k[0].toUpperCase()+k.slice(1)).textContent = all.filter(a=>a.status===k).length; });
+  const rows=all.filter(a=>(!f||a.status===f) && (!q || [a.no,a.nopol,a.pt,a.job,a.bengkel].join(' ').toLowerCase().includes(q)));
+  $id('spkBody').innerHTML = rows.map(a=>`<tr>
+    <td><b>${spkEsc(a.no)}</b></td><td>${spkFmtDate(a.date)}</td><td><b>${spkEsc(a.nopol)}</b></td><td>${spkEsc(a.pt||'-')}</td>
+    <td style="min-width:200px;">${spkEsc(a.job)}</td><td>${spkEsc(a.bengkel||'-')}</td><td>${spkRp(a.cost)}</td>
+    <td><span class="spk-pill ${a.status}" style="cursor:pointer" title="Klik untuk ganti status" onclick="spkCycle('${a.id}')">${SPK_LBL[a.status]}</span></td>
+    <td><div class="spk-act"><button onclick="printSpk('${a.id}')">Cetak</button><button onclick="openSpkForm('${a.id}')">Ubah</button><button class="del" onclick="deleteSpk('${a.id}')">Hapus</button></div></td></tr>`).join('');
+  $id('spkEmpty').style.display = rows.length?'none':'block';
+  $id('spkEmpty').innerHTML = all.length ? 'Tidak ada SPK yang cocok.' : 'Belum ada SPK. Klik <b>Buat SPK Baru</b> untuk memulai.';
+}
+function exportSpk(){
+  const l=spkLoad(); if(!l.length){ showToast('Belum ada data SPK.', true); return; }
+  if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
+  const ws=XLSX.utils.json_to_sheet(l.map(a=>({'No. SPK':a.no,'Tanggal':a.date,'Nopol':a.nopol,'PT':a.pt,'Pekerjaan':a.job,'Bengkel':a.bengkel,'Estimasi Biaya':a.cost,'Status':SPK_LBL[a.status],'Dibuat Oleh':a.by,'Catatan':a.note})));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'SPK'); XLSX.writeFile(wb,'Data-SPK.xlsx');
+}
+function printSpk(id){
+  const a=spkLoad().find(x=>x.id===id); if(!a) return;
+  const w=window.open('','_blank'); if(!w){ showToast('Pop-up diblokir browser.', true); return; }
+  const r=(l,v)=>`<tr><td style="width:170px;color:#555">${l}</td><td><b>${spkEsc(v||'-')}</b></td></tr>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${spkEsc(a.no)}</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#111}h1{margin:0 0 4px;font-size:22px}table{width:100%;border-collapse:collapse;margin-top:18px}td{padding:9px 6px;border-bottom:1px solid #ddd;vertical-align:top;font-size:14px}.sig{display:flex;justify-content:space-around;margin-top:70px;text-align:center;font-size:13px}.sig div{width:180px;border-top:1px solid #111;padding-top:6px}</style></head><body>
+  <h1>SURAT PERINTAH KERJA</h1><div style="color:#555">PT. Dokar Putra Mandiri</div>
+  <table>${r('No. SPK',a.no)}${r('Tanggal',spkFmtDate(a.date))}${r('Nopol',a.nopol)}${r('PT',a.pt)}${r('Jenis Pekerjaan',a.job)}${r('Bengkel',a.bengkel)}${r('Estimasi Biaya',spkRp(a.cost))}${r('Status',SPK_LBL[a.status])}${r('Catatan',a.note)}</table>
+  <div class="sig"><div>Dibuat oleh<br>${spkEsc(a.by||'')}</div><div>Disetujui</div><div>Bengkel</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Enter' && $id('spkGateBg').classList.contains('show')) submitSpkGate(); if(e.key==='Escape'){ closeSpkGate(); closeSpkForm(); } });
+
+/* ================= INIT ================= */
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+function hideSplash(){
+  const sp = document.getElementById('splashScreen');
+  if(!sp) return;
+  sp.classList.add('hide');
+  setTimeout(()=>sp.remove(), 550);
+}
+(async function init(){
+  if(!isConfigured){ document.getElementById('configScreen').style.display='flex'; hideSplash(); return; }
+  await loadAll();
+  updateDbStatusUI();
+  document.getElementById('loginUser').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  document.getElementById('loginPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+  updateDesktopNotifBtnUI();
+  setTimeout(hideSplash, 900);
+})();
+</script>
+</body>
+</html>
