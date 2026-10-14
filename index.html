@@ -273,6 +273,10 @@
   .status-badge.warn{background:var(--warn-bg);color:var(--warn);}
   .status-badge.bad{background:var(--bad-bg);color:var(--bad);}
   .status-badge.info{background:#e8f0ff;color:#1d4ed8;}
+  .fil-tr th{position:static !important;background:#fff !important;padding:6px 8px !important;border-bottom:1px solid var(--line);}
+  .fil-ctl{width:100%;min-width:84px;padding:5px 7px;border:1px solid var(--line);border-radius:8px;font-size:11.5px;font-weight:600;background:#fff;color:var(--ink);font-family:inherit;}
+  .fil-ctl.active{border-color:var(--brand);background:#f3f7ff;}
+  .fil-reset{border:1px solid var(--bad-line);color:var(--bad);background:#fff;border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap;}
   .sp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:14px;align-items:start;}
   .sp-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(16,24,40,.04);}
   .sp-card.all-ready{opacity:.8;}
@@ -608,22 +612,8 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           </div>
           <div class="filter-row">
             <div class="search-box">🔍 <input id="bg_search" oninput="debBengkel()" placeholder="Cari Nopol, PT, atau PIC..."></div>
-            <select class="filter-select" id="bg_bengkel" onchange="renderBengkel()">
-              <option value="">Semua Bengkel</option>
-              <option>Padimas</option><option>IRM</option><option>Lido</option><option>Kita</option><option>Layanan</option>
-            </select>
-            <select class="filter-select" id="bg_status" onchange="renderBengkel()">
-              <option value="">Semua Status</option>
-              <option value="in">Masih di Bengkel</option>
-              <option value="out">Sudah Keluar</option>
-            </select>
-            <select class="filter-select" id="bg_kwitansi" onchange="renderBengkel()">
-              <option value="">Semua Kwitansi</option>
-              <option value="belum">Kwitansi: Belum</option>
-              <option value="sudah">Kwitansi: Sudah</option>
-              <option value="adafile">Sudah Ada File Kwitansi OR</option>
-              <option value="nofile">Belum Ada File Kwitansi OR</option>
-            </select>
+            <button class="btn-outline" onclick="resetBengkelFilters()" title="Hapus semua filter kolom dan pencarian">↺ Reset Filter</button>
+            <span class="small-note" id="bgResultInfo" style="white-space:nowrap;"></span>
           </div>
           <div class="tabs-row">
             <div class="tab-pill active" data-tab="all" onclick="setBengkelTab('all')">Semua <span class="cnt" id="bg_cnt_all">0</span></div>
@@ -637,6 +627,23 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <thead><tr>
                 <th>NOPOL</th><th>NAMA PT</th><th>BENGKEL</th><th>TANGGAL MASUK</th><th>TANGGAL KELUAR</th>
                 <th>LAMA DI BENGKEL</th><th>STATUS</th><th>HARGA OR</th><th>KWITANSI</th><th>PEMBAYARAN</th><th>FILE KWITANSI OR</th><th>REMINDER TAGIHAN OR</th><th>KETERANGAN</th><th>FOTO KERUSAKAN</th><th>AKSI</th>
+              </tr>
+              <tr class="fil-tr">
+                <th><input class="fil-ctl" id="bf_nopol" placeholder="Filter nopol" oninput="debBengkel()"></th>
+                <th><input class="fil-ctl" id="bf_pt" placeholder="Filter PT / PIC" oninput="debBengkel()"></th>
+                <th><select class="fil-ctl" id="bf_bengkel" onchange="renderBengkel()"><option value="">Semua</option></select></th>
+                <th><input class="fil-ctl" id="bf_masuk" type="month" onchange="renderBengkel()" title="Filter bulan masuk"></th>
+                <th><input class="fil-ctl" id="bf_keluar" type="month" onchange="renderBengkel()" title="Filter bulan keluar"></th>
+                <th><select class="fil-ctl" id="bf_lama" onchange="renderBengkel()"><option value="">Semua</option><option value="0-3">0–3 hari</option><option value="4-7">4–7 hari</option><option value="8-14">8–14 hari</option><option value="15+">Lebih dari 14 hari</option></select></th>
+                <th><select class="fil-ctl" id="bf_status" onchange="renderBengkel()"><option value="">Semua</option><option value="in">Masih di Bengkel</option><option value="out">Sudah Keluar</option></select></th>
+                <th><select class="fil-ctl" id="bf_or" onchange="renderBengkel()"><option value="">Semua</option><option value="ada">Ada harga OR</option><option value="kosong">Belum ada harga</option></select></th>
+                <th><select class="fil-ctl" id="bf_kw" onchange="renderBengkel()"><option value="">Semua</option><option value="belum">Belum</option><option value="sudah">Sudah</option></select></th>
+                <th><select class="fil-ctl" id="bf_bayar" onchange="renderBengkel()"><option value="">Semua</option><option value="Belum Bayar">Belum Bayar</option><option value="Sudah Bayar">Paid</option><option value="PO">Pembayaran pakai PO</option><option value="Invoice">Invoice</option></select></th>
+                <th><select class="fil-ctl" id="bf_file" onchange="renderBengkel()"><option value="">Semua</option><option value="ada">Sudah ada file</option><option value="belum">Belum ada file</option></select></th>
+                <th><select class="fil-ctl" id="bf_rem" onchange="renderBengkel()"><option value="">Semua</option><option value="siap">Siap ditagih</option><option value="tunggu">Menunggu mobil keluar</option><option value="none">Tidak perlu</option></select></th>
+                <th><input class="fil-ctl" id="bf_note" placeholder="Filter keterangan" oninput="debBengkel()"></th>
+                <th><select class="fil-ctl" id="bf_foto" onchange="renderBengkel()"><option value="">Semua</option><option value="ada">Ada foto</option><option value="belum">Belum ada foto</option></select></th>
+                <th><button class="fil-reset" onclick="resetBengkelFilters()">✕ Reset</button></th>
               </tr></thead>
               <tbody id="bengkelBody"></tbody>
             </table>
@@ -1908,22 +1915,60 @@ async function setBengkelField(id, field, value){
     console.error(e); b[field] = prev; renderBengkel(); showToast('Gagal menyimpan perubahan.', true);
   }
 }
+const BF_IDS = ['bf_nopol','bf_pt','bf_bengkel','bf_masuk','bf_keluar','bf_lama','bf_status','bf_or','bf_kw','bf_bayar','bf_file','bf_rem','bf_note','bf_foto'];
+function bgLamaDays(b){ return b.tglKeluar ? daysBetween(b.tglMasuk, b.tglKeluar) : daysBetween(b.tglMasuk, today()); }
+function bengkelFilterUi(){
+  // isi pilihan Bengkel dari data, pertahankan pilihan yang aktif
+  const sel = document.getElementById('bf_bengkel');
+  if(sel){
+    const cur = sel.value;
+    const names = [...new Set(DB.bengkel.map(b=>b.bengkel).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+    sel.innerHTML = `<option value="">Semua</option>` + names.map(n=>`<option value="${escH(n)}">${escH(n)}</option>`).join('');
+    sel.value = names.includes(cur) ? cur : '';
+  }
+  BF_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.classList.toggle('active', !!el.value); });
+}
+function resetBengkelFilters(){
+  BF_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const q = document.getElementById('bg_search'); if(q) q.value='';
+  renderBengkel();
+}
 function filteredBengkel(){
-  const q = (document.getElementById('bg_search')?.value||'').trim().toLowerCase();
-  const bFilter = document.getElementById('bg_bengkel')?.value||'';
-  const sFilter = document.getElementById('bg_status')?.value||'';
-  const kFilter = document.getElementById('bg_kwitansi')?.value||'';
+  const v = id => (document.getElementById(id)?.value||'').trim();
+  const q = v('bg_search').toLowerCase();
+  const fNopol = normNopol(v('bf_nopol')), fPt = v('bf_pt').toLowerCase(), fBengkel = v('bf_bengkel'), fMasuk = v('bf_masuk'), fKeluar = v('bf_keluar');
+  const fLama = v('bf_lama'), fStatus = v('bf_status'), fOr = v('bf_or'), fKw = v('bf_kw'), fBayar = v('bf_bayar'), fFile = v('bf_file'), fRem = v('bf_rem');
+  const fNote = v('bf_note').toLowerCase(), fFoto = v('bf_foto');
   return DB.bengkel.filter(b=>{
     if(q && !(`${b.nopol||''} ${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(q))) return false;
-    if(bFilter && b.bengkel!==bFilter) return false;
-    if(sFilter && bengkelStatus(b)!==sFilter) return false;
-    if(kFilter){
-      const kw = b.kwitansi==='Sudah' ? 'sudah' : 'belum', hasFile = (b.kwFiles||[]).length>0;
-      if(kFilter==='belum' && kw!=='belum') return false;
-      if(kFilter==='sudah' && kw!=='sudah') return false;
-      if(kFilter==='adafile' && !hasFile) return false;
-      if(kFilter==='nofile' && hasFile) return false;
+    if(fNopol && !normNopol(b.nopol).includes(fNopol)) return false;
+    if(fPt && !(`${b.pt||''} ${bgPic(b).name}`.toLowerCase().includes(fPt))) return false;
+    if(fBengkel && b.bengkel!==fBengkel) return false;
+    if(fMasuk && !String(b.tglMasuk||'').startsWith(fMasuk)) return false;
+    if(fKeluar && !String(b.tglKeluar||'').startsWith(fKeluar)) return false;
+    if(fLama){
+      const d = bgLamaDays(b);
+      if(fLama==='0-3' && !(d<=3)) return false;
+      if(fLama==='4-7' && !(d>=4 && d<=7)) return false;
+      if(fLama==='8-14' && !(d>=8 && d<=14)) return false;
+      if(fLama==='15+' && !(d>=15)) return false;
     }
+    if(fStatus && bengkelStatus(b)!==fStatus) return false;
+    if(fOr==='ada' && !Number(b.hargaOR)) return false;
+    if(fOr==='kosong' && Number(b.hargaOR)) return false;
+    if(fKw && (b.kwitansi==='Sudah' ? 'sudah' : 'belum')!==fKw) return false;
+    if(fBayar && (b.statusBayar||'Belum Bayar')!==fBayar) return false;
+    const hasFile = (b.kwFiles||[]).length>0;
+    if(fFile==='ada' && !hasFile) return false;
+    if(fFile==='belum' && hasFile) return false;
+    if(fRem){
+      const st = !b.tglKeluar ? 'tunggu' : (orUnpaid(b) ? 'siap' : 'none');
+      if(st!==fRem) return false;
+    }
+    if(fNote && !String(b.note||'').toLowerCase().includes(fNote)) return false;
+    const hasFoto = (b.foto||[]).length>0;
+    if(fFoto==='ada' && !hasFoto) return false;
+    if(fFoto==='belum' && hasFoto) return false;
     if(bengkelTab==='or'){ if(!orBillable(b)) return false; }
     else if(bengkelTab==='orpaid'){ if(b.statusBayar!=='Sudah Bayar') return false; }
     else if(bengkelTab!=='all' && bengkelStatus(b)!==bengkelTab) return false;
@@ -1941,7 +1986,9 @@ function renderBengkel(){
   const navCount = document.getElementById('navBengkelCount');
   if(navCount) navCount.textContent = all.filter(b=>bengkelStatus(b)==='in').length;
 
+  bengkelFilterUi();
   const list = filteredBengkel();
+  const info = document.getElementById('bgResultInfo'); if(info) info.textContent = `Menampilkan ${list.length} dari ${all.length} data`;
   const body = document.getElementById('bengkelBody');
   if(!body) return;
   if(list.length===0){ body.innerHTML = `<tr class="empty-row"><td colspan="15">Belum ada data keluar-masuk bengkel yang cocok.</td></tr>`; return; }
