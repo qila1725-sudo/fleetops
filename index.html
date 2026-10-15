@@ -345,6 +345,9 @@
   .sp-rad input{width:auto;}
   .sp-foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;background:#e4eaf4;border-top:1px solid #b8c4d6;font-size:12px;}
   .sp-foot select{padding:5px 8px;border:1px solid #b8c4d6;border-radius:4px;}
+  .sp-tabs{display:flex;gap:2px;margin-top:12px;border-bottom:1px solid #b8c4d6;} .sp-tabs button{border:1px solid #b8c4d6;border-bottom:0;background:#e4eaf4;padding:6px 14px;font-size:12.5px;border-radius:4px 4px 0 0;cursor:pointer;} .sp-tabs button.on{background:#fff;font-weight:700;}
+  .sp-pane{display:none;border:1px solid #b8c4d6;border-top:0;padding:14px;background:#fff;} .sp-pane.on{display:grid;}
+  .sp-dt b{font-weight:400;align-self:center;} .sp-g .sp-all.h{border-bottom:1px solid #d5dbe6;padding-top:6px;font-weight:700;}
   @media(max-width:700px){.sp-g{grid-template-columns:100px minmax(0,1fr);} .sp-g [style*="grid-column"]{grid-column:1 / -1 !important;} .sp-g .sp-f{grid-column:2 / -1;}}
   .modal{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow:auto;padding:26px 28px;}
   .modal.wide{max-width:780px;}
@@ -534,11 +537,13 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="acts">
       <button class="btn-outline" onclick="backToSpkChoice()">← Pilihan</button>
       <button class="btn-outline" onclick="openReminderFromSpk()">🚗 Data Reminder</button>
-      <button class="btn-outline green" onclick="exportSpk()">⬇ Export Excel</button>
-      <button class="btn btn-primary small" onclick="openSpkForm()">＋ Buat SPK Baru</button>
+      <button class="btn-outline green" onclick="spkChoose('Export Excel',[['📄 Export SPK','exportSpk()'],['🚗 Export Accident','exportAcc()']])">⬇ Export Excel</button>
+      <button class="btn btn-primary small" onclick="spkChoose('Buat Baru',[['📄 Buat SPK','openSpkForm()'],['🚗 Klaim Accident','openAccForm()']])">＋ Buat Baru</button>
     </div>
   </div>
   <div class="spk-body">
+    <div class="sp-tabs" style="margin:0 0 14px;"><button id="tabSpk" class="on" onclick="spkTab('spk')">SPK</button><button id="tabAcc" onclick="spkTab('acc')">Klaim Accident</button></div>
+    <div id="spkPane">
     <div class="spk-kpis">
       <div class="k"><div class="l">TOTAL SPK</div><div class="v" id="spkKTotal">0</div></div>
       <div class="k"><div class="l">DRAFT</div><div class="v" id="spkKDraft">0</div></div>
@@ -551,6 +556,21 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <div class="spk-card"><table class="spk-tbl"><thead><tr><th>NO. SPK</th><th>TANGGAL</th><th>NOPOL</th><th>PT</th><th>PERMINTAAN</th><th>WORKSHOP</th><th>JENIS</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody id="spkBody"></tbody></table><div class="spk-empty" id="spkEmpty" style="display:none;">Belum ada SPK. Klik <b>Buat SPK Baru</b> untuk memulai.</div></div>
     <p class="small-note" style="margin-top:10px;">Data SPK tersimpan di database dan bisa dibuka dari perangkat mana pun.</p>
+    </div>
+    <div id="accPane" style="display:none">
+      <div class="spk-tools"><input id="accSearch" placeholder="Cari no. kejadian, pengemudi, nopol, tempat..." oninput="renderAcc()"></div>
+      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>NO. KEJADIAN</th><th>TGL LAPOR</th><th>PENGEMUDI</th><th>NO. POLISI</th><th>TEMPAT KEJADIAN</th><th>KERUSAKAN</th><th>AKSI</th></tr></thead><tbody id="accBody"></tbody></table>
+      <div id="accEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada klaim Accident. Klik <b>Buat Baru</b> lalu pilih Klaim Accident.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="chooseBg" onclick="if(event.target===this)this.classList.remove('show')"><div class="modal" style="max-width:340px;"><h3 id="chTitle" style="margin:0 0 4px"></h3><div id="chBtns"></div><button class="btn-outline" style="width:100%;margin-top:10px" onclick="$id('chooseBg').classList.remove('show')">Batal</button></div></div>
+<div class="modal-bg" id="accFormBg">
+  <div class="modal sp-win" style="max-width:760px;">
+    <div class="sp-title">Accident</div>
+    <div class="sp-body"><div class="sp-g" id="accHead"></div><div class="sp-tabs" id="accTabs"></div><div id="accPanes"></div></div>
+    <div class="sp-foot"><div>Dibuat oleh <b id="acc_by"></b></div><div><button class="btn-outline" onclick="$id('accFormBg').classList.remove('show')">Batal</button> <button class="btn btn-primary" onclick="saveAcc()">Simpan</button></div></div>
   </div>
 </div>
 
@@ -560,7 +580,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="sp-title" id="spkFormTitle">SPKLK &amp; Delivery Form</div>
     <div class="sp-body"><div class="sp-g">
       <label>SPKLK No.</label><input id="spk_no" readonly>
-      <div class="sp-rad" style="grid-column:3 / -1;"><label><input type="radio" name="spk_type" value="bengkel" checked>Bengkel</label><label><input type="radio" name="spk_type" value="luar">Kerja Luar</label><label><input type="radio" name="spk_type" value="luarkota">Kerja Luar Kota</label></div>
+      <div class="sp-rad" style="grid-column:3 / -1;"><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="bengkel" checked>Bengkel</label><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="luar">Kerja Luar</label><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="luarkota">Kerja Luar Kota</label></div>
       <label>Workshop</label><input id="spk_bengkel" class="sp-f">
       <label>Registration No.</label><input id="spk_nopol" list="spkNopolList" oninput="spkFillFromNopol()" placeholder="Pilih / ketik nopol"><datalist id="spkNopolList"></datalist><span></span><span></span>
       <label>Model</label><input id="spk_model" readonly><label>Brand</label><input id="spk_brand" readonly>
@@ -3355,6 +3375,7 @@ const spkToDb = r => ({ spk_no:r.no, spk_date:r.date||null, nopol:r.nopol, pt:r.
   spk_type:r.type, model:r.model, brand:r.brand, veh_type:r.vtype, pic:r.pic, handphone:r.phone, km:r.km===''?null:Number(r.km), date_in:r.din||null, date_out:r.dout||null, pengerjaan:r.work, alasan:r.alasan });
 function spkLoad(){ return SPK_LIST; }
 async function spkReload(){
+  accReload();
   try{ SPK_LIST = (await sbGet('spk','select=*&order=created_at.desc')).map(spkFromDb); }
   catch(e){ console.error(e); SPK_LIST=[]; showToast('Gagal memuat data SPK dari database. Pastikan tabel "spk" sudah dibuat (lihat SETUP-SPK.sql).', true); }
   renderSpk();
@@ -3381,10 +3402,14 @@ function leaveSpk(){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; window._spkAcc=null;
 function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
 async function openReminderFromSpk(){ await enterApp(window._spkAcc); }
 function openSpkWork(){ spkShowOnly('spkScreen'); renderSpk(); spkReload(); }
-function spkNextNo(list){
-  const d=new Date(), pre=String(d.getMonth()+1).padStart(2,'0')+String(d.getFullYear()).slice(2)+'-';
-  const n = list.filter(x=>String(x.no).startsWith(pre)).map(x=>parseInt(String(x.no).slice(pre.length))||0);
+function spkNextNo(list,type){
+  const code={bengkel:'01',luar:'02',luarkota:'03'}[type]||'01', pre=code+String(new Date().getFullYear()).slice(2)+'-';
+  const n=list.filter(x=>String(x.no).startsWith(pre)).map(x=>parseInt(String(x.no).slice(pre.length))||0);
   return pre+String((n.length?Math.max(...n):0)+1).padStart(4,'0');
+}
+function spkTypeChanged(){
+  const t=(document.querySelector('input[name=spk_type]:checked')||{}).value||'bengkel', o=spkEditId? SPK_LIST.find(a=>a.id===spkEditId):null;
+  $id('spk_no').value = (o && o.type===t) ? o.no : spkNextNo(spkLoad(), t);
 }
 function spkToday(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function spkFmtDate(x){ if(!x) return '-'; const p=String(x).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:x; }
@@ -3401,7 +3426,7 @@ function openSpkForm(id){
   $id('spkNopolList').innerHTML = (DB.vehicles||[]).map(v=>`<option value="${spkEsc(v.nopol)}">${spkEsc(v.pt||'')}</option>`).join('');
   const sp=(t)=>{ const p=String(t||'').split('T'); return [p[0]||'', (p[1]||'').slice(0,5)]; };
   const now=new Date(), hhmm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-  $id('spk_no').value = x? x.no : spkNextNo(list);
+  $id('spk_no').value = x? x.no : spkNextNo(list,'bengkel');
   document.querySelectorAll('input[name=spk_type]').forEach(r=>r.checked = (r.value===(x? x.type : 'bengkel')));
   $id('spk_bengkel').value = x? x.bengkel : ''; $id('spk_nopol').value = x? x.nopol : '';
   $id('spk_model').value = x? x.model : ''; $id('spk_brand').value = x? x.brand : ''; $id('spk_vtype').value = x? x.vtype : '';
@@ -3446,11 +3471,103 @@ function renderSpk(){
   $id('spkEmpty').style.display = rows.length?'none':'block';
   $id('spkEmpty').innerHTML = all.length ? 'Tidak ada SPK yang cocok.' : 'Belum ada SPK. Klik <b>Buat SPK Baru</b> untuk memulai.';
 }
+
+function spkChoose(title,opts){ $id('chTitle').textContent=title; $id('chBtns').innerHTML=opts.map(o=>`<button class="btn btn-primary" style="width:100%;margin-top:10px;padding:14px" onclick="$id('chooseBg').classList.remove('show');${o[1]}">${o[0]}</button>`).join(''); $id('chooseBg').classList.add('show'); }
+function spkTab(t){ $id('spkPane').style.display=t==='spk'?'':'none'; $id('accPane').style.display=t==='acc'?'':'none'; $id('tabSpk').classList.toggle('on',t==='spk'); $id('tabAcc').classList.toggle('on',t==='acc'); if(t==='acc') renderAcc(); }
+const ACC_OPT={YN:['01 - Ya','02 - Tidak'],JENIS:['01 - Kecelakaan lalu lintas','02 - Lainnya'],HARI:['01 - Senin','02 - Selasa','03 - Rabu','04 - Kamis','05 - Jumat','06 - Sabtu','07 - Minggu']};
+const ACC_HEAD=[['No. Kejadian','t','a_no'],['Jenis Kecelakaan','s','a_jenis','JENIS'],['Hari/Tanggal Pelaporan','dt','a_hari','a_tgl','a_jam'],['Pengemudi','t','a_pengemudi'],['No. Polisi','t','a_nopol'],['Golongan / No. SIM','d','a_gol','a_sim']];
+const ACC_TABS={
+ 'Pihak I':[['Nama/Umur','d','p1_nama','p1_umur'],['Alamat','t','p1_alamat'],['','t','p1_alamat2'],['No. Polisi/Jenis','d','p1_nopol','p1_jenis'],['Merk/Tahun','d','p1_merk','p1_tahun'],['No. Ka/No. Sin','d','p1_noka','p1_nosin'],['Posisi Kendaraan Sekarang','t','p1_posisi'],['Kerusakan','x','p1_rusak'],['Taksiran Biaya','t','p1_taksiran'],['Atas Perintah','s','p1_perintah','YN'],['Keperluan','t','p1_perlu']],
+ 'Pihak II':[['Nama/Umur','d','p2_nama','p2_umur'],['Alamat','t','p2_alamat'],['','t','p2_alamat2'],['No. Polisi/Jenis','d','p2_nopol','p2_jenis'],['Merk/Tahun','d','p2_merk','p2_tahun'],['No. Ka/No. Sin','d','p2_noka','p2_nosin'],['Jumlah Tuntutan','t','p2_tuntut']],
+ 'Kronologi':[['Tempat Kejadian','t','k_tempat'],['Hari/Tanggal','dt','k_hari','k_tgl','k_jam'],['Kondisi Jalan/Kecepatan','d','k_jalan','k_speed'],['Lapor Polisi/Tempat Pelaporan','sd','k_lapor','k_tlapor'],['Berita Acara Polisi','s','k_ba','YN'],['Kronologi','x','k_kronologi']],
+ 'Penanganan':[['Tipe Penanganan','s','n_tipe','JENIS'],['No. Dokumen','t','n_dok'],['Catatan','x','n_cat']],
+ 'Asuransi':[['Nama Asuransi','t','s_nama'],['No. Polis','t','s_polis'],['Nama Tertanggung','t','s_tertanggung'],['Alamat','t','s_alamat'],['Penumpang','h'],['Nama','t','s_pnama'],['Alamat','t','s_palamat'],['Saksi','h'],['Nama','t','s_snama'],['Alamat','t','s_salamat']]};
+let ACC_LIST=[], accEditId=null, accBuilt=false;
+const accRowIds=r=>({t:[r[2]],x:[r[2]],s:[r[2]],d:[r[2],r[3]],sd:[r[2],r[3]],dt:[r[2],r[3],r[4]],h:[]}[r[1]]);
+const accIdsAll=()=>[...ACC_HEAD,...Object.values(ACC_TABS).flat()].flatMap(accRowIds);
+function accRow(r){
+  const k=r[1], I=n=>'acc_'+n, op=key=>ACC_OPT[key].map(o=>`<option>${o}</option>`).join('');
+  if(k==='h') return `<label class="sp-all h">${r[0]}</label>`;
+  let c='';
+  if(k==='t') c=`<input id="${I(r[2])}" class="sp-f"${r[2]==='a_no'?' readonly':''}${r[2]==='a_nopol'?' list="accNopolList" oninput="accFillVeh()"':''}>`;
+  else if(k==='x') c=`<textarea id="${I(r[2])}" class="sp-f"></textarea>`;
+  else if(k==='s') c=`<select id="${I(r[2])}" class="sp-f"${r[3]==='YN'?' style="max-width:200px"':''}>${op(r[3])}</select>`;
+  else if(k==='d') c=`<div class="sp-f sp-dt"><input id="${I(r[2])}" style="flex:${r[2]==='a_gol'?1:3}"><b>/</b><input id="${I(r[3])}" style="flex:${r[2]==='a_gol'?3:1}"></div>`;
+  else if(k==='sd') c=`<div class="sp-f sp-dt"><select id="${I(r[2])}" style="flex:0 0 100px">${op('YN')}</select><b>/</b><input id="${I(r[3])}"></div>`;
+  else if(k==='dt') c=`<div class="sp-f sp-dt"><select id="${I(r[2])}" style="flex:0 0 125px">${op('HARI')}</select><b>/</b><input type="date" id="${I(r[3])}" oninput="accDay(this)"><input type="time" id="${I(r[4])}" style="flex:0 0 105px"></div>`;
+  return `<label>${r[0]}</label>${c}`;
+}
+function accBuild(){
+  if(accBuilt) return; accBuilt=true;
+  $id('accHead').innerHTML=ACC_HEAD.map(accRow).join('')+'<datalist id="accNopolList"></datalist>';
+  const names=Object.keys(ACC_TABS);
+  $id('accTabs').innerHTML=names.map((n,i)=>`<button type="button" class="${i?'':'on'}" onclick="accTab(${i})">${n}</button>`).join('');
+  $id('accPanes').innerHTML=names.map((n,i)=>`<div class="sp-pane sp-g${i?'':' on'}">${ACC_TABS[n].map(accRow).join('')}</div>`).join('');
+}
+function accTab(i){ document.querySelectorAll('#accTabs button').forEach((b,j)=>b.classList.toggle('on',i===j)); document.querySelectorAll('#accPanes .sp-pane').forEach((p,j)=>p.classList.toggle('on',i===j)); }
+function accDay(el){ const s=el.parentNode.querySelector('select'); if(el.value && s) s.selectedIndex=(new Date(el.value+'T00:00').getDay()+6)%7; }
+function accFillVeh(){
+  const v=(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===$id('acc_a_nopol').value.trim().toUpperCase()); if(!v) return;
+  const set=(i,t)=>{ const e=$id('acc_'+i); if(!e.value) e.value=t||''; };
+  set('a_pengemudi',v.user); set('p1_nopol',v.nopol); set('p1_jenis',v.type); set('p1_merk',v.brand); set('p1_tahun',v.year);
+}
+function accNextNo(){
+  const pre='LK'+String(new Date().getFullYear()).slice(2)+'-', n=ACC_LIST.filter(x=>String(x.no).startsWith(pre)).map(x=>parseInt(String(x.no).slice(pre.length))||0);
+  return pre+String((n.length?Math.max(...n):0)+1).padStart(4,'0');
+}
+function openAccForm(id){
+  accBuild(); const x=id? ACC_LIST.find(a=>a.id===id):null; accEditId=x? x.id:null;
+  $id('accNopolList').innerHTML=(DB.vehicles||[]).map(v=>`<option value="${spkEsc(v.nopol)}">`).join('');
+  const d=x? x.d:{}, now=new Date();
+  accIdsAll().forEach(n=>{ const e=$id('acc_'+n); e.value = d[n]!==undefined? d[n] : (e.tagName==='SELECT'? e.options[0].value : ''); });
+  if(!x){ $id('acc_a_no').value=accNextNo(); $id('acc_a_tgl').value=spkToday(); $id('acc_a_jam').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'); accDay($id('acc_a_tgl')); }
+  $id('acc_by').textContent = x? x.by : (currentUser? currentUser.username : SPK_USER);
+  accTab(0); $id('accFormBg').classList.add('show');
+}
+async function saveAcc(){
+  const d={}; accIdsAll().forEach(n=>d[n]=$id('acc_'+n).value.trim()); d.a_nopol=d.a_nopol.toUpperCase();
+  if(!d.a_nopol){ showToast('No. Polisi wajib diisi.', true); return; }
+  if(ACC_LIST.some(a=>a.no===d.a_no && a.id!==accEditId)){ showToast('No. Kejadian sudah dipakai.', true); return; }
+  const row={no_kejadian:d.a_no, tgl_lapor:d.a_tgl? d.a_tgl+'T'+(d.a_jam||'00:00'):null, nopol:d.a_nopol, pengemudi:d.a_pengemudi, made_by:$id('acc_by').textContent, data:d};
+  try{ if(accEditId) await sbUpdate('accident',accEditId,row); else await sbInsert('accident',row);
+    $id('accFormBg').classList.remove('show'); await accReload(); spkTab('acc'); showToast('Klaim Accident disimpan.');
+  }catch(e){ showToast('Gagal menyimpan: '+e.message, true); }
+}
+async function accReload(){
+  try{ ACC_LIST=(await sbGet('accident','select=*&order=created_at.desc')).map(r=>({id:String(r.id),no:r.no_kejadian,tgl:r.tgl_lapor||'',nopol:r.nopol||'',peng:r.pengemudi||'',by:r.made_by||'',d:r.data||{}})); }
+  catch(e){ console.error(e); ACC_LIST=[]; if(!window._accWarn){ window._accWarn=1; showToast('Tabel "accident" belum ada. Jalankan 03-accident.sql di Supabase.', true); } }
+  renderAcc();
+}
+function renderAcc(){
+  const q=($id('accSearch').value||'').toLowerCase();
+  const rows=ACC_LIST.filter(a=>!q||[a.no,a.peng,a.nopol,a.d.k_tempat,a.d.p1_rusak].join(' ').toLowerCase().includes(q));
+  $id('accBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.no)}</b></td><td>${spkFmtDate(String(a.tgl).split('T')[0])}</td><td>${spkEsc(a.peng||'-')}</td><td><b>${spkEsc(a.nopol)}</b></td><td>${spkEsc(a.d.k_tempat||'-')}</td><td style="min-width:180px;">${spkEsc(a.d.p1_rusak||'-')}</td>
+    <td><div class="spk-act"><button onclick="openAccForm('${a.id}')">Ubah</button><button class="del" onclick="deleteAcc('${a.id}')">Hapus</button></div></td></tr>`).join('');
+  $id('accEmpty').style.display=rows.length?'none':'block';
+}
+async function deleteAcc(id){ if(!confirm('Hapus klaim Accident ini?')) return; try{ await sbDeleteIds('accident',[id]); await accReload(); showToast('Klaim dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
+const xlVeh=n=>(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===String(n||'').toUpperCase())||{};
+const xlD=t=>{ const p=String(t||'').split('T'); return (p[0]?spkFmtDate(p[0]):'')+(p[1]?' '+p[1].slice(0,5):''); };
+function xlSave(rows,merges,widths,name){
+  const ws=XLSX.utils.aoa_to_sheet(rows); if(merges) ws['!merges']=merges; ws['!cols']=widths.map(w=>({wch:w}));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Sheet1'); XLSX.writeFile(wb,name);
+}
+function exportAcc(){
+  if(!ACC_LIST.length){ showToast('Belum ada data Accident.', true); return; }
+  if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
+  const rows=[[],['No','No. LK','No. Polis','Merk & Jenis Kendaraan','No. Polisi','No. Rangka & Mesin','Tempat Kecelakaan','Tanggal & Jam Kecelakaan','Nama & Alamat Pengemudi','Gol & Sim Pengemudi','Kerusakan','Keterangan','Tanggal Pelaporan','Bengkel','Keterangan','Tgl Selesai','OR','Perusahaan','Mobil balikan dari']];
+  [...ACC_LIST].sort((a,b)=>String(a.no).localeCompare(String(b.no))).forEach((a,i)=>{ const d=a.d, j=(...p)=>p.filter(Boolean).join(' / ');
+    rows.push([i+1,a.no,d.s_polis,[d.p1_merk,d.p1_jenis].filter(Boolean).join(' '),a.nopol,j(d.p1_noka,d.p1_nosin),d.k_tempat,xlD(d.k_tgl+'T'+(d.k_jam||'')),[d.a_pengemudi,d.p1_alamat,d.p1_alamat2].filter(Boolean).join(', '),j(d.a_gol,d.a_sim),d.p1_rusak,d.k_kronologi,xlD(d.a_tgl),'',d.n_cat,'','',xlVeh(a.nopol).pt||'','']); });
+  xlSave(rows,null,[4,9,12,26,11,22,21,28,30,24,24,24,13,13,20,11,6,13,20],'Master_Record_Accident.xlsx');
+}
+
 function exportSpk(){
   const l=spkLoad(); if(!l.length){ showToast('Belum ada data SPK.', true); return; }
   if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
-  const ws=XLSX.utils.json_to_sheet(l.map(a=>({'SPKLK No.':a.no,'Jenis':SPK_TYPE[a.type],'Workshop':a.bengkel,'Nopol':a.nopol,'Model':a.model,'Brand':a.brand,'Type':a.vtype,'Customer':a.pt,'PIC':a.pic,'Handphone':a.phone,'Km':a.km,'Date In':a.din,'Date Out':a.dout,'Permintaan':a.job,'Pengerjaan':a.work,'Catatan':a.note,'Alasan':a.alasan,'Status':SPK_LBL[a.status],'Dibuat Oleh':a.by})));
-  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'SPK'); XLSX.writeFile(wb,'Data-SPK.xlsx');
+  const rows=[[],['No.','No. SPK','Date','Nopol','Type','User','','Bengkel','City','Km.','Permintaan','Pengerjaan','Note'],['','','','','','Compeny','Pesonal','','','','','','']];
+  [...l].sort((a,b)=>String(a.no).localeCompare(String(b.no))).forEach((a,i)=>rows.push([i+1,a.no,spkFmtDate(a.date),a.nopol,a.vtype||[a.brand,a.model].filter(Boolean).join(' '),a.pt,a.pic,a.bengkel,xlVeh(a.nopol).area||'',a.km===''?'':Number(a.km),a.job,a.work,a.note]));
+  const mg=[...Array(13).keys()].filter(c=>c!==5&&c!==6).map(c=>({s:{r:1,c},e:{r:2,c}})).concat([{s:{r:1,c:5},e:{r:1,c:6}}]);
+  xlSave(rows,mg,[5,14,11,11,16,18,16,18,14,9,34,34,24],'Master_Record_service.xlsx');
 }
 function printSpk(id){
   const a=spkLoad().find(x=>x.id===id); if(!a) return;
