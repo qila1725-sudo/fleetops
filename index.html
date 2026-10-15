@@ -484,8 +484,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="field"><label>Username</label><input id="loginUser" type="text" placeholder="Username" autocomplete="username"></div>
     <div class="field"><label>Password</label><input id="loginPass" type="password" placeholder="Password" autocomplete="current-password"></div>
     <button class="btn btn-primary btn-block" onclick="doLogin()">Masuk</button>
-    <div class="login-divider">atau</div>
-    <button class="btn-spk-entry" onclick="openSpkGate()"><span class="ic">🗂️</span><span>Data Sistem SPK<small>Khusus tim Maintenance</small></span></button>
   </div>
 </div>
 
@@ -505,12 +503,12 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 <!-- PILIHAN SETELAH MASUK DATA SISTEM SPK -->
 <div id="spkChoiceScreen">
   <div class="choice-wrap">
-    <div class="choice-head"><h1>Data Sistem SPK</h1><p>Pilih yang ingin kamu kerjakan</p></div>
+    <div class="choice-head"><h1>Pilih Menu</h1><p>Pilih yang ingin kamu kerjakan</p></div>
     <div class="choice-grid">
       <button class="choice-card" onclick="openSpkWork()"><div class="ic">📝</div><h3>Mengerjakan SPK</h3><p>Buat, ubah, cetak, dan pantau Surat Perintah Kerja untuk tiap unit.</p></button>
       <button class="choice-card green" onclick="openReminderFromSpk()"><div class="ic">🚗</div><h3>Data Reminder</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi.</p></button>
     </div>
-    <button class="choice-back" onclick="leaveSpk()">← Kembali ke halaman masuk</button>
+    <button class="choice-back" onclick="leaveSpk()">← Keluar</button>
   </div>
 </div>
 
@@ -1570,7 +1568,11 @@ async function doLogin(){
   await loadAll();
   const acc = DB.accounts.find(a=>a.id===user.id);
   if(!acc || acc.active===false){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; err.textContent='Akun tidak aktif atau belum terdaftar.'; err.style.display='block'; return; }
-  await enterApp(acc);
+  if(String(acc.role).toLowerCase()==='maintenance'){
+    SPK_USER = acc.username; window._spkAcc = acc;
+    document.getElementById('loginPass').value='';
+    spkShowOnly('spkChoiceScreen');
+  } else { await enterApp(acc); }
 }
 async function enterApp(acc){
   const u = acc.username;
@@ -3352,7 +3354,7 @@ async function submitSpkGate(){
   if(!acc || String(acc.role).toLowerCase()!=='maintenance' || acc.active===false){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; $id('spkGateErr').style.display='block'; return; }
   SPK_USER = acc.username; window._spkAcc = acc; closeSpkGate(); spkShowOnly('spkChoiceScreen');
 }
-function leaveSpk(){ spkShowOnly('loginScreen'); }
+function leaveSpk(){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; window._spkAcc=null; currentUser=null; spkShowOnly('loginScreen'); }
 function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
 async function openReminderFromSpk(){ await enterApp(window._spkAcc); }
 function openSpkWork(){ spkShowOnly('spkScreen'); renderSpk(); spkReload(); }
