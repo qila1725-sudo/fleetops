@@ -331,21 +331,21 @@
 
   .modal-bg{position:fixed;inset:0;background:rgba(15,25,35,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;}
   .modal-bg.show{display:flex;}
-  .sp-win{max-width:720px;padding:0!important;border:1px solid #6b8fc4;overflow:hidden;}
+  .modal.sp-win{max-width:900px;padding:0;border:1px solid #6b8fc4;overflow:auto;}
   .sp-title{background:linear-gradient(#dbe8fb,#b9d0f3);padding:9px 16px;font-size:13px;color:#1b2f52;font-weight:700;}
   .sp-body{padding:16px 18px;background:#f3f6fb;}
-  .sp-g{display:grid;grid-template-columns:105px 1fr 85px 1fr;gap:8px 10px;align-items:center;}
+  .sp-g{display:grid;grid-template-columns:110px minmax(0,1fr) 90px minmax(0,1fr);gap:9px 12px;align-items:center;}
   .sp-g label{font-size:12px;color:#334;font-weight:600;margin:0;}
   .sp-g input,.sp-g textarea,.sp-g select{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #b8c4d6;border-radius:4px;background:#fff;font-size:13px;font-family:inherit;}
   .sp-g input[readonly]{background:#e3e6eb;color:#667;}
   .sp-g .sp-f{grid-column:2 / -1;} .sp-g .sp-all{grid-column:1 / -1;}
   .sp-g textarea{min-height:92px;resize:vertical;} .sp-g textarea.s{min-height:56px;}
-  .sp-dt{display:flex;gap:6px;} .sp-dt input[type=time]{max-width:100px;}
+  .sp-g>*{min-width:0;} .sp-dt{display:flex;gap:6px;} .sp-dt input{min-width:0;flex:1;} .sp-dt input[type=time]{flex:0 0 105px;}
   .sp-rad{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;} .sp-rad label{display:flex;gap:5px;align-items:center;font-weight:500;}
   .sp-rad input{width:auto;}
   .sp-foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;background:#e4eaf4;border-top:1px solid #b8c4d6;font-size:12px;}
   .sp-foot select{padding:5px 8px;border:1px solid #b8c4d6;border-radius:4px;}
-  @media(max-width:640px){.sp-g{grid-template-columns:100px 1fr;}}
+  @media(max-width:700px){.sp-g{grid-template-columns:100px minmax(0,1fr);} .sp-g [style*="grid-column"]{grid-column:1 / -1 !important;} .sp-g .sp-f{grid-column:2 / -1;}}
   .modal{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow:auto;padding:26px 28px;}
   .modal.wide{max-width:780px;}
   .modal h3{margin:0 0 4px;font-size:17px;font-weight:800;}
@@ -565,8 +565,8 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <label>Registration No.</label><input id="spk_nopol" list="spkNopolList" oninput="spkFillFromNopol()" placeholder="Pilih / ketik nopol"><datalist id="spkNopolList"></datalist><span></span><span></span>
       <label>Model</label><input id="spk_model" readonly><label>Brand</label><input id="spk_brand" readonly>
       <label>Type</label><input id="spk_vtype" readonly><span></span><span></span>
-      <label>Customer</label><input id="spk_pt">
-      <label>PIC</label><input id="spk_pic" class="sp-f" style="grid-column:2 / 3;"><label>Handphone</label><input id="spk_phone">
+      <label>Customer</label><input id="spk_pt" class="sp-f">
+      <label>PIC</label><input id="spk_pic"><label>Handphone</label><input id="spk_phone">
       <label>Km</label><input id="spk_km" type="number" min="0"><span></span><span></span>
       <label>Date In</label><div class="sp-dt"><input id="spk_din" type="date"><input id="spk_tin" type="time"></div>
       <label>Date Out</label><div class="sp-dt"><input id="spk_dout" type="date"><input id="spk_tout" type="time"></div>
