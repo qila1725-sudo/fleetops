@@ -1236,7 +1236,7 @@ async function loadAll(){
     DB.settings.waOpening = (sRows && sRows[0]) ? (sRows[0].wa_opening||'') : '';
     DB.settings.waClosing = (sRows && sRows[0]) ? (sRows[0].wa_closing||'') : '';
     DB.loginlog = (lRows||[]).map(r=>({user:r.username, time:new Date(r.logged_at).toLocaleString('id-ID')}));
-    dbOnline = true;
+    dbOnline = true; try{ updateDbStatusUI(); }catch(_){}
     try{
       const bRows = await sbGet('bengkel_log','select=*&order=tanggal_masuk.desc');
       DB.bengkel = (bRows||[]).map(fromDbBengkel);
