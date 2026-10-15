@@ -1598,7 +1598,7 @@ function doLogout(){
 function updateDbStatusUI(){
   const dot = document.getElementById('dbLiveDot');
   const chip = document.getElementById('syncChip');
-  if(dbOnline){ dot.textContent='Live'; dot.classList.remove('off'); chip.classList.remove('err'); }
+  if(dbOnline){ dot.textContent='Live'; dot.classList.remove('off'); chip.classList.remove('err'); chip.innerHTML = '☁️ Tersinkronisasi Cloud DB <span id="syncTime"></span>'; }
   else{ dot.textContent='Terputus'; dot.classList.add('off'); chip.classList.add('err'); chip.innerHTML = '⚠️ Gagal sambung ke database'; }
 }
 
@@ -3439,7 +3439,6 @@ function hideSplash(){
 }
 (async function init(){
   if(!isConfigured){ document.getElementById('configScreen').style.display='flex'; hideSplash(); return; }
-  updateDbStatusUI();
   document.getElementById('loginUser').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
   document.getElementById('loginPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
   updateDesktopNotifBtnUI();
