@@ -331,6 +331,21 @@
 
   .modal-bg{position:fixed;inset:0;background:rgba(15,25,35,.5);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;}
   .modal-bg.show{display:flex;}
+  .sp-win{max-width:720px;padding:0!important;border:1px solid #6b8fc4;overflow:hidden;}
+  .sp-title{background:linear-gradient(#dbe8fb,#b9d0f3);padding:9px 16px;font-size:13px;color:#1b2f52;font-weight:700;}
+  .sp-body{padding:16px 18px;background:#f3f6fb;}
+  .sp-g{display:grid;grid-template-columns:105px 1fr 85px 1fr;gap:8px 10px;align-items:center;}
+  .sp-g label{font-size:12px;color:#334;font-weight:600;margin:0;}
+  .sp-g input,.sp-g textarea,.sp-g select{width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #b8c4d6;border-radius:4px;background:#fff;font-size:13px;font-family:inherit;}
+  .sp-g input[readonly]{background:#e3e6eb;color:#667;}
+  .sp-g .sp-f{grid-column:2 / -1;} .sp-g .sp-all{grid-column:1 / -1;}
+  .sp-g textarea{min-height:92px;resize:vertical;} .sp-g textarea.s{min-height:56px;}
+  .sp-dt{display:flex;gap:6px;} .sp-dt input[type=time]{max-width:100px;}
+  .sp-rad{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;} .sp-rad label{display:flex;gap:5px;align-items:center;font-weight:500;}
+  .sp-rad input{width:auto;}
+  .sp-foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 18px;background:#e4eaf4;border-top:1px solid #b8c4d6;font-size:12px;}
+  .sp-foot select{padding:5px 8px;border:1px solid #b8c4d6;border-radius:4px;}
+  @media(max-width:640px){.sp-g{grid-template-columns:100px 1fr;}}
   .modal{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow:auto;padding:26px 28px;}
   .modal.wide{max-width:780px;}
   .modal h3{margin:0 0 4px;font-size:17px;font-weight:800;}
@@ -534,29 +549,34 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <input id="spkSearch" placeholder="Cari no. SPK, nopol, PT, pekerjaan, bengkel..." oninput="renderSpk()">
       <select id="spkFilter" onchange="renderSpk()"><option value="">Semua status</option><option value="draft">Draft</option><option value="proses">Dikerjakan</option><option value="selesai">Selesai</option></select>
     </div>
-    <div class="spk-card"><table class="spk-tbl"><thead><tr><th>NO. SPK</th><th>TANGGAL</th><th>NOPOL</th><th>PT</th><th>PEKERJAAN</th><th>BENGKEL</th><th>ESTIMASI</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody id="spkBody"></tbody></table><div class="spk-empty" id="spkEmpty" style="display:none;">Belum ada SPK. Klik <b>Buat SPK Baru</b> untuk memulai.</div></div>
+    <div class="spk-card"><table class="spk-tbl"><thead><tr><th>NO. SPK</th><th>TANGGAL</th><th>NOPOL</th><th>PT</th><th>PERMINTAAN</th><th>WORKSHOP</th><th>JENIS</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody id="spkBody"></tbody></table><div class="spk-empty" id="spkEmpty" style="display:none;">Belum ada SPK. Klik <b>Buat SPK Baru</b> untuk memulai.</div></div>
     <p class="small-note" style="margin-top:10px;">Data SPK tersimpan di database dan bisa dibuka dari perangkat mana pun.</p>
   </div>
 </div>
 
 <!-- FORM SPK -->
 <div class="modal-bg" id="spkFormBg">
-  <div class="modal">
-    <h3 id="spkFormTitle">Buat SPK Baru</h3>
-    <p class="sub">Isi detail pekerjaan yang diperintahkan.</p>
-    <div class="form-grid">
-      <div><label>No. SPK</label><input id="spk_no"></div>
-      <div><label>Tanggal</label><input id="spk_date" type="date"></div>
-      <div><label>Nopol</label><input id="spk_nopol" list="spkNopolList" oninput="spkFillFromNopol()" placeholder="Pilih / ketik nopol"><datalist id="spkNopolList"></datalist></div>
-      <div><label>PT</label><input id="spk_pt"></div>
-      <div class="full"><label>Jenis Pekerjaan</label><textarea id="spk_job" placeholder="Contoh: Ganti oli mesin, kampas rem depan, tune up"></textarea></div>
-      <div><label>Bengkel</label><input id="spk_bengkel"></div>
-      <div><label>Estimasi Biaya (Rp)</label><input id="spk_cost" type="number" min="0"></div>
-      <div><label>Status</label><select id="spk_status"><option value="draft">Draft</option><option value="proses">Dikerjakan</option><option value="selesai">Selesai</option></select></div>
-      <div><label>Dibuat Oleh</label><input id="spk_by"></div>
-      <div class="full"><label>Catatan</label><textarea id="spk_note"></textarea></div>
-    </div>
-    <div class="modal-actions"><button class="btn-outline" onclick="closeSpkForm()">Batal</button><button class="btn btn-primary" onclick="saveSpk()">Simpan</button></div>
+  <div class="modal sp-win">
+    <div class="sp-title" id="spkFormTitle">SPKLK &amp; Delivery Form</div>
+    <div class="sp-body"><div class="sp-g">
+      <label>SPKLK No.</label><input id="spk_no" readonly>
+      <div class="sp-rad" style="grid-column:3 / -1;"><label><input type="radio" name="spk_type" value="bengkel" checked>Bengkel</label><label><input type="radio" name="spk_type" value="luar">Kerja Luar</label><label><input type="radio" name="spk_type" value="luarkota">Kerja Luar Kota</label></div>
+      <label>Workshop</label><input id="spk_bengkel" class="sp-f">
+      <label>Registration No.</label><input id="spk_nopol" list="spkNopolList" oninput="spkFillFromNopol()" placeholder="Pilih / ketik nopol"><datalist id="spkNopolList"></datalist><span></span><span></span>
+      <label>Model</label><input id="spk_model" readonly><label>Brand</label><input id="spk_brand" readonly>
+      <label>Type</label><input id="spk_vtype" readonly><span></span><span></span>
+      <label>Customer</label><input id="spk_pt">
+      <label>PIC</label><input id="spk_pic" class="sp-f" style="grid-column:2 / 3;"><label>Handphone</label><input id="spk_phone">
+      <label>Km</label><input id="spk_km" type="number" min="0"><span></span><span></span>
+      <label>Date In</label><div class="sp-dt"><input id="spk_din" type="date"><input id="spk_tin" type="time"></div>
+      <label>Date Out</label><div class="sp-dt"><input id="spk_dout" type="date"><input id="spk_tout" type="time"></div>
+      <label style="grid-column:1 / 3;">Permintaan</label><label style="grid-column:3 / -1;">Pengerjaan</label>
+      <textarea id="spk_job" style="grid-column:1 / 3;"></textarea><textarea id="spk_work" style="grid-column:3 / -1;"></textarea>
+      <label class="sp-all">Notes / Catatan</label><textarea id="spk_note" class="sp-all s"></textarea>
+      <label class="sp-all">Alasan</label><textarea id="spk_alasan" class="sp-all s"></textarea>
+    </div></div>
+    <div class="sp-foot"><div>Status <select id="spk_status"><option value="draft">Draft</option><option value="proses">Dikerjakan</option><option value="selesai">Selesai</option></select> &nbsp; Dibuat oleh <b id="spk_by_lbl"></b><input id="spk_by" type="hidden"></div>
+      <div><button class="btn-outline" onclick="closeSpkForm()">Batal</button> <button class="btn btn-primary" onclick="saveSpk()">Simpan</button></div></div>
   </div>
 </div>
 
@@ -3328,8 +3348,11 @@ let spkEditId = null;
 const $id = i=>document.getElementById(i);
 const spkEsc = t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let SPK_LIST = [];
-const spkFromDb = r => ({ id:String(r.id), no:r.spk_no, date:r.spk_date, nopol:r.nopol||'', pt:r.pt||'', job:r.job||'', bengkel:r.bengkel||'', cost:Number(r.cost)||0, status:r.status||'draft', by:r.made_by||'', note:r.note||'' });
-const spkToDb = r => ({ spk_no:r.no, spk_date:r.date||null, nopol:r.nopol, pt:r.pt, job:r.job, bengkel:r.bengkel, cost:r.cost, status:r.status, made_by:r.by, note:r.note });
+const SPK_TYPE={bengkel:'Bengkel',luar:'Kerja Luar',luarkota:'Kerja Luar Kota'};
+const spkFromDb = r => ({ id:String(r.id), no:r.spk_no, date:r.spk_date, nopol:r.nopol||'', pt:r.pt||'', job:r.job||'', bengkel:r.bengkel||'', cost:Number(r.cost)||0, status:r.status||'draft', by:r.made_by||'', note:r.note||'',
+  type:r.spk_type||'bengkel', model:r.model||'', brand:r.brand||'', vtype:r.veh_type||'', pic:r.pic||'', phone:r.handphone||'', km:r.km||'', din:r.date_in||'', dout:r.date_out||'', work:r.pengerjaan||'', alasan:r.alasan||'' });
+const spkToDb = r => ({ spk_no:r.no, spk_date:r.date||null, nopol:r.nopol, pt:r.pt, job:r.job, bengkel:r.bengkel, cost:r.cost, status:r.status, made_by:r.by, note:r.note,
+  spk_type:r.type, model:r.model, brand:r.brand, veh_type:r.vtype, pic:r.pic, handphone:r.phone, km:r.km===''?null:Number(r.km), date_in:r.din||null, date_out:r.dout||null, pengerjaan:r.work, alasan:r.alasan });
 function spkLoad(){ return SPK_LIST; }
 async function spkReload(){
   try{ SPK_LIST = (await sbGet('spk','select=*&order=created_at.desc')).map(spkFromDb); }
@@ -3359,36 +3382,48 @@ function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
 async function openReminderFromSpk(){ await enterApp(window._spkAcc); }
 function openSpkWork(){ spkShowOnly('spkScreen'); renderSpk(); spkReload(); }
 function spkNextNo(list){
-  const d=new Date(), pre=`SPK/${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/`;
+  const d=new Date(), pre=String(d.getMonth()+1).padStart(2,'0')+String(d.getFullYear()).slice(2)+'-';
   const n = list.filter(x=>String(x.no).startsWith(pre)).map(x=>parseInt(String(x.no).slice(pre.length))||0);
-  return pre+String((n.length?Math.max(...n):0)+1).padStart(3,'0');
+  return pre+String((n.length?Math.max(...n):0)+1).padStart(4,'0');
 }
 function spkToday(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function spkFmtDate(x){ if(!x) return '-'; const p=String(x).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:x; }
 function spkRp(n){ return n? 'Rp '+Number(n).toLocaleString('id-ID') : '-'; }
 function spkFillFromNopol(){
   const v=(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===$id('spk_nopol').value.trim().toUpperCase());
-  if(v && !$id('spk_pt').value) $id('spk_pt').value = v.pt||'';
+  $id('spk_model').value = v? (v.model||'') : ''; $id('spk_brand').value = v? (v.brand||'') : ''; $id('spk_vtype').value = v? (v.type||'') : '';
+  if(v){ $id('spk_pt').value = v.pt||''; $id('spk_pic').value = v.user||''; $id('spk_phone').value = v.phone||''; if(v.currentkm) $id('spk_km').value = v.currentkm; }
 }
 function openSpkForm(id){
   const list=spkLoad(), x = id ? list.find(a=>a.id===id) : null;
   spkEditId = x ? x.id : null;
-  $id('spkFormTitle').textContent = x ? 'Ubah SPK' : 'Buat SPK Baru';
+  $id('spkFormTitle').textContent = 'SPKLK & Delivery Form' + (x ? ' (Ubah)' : '');
   $id('spkNopolList').innerHTML = (DB.vehicles||[]).map(v=>`<option value="${spkEsc(v.nopol)}">${spkEsc(v.pt||'')}</option>`).join('');
+  const sp=(t)=>{ const p=String(t||'').split('T'); return [p[0]||'', (p[1]||'').slice(0,5)]; };
+  const now=new Date(), hhmm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   $id('spk_no').value = x? x.no : spkNextNo(list);
-  $id('spk_date').value = x? x.date : spkToday();
-  $id('spk_nopol').value = x? x.nopol : ''; $id('spk_pt').value = x? x.pt : '';
-  $id('spk_job').value = x? x.job : ''; $id('spk_bengkel').value = x? x.bengkel : '';
-  $id('spk_cost').value = x? x.cost : ''; $id('spk_status').value = x? x.status : 'draft';
-  $id('spk_by').value = x? x.by : (currentUser? currentUser.username : SPK_USER); $id('spk_note').value = x? x.note : '';
+  document.querySelectorAll('input[name=spk_type]').forEach(r=>r.checked = (r.value===(x? x.type : 'bengkel')));
+  $id('spk_bengkel').value = x? x.bengkel : ''; $id('spk_nopol').value = x? x.nopol : '';
+  $id('spk_model').value = x? x.model : ''; $id('spk_brand').value = x? x.brand : ''; $id('spk_vtype').value = x? x.vtype : '';
+  $id('spk_pt').value = x? x.pt : ''; $id('spk_pic').value = x? x.pic : ''; $id('spk_phone').value = x? x.phone : ''; $id('spk_km').value = x? x.km : '';
+  const di = x? sp(x.din) : [spkToday(), hhmm], dOut = x? sp(x.dout) : ['',''];
+  $id('spk_din').value = di[0]; $id('spk_tin').value = di[1]; $id('spk_dout').value = dOut[0]; $id('spk_tout').value = dOut[1];
+  $id('spk_job').value = x? x.job : ''; $id('spk_work').value = x? x.work : ''; $id('spk_note').value = x? x.note : ''; $id('spk_alasan').value = x? x.alasan : '';
+  $id('spk_status').value = x? x.status : 'draft';
+  const by = x? x.by : (currentUser? currentUser.username : SPK_USER); $id('spk_by').value = by; $id('spk_by_lbl').textContent = by;
   $id('spkFormBg').classList.add('show');
 }
 function closeSpkForm(){ $id('spkFormBg').classList.remove('show'); }
 async function saveSpk(){
-  const rec = { id: spkEditId, no:$id('spk_no').value.trim(), date:$id('spk_date').value, nopol:$id('spk_nopol').value.trim().toUpperCase(),
-    pt:$id('spk_pt').value.trim(), job:$id('spk_job').value.trim(), bengkel:$id('spk_bengkel').value.trim(), cost:Number($id('spk_cost').value)||0,
-    status:$id('spk_status').value, by:$id('spk_by').value.trim(), note:$id('spk_note').value.trim() };
-  if(!rec.no || !rec.nopol || !rec.job){ showToast('No. SPK, Nopol, dan Jenis Pekerjaan wajib diisi.', true); return; }
+  const dt=(d,t)=> d ? d+'T'+(t||'00:00') : '';
+  const old = spkEditId ? SPK_LIST.find(a=>a.id===spkEditId) : null;
+  const rec = { id: spkEditId, no:$id('spk_no').value.trim(), type:(document.querySelector('input[name=spk_type]:checked')||{}).value||'bengkel',
+    date:$id('spk_din').value || spkToday(), nopol:$id('spk_nopol').value.trim().toUpperCase(), model:$id('spk_model').value, brand:$id('spk_brand').value, vtype:$id('spk_vtype').value,
+    pt:$id('spk_pt').value.trim(), pic:$id('spk_pic').value.trim(), phone:$id('spk_phone').value.trim(), km:$id('spk_km').value,
+    din:dt($id('spk_din').value,$id('spk_tin').value), dout:dt($id('spk_dout').value,$id('spk_tout').value),
+    job:$id('spk_job').value.trim(), work:$id('spk_work').value.trim(), bengkel:$id('spk_bengkel').value.trim(), cost:old? old.cost : 0,
+    status:$id('spk_status').value, by:$id('spk_by').value.trim(), note:$id('spk_note').value.trim(), alasan:$id('spk_alasan').value.trim() };
+  if(!rec.no || !rec.nopol || !rec.job){ showToast('Registration No. dan Permintaan wajib diisi.', true); return; }
   if(SPK_LIST.some(a=>a.no===rec.no && a.id!==rec.id)){ showToast('No. SPK sudah dipakai.', true); return; }
   try{
     if(rec.id) await sbUpdate('spk', rec.id, spkToDb(rec)); else await sbInsert('spk', spkToDb(rec));
@@ -3405,7 +3440,7 @@ function renderSpk(){
   const rows=all.filter(a=>(!f||a.status===f) && (!q || [a.no,a.nopol,a.pt,a.job,a.bengkel].join(' ').toLowerCase().includes(q)));
   $id('spkBody').innerHTML = rows.map(a=>`<tr>
     <td><b>${spkEsc(a.no)}</b></td><td>${spkFmtDate(a.date)}</td><td><b>${spkEsc(a.nopol)}</b></td><td>${spkEsc(a.pt||'-')}</td>
-    <td style="min-width:200px;">${spkEsc(a.job)}</td><td>${spkEsc(a.bengkel||'-')}</td><td>${spkRp(a.cost)}</td>
+    <td style="min-width:200px;">${spkEsc(a.job)}</td><td>${spkEsc(a.bengkel||'-')}</td><td>${SPK_TYPE[a.type]||'-'}</td>
     <td><span class="spk-pill ${a.status}" style="cursor:pointer" title="Klik untuk ganti status" onclick="spkCycle('${a.id}')">${SPK_LBL[a.status]}</span></td>
     <td><div class="spk-act"><button onclick="printSpk('${a.id}')">Cetak</button><button onclick="openSpkForm('${a.id}')">Ubah</button><button class="del" onclick="deleteSpk('${a.id}')">Hapus</button></div></td></tr>`).join('');
   $id('spkEmpty').style.display = rows.length?'none':'block';
@@ -3414,7 +3449,7 @@ function renderSpk(){
 function exportSpk(){
   const l=spkLoad(); if(!l.length){ showToast('Belum ada data SPK.', true); return; }
   if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
-  const ws=XLSX.utils.json_to_sheet(l.map(a=>({'No. SPK':a.no,'Tanggal':a.date,'Nopol':a.nopol,'PT':a.pt,'Pekerjaan':a.job,'Bengkel':a.bengkel,'Estimasi Biaya':a.cost,'Status':SPK_LBL[a.status],'Dibuat Oleh':a.by,'Catatan':a.note})));
+  const ws=XLSX.utils.json_to_sheet(l.map(a=>({'SPKLK No.':a.no,'Jenis':SPK_TYPE[a.type],'Workshop':a.bengkel,'Nopol':a.nopol,'Model':a.model,'Brand':a.brand,'Type':a.vtype,'Customer':a.pt,'PIC':a.pic,'Handphone':a.phone,'Km':a.km,'Date In':a.din,'Date Out':a.dout,'Permintaan':a.job,'Pengerjaan':a.work,'Catatan':a.note,'Alasan':a.alasan,'Status':SPK_LBL[a.status],'Dibuat Oleh':a.by})));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'SPK'); XLSX.writeFile(wb,'Data-SPK.xlsx');
 }
 function printSpk(id){
@@ -3422,8 +3457,8 @@ function printSpk(id){
   const w=window.open('','_blank'); if(!w){ showToast('Pop-up diblokir browser.', true); return; }
   const r=(l,v)=>`<tr><td style="width:170px;color:#555">${l}</td><td><b>${spkEsc(v||'-')}</b></td></tr>`;
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${spkEsc(a.no)}</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#111}h1{margin:0 0 4px;font-size:22px}table{width:100%;border-collapse:collapse;margin-top:18px}td{padding:9px 6px;border-bottom:1px solid #ddd;vertical-align:top;font-size:14px}.sig{display:flex;justify-content:space-around;margin-top:70px;text-align:center;font-size:13px}.sig div{width:180px;border-top:1px solid #111;padding-top:6px}</style></head><body>
-  <h1>SURAT PERINTAH KERJA</h1><div style="color:#555">PT. Dokar Putra Mandiri</div>
-  <table>${r('No. SPK',a.no)}${r('Tanggal',spkFmtDate(a.date))}${r('Nopol',a.nopol)}${r('PT',a.pt)}${r('Jenis Pekerjaan',a.job)}${r('Bengkel',a.bengkel)}${r('Estimasi Biaya',spkRp(a.cost))}${r('Status',SPK_LBL[a.status])}${r('Catatan',a.note)}</table>
+  <h1>SPKLK &amp; DELIVERY FORM</h1><div style="color:#555">PT. Dokar Putra Mandiri</div>
+  <table>${r('SPKLK No.',a.no)}${r('Jenis',SPK_TYPE[a.type])}${r('Workshop',a.bengkel)}${r('Registration No.',a.nopol)}${r('Model / Brand / Type',[a.model,a.brand,a.vtype].filter(Boolean).join(' / '))}${r('Customer',a.pt)}${r('PIC / Handphone',[a.pic,a.phone].filter(Boolean).join(' / '))}${r('Km',a.km)}${r('Date In',String(a.din).replace('T',' '))}${r('Date Out',String(a.dout).replace('T',' '))}${r('Permintaan',a.job)}${r('Pengerjaan',a.work)}${r('Notes / Catatan',a.note)}${r('Alasan',a.alasan)}${r('Status',SPK_LBL[a.status])}</table>
   <div class="sig"><div>Dibuat oleh<br>${spkEsc(a.by||'')}</div><div>Disetujui</div><div>Bengkel</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
   w.document.close();
 }
