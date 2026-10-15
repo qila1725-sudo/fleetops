@@ -347,6 +347,7 @@
   .sp-foot select{padding:5px 8px;border:1px solid #b8c4d6;border-radius:4px;}
   .sp-tabs{display:flex;gap:2px;margin-top:12px;border-bottom:1px solid #b8c4d6;} .sp-tabs button{border:1px solid #b8c4d6;border-bottom:0;background:#e4eaf4;padding:6px 14px;font-size:12.5px;border-radius:4px 4px 0 0;cursor:pointer;} .sp-tabs button.on{background:#fff;font-weight:700;}
   .sp-pane{display:none;border:1px solid #b8c4d6;border-top:0;padding:14px;background:#fff;} .sp-pane.on{display:grid;}
+  .sp-g input[type=checkbox]{width:auto;flex:none;} .sp-g input.req{background:#fcc8d0;} .sp-g .ck{display:flex;gap:4px;align-items:center;font-weight:500;white-space:nowrap;}
   .sp-dt b{font-weight:400;align-self:center;} .sp-g .sp-all.h{border-bottom:1px solid #d5dbe6;padding-top:6px;font-weight:700;}
   @media(max-width:700px){.sp-g{grid-template-columns:100px minmax(0,1fr);} .sp-g [style*="grid-column"]{grid-column:1 / -1 !important;} .sp-g .sp-f{grid-column:2 / -1;}}
   .modal{background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:88vh;overflow:auto;padding:26px 28px;}
@@ -537,6 +538,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="acts">
       <button class="btn-outline" onclick="backToSpkChoice()">← Pilihan</button>
       <button class="btn-outline" onclick="openReminderFromSpk()">🚗 Data Reminder</button>
+      <button class="btn-outline" onclick="spkChoose('Parameter',[['🏭 Workshop Parameter','openWsList()'],['👤 Customer Parameter','openCustList()']])">⚙ Parameter</button>
       <button class="btn-outline green" onclick="spkChoose('Export Excel',[['📄 Export SPK','exportSpk()'],['🚗 Export Accident','exportAcc()']])">⬇ Export Excel</button>
       <button class="btn btn-primary small" onclick="spkChoose('Buat Baru',[['📄 Buat SPK','openSpkForm()'],['🚗 Klaim Accident','openAccForm()']])">＋ Buat Baru</button>
     </div>
@@ -557,6 +559,16 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="spk-card"><table class="spk-tbl"><thead><tr><th>NO. SPK</th><th>TANGGAL</th><th>NOPOL</th><th>PT</th><th>PERMINTAAN</th><th>WORKSHOP</th><th>JENIS</th><th>STATUS</th><th>AKSI</th></tr></thead><tbody id="spkBody"></tbody></table><div class="spk-empty" id="spkEmpty" style="display:none;">Belum ada SPK. Klik <b>Buat SPK Baru</b> untuk memulai.</div></div>
     <p class="small-note" style="margin-top:10px;">Data SPK tersimpan di database dan bisa dibuka dari perangkat mana pun.</p>
     </div>
+    <div id="wsPane" style="display:none">
+      <div class="spk-tools"><input id="wsSearch" placeholder="Cari kode, nama, kota..." oninput="renderWs()"><button class="btn btn-primary small" onclick="openWsForm()">＋ Tambah Workshop</button></div>
+      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CODE</th><th>WORKSHOP NAME</th><th>PKS</th><th>CITY</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="wsBody"></tbody></table>
+      <div id="wsEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada Workshop Parameter. Klik <b>Tambah Workshop</b>.</div></div>
+    </div>
+    <div id="custPane" style="display:none">
+      <div class="spk-tools"><input id="custSearch" placeholder="Cari kode atau nama customer..." oninput="renderCust()"><button class="btn btn-primary small" onclick="openCustForm()">＋ Tambah Customer</button></div>
+      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CUSTOMER CODE</th><th>CUSTOMER NAME</th><th>AKSI</th></tr></thead><tbody id="custBody"></tbody></table>
+      <div id="custEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada Customer Parameter. Klik <b>Tambah Customer</b>.</div></div>
+    </div>
     <div id="accPane" style="display:none">
       <div class="spk-tools"><input id="accSearch" placeholder="Cari no. kejadian, pengemudi, nopol, tempat..." oninput="renderAcc()"></div>
       <div class="spk-card"><table class="spk-tbl"><thead><tr><th>NO. KEJADIAN</th><th>TGL LAPOR</th><th>PENGEMUDI</th><th>NO. POLISI</th><th>TEMPAT KEJADIAN</th><th>KERUSAKAN</th><th>AKSI</th></tr></thead><tbody id="accBody"></tbody></table>
@@ -566,6 +578,26 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 </div>
 
 <div class="modal-bg" id="chooseBg" onclick="if(event.target===this)this.classList.remove('show')"><div class="modal" style="max-width:340px;"><h3 id="chTitle" style="margin:0 0 4px"></h3><div id="chBtns"></div><button class="btn-outline" style="width:100%;margin-top:10px" onclick="$id('chooseBg').classList.remove('show')">Batal</button></div></div>
+<div class="modal-bg" id="wsFormBg"><div class="modal sp-win" style="max-width:720px;">
+  <div class="sp-title">Workshop Parameter</div>
+  <div class="sp-body"><div class="sp-g">
+    <label>Workshop Code</label><div class="sp-f sp-dt"><input id="ws_code" class="req" style="flex:0 0 150px"><label class="ck"><input type="checkbox" id="ws_pks" onchange="wsPks()"> PKS</label><input type="date" id="ws_from" disabled oninput="wsDays()"><b>s/d</b><input type="date" id="ws_to" disabled oninput="wsDays()"><b>#</b><input id="ws_days" readonly value="0" style="flex:0 0 46px;text-align:center"></div>
+    <label>Workshop Name</label><input id="ws_name" class="sp-f req">
+    <label>Address</label><input id="ws_a1" class="sp-f">
+    <span></span><input id="ws_a2" class="sp-f">
+    <label>City</label><div class="sp-f sp-dt"><input id="ws_cc" style="flex:0 0 90px"><b>City Name</b><input id="ws_cn"></div>
+    <label>Phone No.</label><input id="ws_ph"><label>Fax No.</label><input id="ws_fx">
+  </div></div>
+  <div class="sp-foot"><div></div><div><button class="btn-outline" onclick="$id('wsFormBg').classList.remove('show')">Batal</button> <button class="btn btn-primary" onclick="saveWs()">Simpan</button></div></div>
+</div></div>
+<div class="modal-bg" id="custFormBg"><div class="modal sp-win" style="max-width:520px;">
+  <div class="sp-title">Customer Parameter</div>
+  <div class="sp-body"><div class="sp-g">
+    <label>Customer Code</label><input id="cu_code" class="sp-f req" style="max-width:160px">
+    <label>Customer Name</label><input id="cu_name" class="sp-f req">
+  </div></div>
+  <div class="sp-foot"><div></div><div><button class="btn-outline" onclick="$id('custFormBg').classList.remove('show')">Batal</button> <button class="btn btn-primary" onclick="saveCust()">Simpan</button></div></div>
+</div></div>
 <div class="modal-bg" id="accFormBg">
   <div class="modal sp-win" style="max-width:760px;">
     <div class="sp-title">Accident</div>
@@ -581,11 +613,11 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="sp-body"><div class="sp-g">
       <label>SPKLK No.</label><input id="spk_no" readonly>
       <div class="sp-rad" style="grid-column:3 / -1;"><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="bengkel" checked>Bengkel</label><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="luar">Kerja Luar</label><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="luarkota">Kerja Luar Kota</label></div>
-      <label>Workshop</label><input id="spk_bengkel" class="sp-f">
+      <label>Workshop</label><input id="spk_bengkel" class="sp-f" list="spkWsList"><datalist id="spkWsList"></datalist>
       <label>Registration No.</label><input id="spk_nopol" list="spkNopolList" oninput="spkFillFromNopol()" placeholder="Pilih / ketik nopol"><datalist id="spkNopolList"></datalist><span></span><span></span>
       <label>Model</label><input id="spk_model" readonly><label>Brand</label><input id="spk_brand" readonly>
       <label>Type</label><input id="spk_vtype" readonly><span></span><span></span>
-      <label>Customer</label><input id="spk_pt" class="sp-f">
+      <label>Customer</label><input id="spk_pt" class="sp-f" list="spkCustList"><datalist id="spkCustList"></datalist>
       <label>PIC</label><input id="spk_pic"><label>Handphone</label><input id="spk_phone">
       <label>Km</label><input id="spk_km" type="number" min="0"><span></span><span></span>
       <label>Date In</label><div class="sp-dt"><input id="spk_din" type="date"><input id="spk_tin" type="time"></div>
@@ -3375,7 +3407,7 @@ const spkToDb = r => ({ spk_no:r.no, spk_date:r.date||null, nopol:r.nopol, pt:r.
   spk_type:r.type, model:r.model, brand:r.brand, veh_type:r.vtype, pic:r.pic, handphone:r.phone, km:r.km===''?null:Number(r.km), date_in:r.din||null, date_out:r.dout||null, pengerjaan:r.work, alasan:r.alasan });
 function spkLoad(){ return SPK_LIST; }
 async function spkReload(){
-  accReload();
+  accReload(); paramReload();
   try{ SPK_LIST = (await sbGet('spk','select=*&order=created_at.desc')).map(spkFromDb); }
   catch(e){ console.error(e); SPK_LIST=[]; showToast('Gagal memuat data SPK dari database. Pastikan tabel "spk" sudah dibuat (lihat SETUP-SPK.sql).', true); }
   renderSpk();
@@ -3424,6 +3456,7 @@ function openSpkForm(id){
   spkEditId = x ? x.id : null;
   $id('spkFormTitle').textContent = 'SPKLK & Delivery Form' + (x ? ' (Ubah)' : '');
   $id('spkNopolList').innerHTML = (DB.vehicles||[]).map(v=>`<option value="${spkEsc(v.nopol)}">${spkEsc(v.pt||'')}</option>`).join('');
+  $id('spkWsList').innerHTML=WS_LIST.map(w=>`<option value="${spkEsc(w.name)}">${spkEsc(w.code)}</option>`).join(''); $id('spkCustList').innerHTML=CUST_LIST.map(c=>`<option value="${spkEsc(c.name)}">${spkEsc(c.code)}</option>`).join('');
   const sp=(t)=>{ const p=String(t||'').split('T'); return [p[0]||'', (p[1]||'').slice(0,5)]; };
   const now=new Date(), hhmm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
   $id('spk_no').value = x? x.no : spkNextNo(list,'bengkel');
@@ -3473,7 +3506,7 @@ function renderSpk(){
 }
 
 function spkChoose(title,opts){ $id('chTitle').textContent=title; $id('chBtns').innerHTML=opts.map(o=>`<button class="btn btn-primary" style="width:100%;margin-top:10px;padding:14px" onclick="$id('chooseBg').classList.remove('show');${o[1]}">${o[0]}</button>`).join(''); $id('chooseBg').classList.add('show'); }
-function spkTab(t){ $id('spkPane').style.display=t==='spk'?'':'none'; $id('accPane').style.display=t==='acc'?'':'none'; $id('tabSpk').classList.toggle('on',t==='spk'); $id('tabAcc').classList.toggle('on',t==='acc'); if(t==='acc') renderAcc(); }
+function spkTab(t){ ['spk','acc','ws','cust'].forEach(k=>$id(k+'Pane').style.display=k===t?'':'none'); $id('tabSpk').classList.toggle('on',t==='spk'); $id('tabAcc').classList.toggle('on',t==='acc'); if(t==='acc') renderAcc(); if(t==='ws') renderWs(); if(t==='cust') renderCust(); }
 const ACC_OPT={YN:['01 - Ya','02 - Tidak'],JENIS:['01 - Kecelakaan lalu lintas','02 - Lainnya'],HARI:['01 - Senin','02 - Selasa','03 - Rabu','04 - Kamis','05 - Jumat','06 - Sabtu','07 - Minggu']};
 const ACC_HEAD=[['No. Kejadian','t','a_no'],['Jenis Kecelakaan','s','a_jenis','JENIS'],['Hari/Tanggal Pelaporan','dt','a_hari','a_tgl','a_jam'],['Pengemudi','t','a_pengemudi'],['No. Polisi','t','a_nopol'],['Golongan / No. SIM','d','a_gol','a_sim']];
 const ACC_TABS={
@@ -3581,6 +3614,55 @@ function printAcc(id){
   w.document.close();
 }
 
+
+let WS_LIST=[], CUST_LIST=[], wsEditId=null, custEditId=null;
+const openWsList=()=>spkTab('ws'), openCustList=()=>spkTab('cust');
+const wsFromDb=r=>({id:String(r.id),code:r.code,name:r.name,pks:!!r.pks,from:r.pks_from||'',to:r.pks_to||'',a1:r.address1||'',a2:r.address2||'',cc:r.city_code||'',cn:r.city_name||'',ph:r.phone||'',fx:r.fax||''});
+const wsCity=n=>{ const w=WS_LIST.find(x=>String(x.name).toLowerCase()===String(n||'').trim().toLowerCase()); return w? w.cn:''; };
+async function paramReload(){
+  try{ WS_LIST=(await sbGet('workshop','select=*&order=code.asc')).map(wsFromDb); CUST_LIST=(await sbGet('customer','select=*&order=code.asc')).map(r=>({id:String(r.id),code:r.code,name:r.name})); }
+  catch(e){ console.error(e); WS_LIST=[]; CUST_LIST=[]; if(!window._parWarn){ window._parWarn=1; showToast('Tabel parameter belum ada. Jalankan 04-parameter.sql di Supabase.', true); } }
+  renderWs(); renderCust();
+}
+function renderWs(){
+  const q=($id('wsSearch').value||'').toLowerCase(), rows=WS_LIST.filter(a=>!q||[a.code,a.name,a.cn,a.cc].join(' ').toLowerCase().includes(q));
+  $id('wsBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td>${a.pks?'Ya ('+spkFmtDate(a.from)+' s/d '+spkFmtDate(a.to)+')':'Tidak'}</td><td>${spkEsc(a.cn||a.cc||'-')}</td><td>${spkEsc(a.ph||'-')}</td>
+    <td><div class="spk-act"><button onclick="openWsForm('${a.id}')">Ubah</button><button class="del" onclick="deleteWs('${a.id}')">Hapus</button></div></td></tr>`).join('');
+  $id('wsEmpty').style.display=rows.length?'none':'block';
+}
+function wsDays(){ const f=$id('ws_from').value, t=$id('ws_to').value; $id('ws_days').value=($id('ws_pks').checked&&f&&t)? Math.max(0,Math.round((new Date(t)-new Date(f))/864e5)):0; }
+function wsPks(){ const on=$id('ws_pks').checked; $id('ws_from').disabled=$id('ws_to').disabled=!on; wsDays(); }
+function openWsForm(id){
+  const x=id? WS_LIST.find(a=>a.id===id):null; wsEditId=x? x.id:null;
+  $id('ws_code').value=x?x.code:''; $id('ws_pks').checked=!!(x&&x.pks); $id('ws_from').value=x&&x.from?x.from:spkToday(); $id('ws_to').value=x&&x.to?x.to:spkToday();
+  $id('ws_name').value=x?x.name:''; $id('ws_a1').value=x?x.a1:''; $id('ws_a2').value=x?x.a2:''; $id('ws_cc').value=x?x.cc:''; $id('ws_cn').value=x?x.cn:''; $id('ws_ph').value=x?x.ph:''; $id('ws_fx').value=x?x.fx:'';
+  wsPks(); $id('wsFormBg').classList.add('show');
+}
+async function saveWs(){
+  const code=$id('ws_code').value.trim(), name=$id('ws_name').value.trim(), pks=$id('ws_pks').checked;
+  if(!code||!name){ showToast('Workshop Code dan Workshop Name wajib diisi.', true); return; }
+  if(WS_LIST.some(a=>a.code.toLowerCase()===code.toLowerCase() && a.id!==wsEditId)){ showToast('Workshop Code sudah dipakai.', true); return; }
+  if(pks && $id('ws_to').value<$id('ws_from').value){ showToast('Tanggal PKS akhir tidak boleh sebelum tanggal awal.', true); return; }
+  const row={code,name,pks,pks_from:pks?$id('ws_from').value:null,pks_to:pks?$id('ws_to').value:null,address1:$id('ws_a1').value.trim(),address2:$id('ws_a2').value.trim(),city_code:$id('ws_cc').value.trim(),city_name:$id('ws_cn').value.trim(),phone:$id('ws_ph').value.trim(),fax:$id('ws_fx').value.trim()};
+  try{ if(wsEditId) await sbUpdate('workshop',wsEditId,row); else await sbInsert('workshop',row); $id('wsFormBg').classList.remove('show'); await paramReload(); showToast('Workshop disimpan.'); }
+  catch(e){ showToast('Gagal menyimpan: '+e.message, true); }
+}
+async function deleteWs(id){ if(!confirm('Hapus workshop ini?')) return; try{ await sbDeleteIds('workshop',[id]); await paramReload(); showToast('Workshop dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
+function renderCust(){
+  const q=($id('custSearch').value||'').toLowerCase(), rows=CUST_LIST.filter(a=>!q||[a.code,a.name].join(' ').toLowerCase().includes(q));
+  $id('custBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td><div class="spk-act"><button onclick="openCustForm('${a.id}')">Ubah</button><button class="del" onclick="deleteCust('${a.id}')">Hapus</button></div></td></tr>`).join('');
+  $id('custEmpty').style.display=rows.length?'none':'block';
+}
+function openCustForm(id){ const x=id? CUST_LIST.find(a=>a.id===id):null; custEditId=x? x.id:null; $id('cu_code').value=x?x.code:''; $id('cu_name').value=x?x.name:''; $id('custFormBg').classList.add('show'); }
+async function saveCust(){
+  const code=$id('cu_code').value.trim(), name=$id('cu_name').value.trim();
+  if(!code||!name){ showToast('Customer Code dan Customer Name wajib diisi.', true); return; }
+  if(CUST_LIST.some(a=>a.code.toLowerCase()===code.toLowerCase() && a.id!==custEditId)){ showToast('Customer Code sudah dipakai.', true); return; }
+  try{ if(custEditId) await sbUpdate('customer',custEditId,{code,name}); else await sbInsert('customer',{code,name}); $id('custFormBg').classList.remove('show'); await paramReload(); showToast('Customer disimpan.'); }
+  catch(e){ showToast('Gagal menyimpan: '+e.message, true); }
+}
+async function deleteCust(id){ if(!confirm('Hapus customer ini?')) return; try{ await sbDeleteIds('customer',[id]); await paramReload(); showToast('Customer dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
+
 const xlVeh=n=>(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===String(n||'').toUpperCase())||{};
 const xlD=t=>{ const p=String(t||'').split('T'); return (p[0]?spkFmtDate(p[0]):'')+(p[1]?' '+p[1].slice(0,5):''); };
 function xlSave(rows,merges,widths,name){
@@ -3600,7 +3682,7 @@ function exportSpk(){
   const l=spkLoad(); if(!l.length){ showToast('Belum ada data SPK.', true); return; }
   if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
   const rows=[[],['No.','No. SPK','Date','Nopol','Type','User','','Bengkel','City','Km.','Permintaan','Pengerjaan','Note'],['','','','','','Compeny','Pesonal','','','','','','']];
-  [...l].sort((a,b)=>String(a.no).localeCompare(String(b.no))).forEach((a,i)=>rows.push([i+1,a.no,spkFmtDate(a.date),a.nopol,a.vtype||[a.brand,a.model].filter(Boolean).join(' '),a.pt,a.pic,a.bengkel,xlVeh(a.nopol).area||'',a.km===''?'':Number(a.km),a.job,a.work,a.note]));
+  [...l].sort((a,b)=>String(a.no).localeCompare(String(b.no))).forEach((a,i)=>rows.push([i+1,a.no,spkFmtDate(a.date),a.nopol,a.vtype||[a.brand,a.model].filter(Boolean).join(' '),a.pt,a.pic,a.bengkel,wsCity(a.bengkel)||xlVeh(a.nopol).area||'',a.km===''?'':Number(a.km),a.job,a.work,a.note]));
   const mg=[...Array(13).keys()].filter(c=>c!==5&&c!==6).map(c=>({s:{r:1,c},e:{r:2,c}})).concat([{s:{r:1,c:5},e:{r:1,c:6}}]);
   xlSave(rows,mg,[5,14,11,11,16,18,16,18,14,9,34,34,24],'Master_Record_service.xlsx');
 }
