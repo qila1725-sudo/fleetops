@@ -566,7 +566,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <div id="custPane" style="display:none">
       <div class="spk-tools"><input id="custSearch" placeholder="Cari kode atau nama customer..." oninput="renderCust()"><button class="btn btn-primary small" onclick="openCustForm()">＋ Tambah Customer</button></div>
-      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CUSTOMER CODE</th><th>CUSTOMER NAME</th><th>AKSI</th></tr></thead><tbody id="custBody"></tbody></table>
+      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CUSTOMER CODE</th><th>CUSTOMER NAME</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="custBody"></tbody></table>
       <div id="custEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada Customer Parameter. Klik <b>Tambah Customer</b>.</div></div>
     </div>
     <div id="accPane" style="display:none">
@@ -590,11 +590,14 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   </div></div>
   <div class="sp-foot"><div></div><div><button class="btn-outline" onclick="$id('wsFormBg').classList.remove('show')">Batal</button> <button class="btn btn-primary" onclick="saveWs()">Simpan</button></div></div>
 </div></div>
-<div class="modal-bg" id="custFormBg"><div class="modal sp-win" style="max-width:520px;">
+<div class="modal-bg" id="custFormBg"><div class="modal sp-win" style="max-width:660px;">
   <div class="sp-title">Customer Parameter</div>
   <div class="sp-body"><div class="sp-g">
     <label>Customer Code</label><input id="cu_code" class="sp-f req" style="max-width:160px">
     <label>Customer Name</label><input id="cu_name" class="sp-f req">
+    <label>Address</label><input id="cu_a1" class="sp-f">
+    <span></span><input id="cu_a2" class="sp-f">
+    <label>Phone No.</label><input id="cu_ph"><label>Fax No.</label><input id="cu_fx">
   </div></div>
   <div class="sp-foot"><div></div><div><button class="btn-outline" onclick="$id('custFormBg').classList.remove('show')">Batal</button> <button class="btn btn-primary" onclick="saveCust()">Simpan</button></div></div>
 </div></div>
@@ -864,6 +867,12 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 
         <div class="page" id="page-akun">
           <div class="settings-grid">
+            <div class="panel" id="bkPanel">
+              <h3>💾 Backup Data</h3>
+              <p class="small-note">Unduh salinan seluruh data (kendaraan, histori, bengkel, SPK, accident, parameter). Simpan file di Google Drive atau flashdisk. Foto tidak ikut, hanya tautannya.</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button class="btn btn-primary" onclick="backupJson()">⬇ Backup Lengkap (JSON)</button><button class="btn-outline" onclick="backupExcel()">⬇ Versi Excel</button></div>
+              <div class="small-note" id="bkStatus" style="margin-top:8px;"></div>
+            </div>
             <div class="panel">
               <h3>Profil Admin</h3>
               <div class="form-grid">
@@ -3620,7 +3629,7 @@ const openWsList=()=>spkTab('ws'), openCustList=()=>spkTab('cust');
 const wsFromDb=r=>({id:String(r.id),code:r.code,name:r.name,pks:!!r.pks,from:r.pks_from||'',to:r.pks_to||'',a1:r.address1||'',a2:r.address2||'',cc:r.city_code||'',cn:r.city_name||'',ph:r.phone||'',fx:r.fax||''});
 const wsCity=n=>{ const w=WS_LIST.find(x=>String(x.name).toLowerCase()===String(n||'').trim().toLowerCase()); return w? w.cn:''; };
 async function paramReload(){
-  try{ WS_LIST=(await sbGet('workshop','select=*&order=code.asc')).map(wsFromDb); CUST_LIST=(await sbGet('customer','select=*&order=code.asc')).map(r=>({id:String(r.id),code:r.code,name:r.name})); }
+  try{ WS_LIST=(await sbGet('workshop','select=*&order=code.asc')).map(wsFromDb); CUST_LIST=(await sbGet('customer','select=*&order=code.asc')).map(r=>({id:String(r.id),code:r.code,name:r.name,a1:r.address1||'',a2:r.address2||'',ph:r.phone||'',fx:r.fax||''})); }
   catch(e){ console.error(e); WS_LIST=[]; CUST_LIST=[]; if(!window._parWarn){ window._parWarn=1; showToast('Tabel parameter belum ada. Jalankan 04-parameter.sql di Supabase.', true); } }
   renderWs(); renderCust();
 }
@@ -3650,18 +3659,47 @@ async function saveWs(){
 async function deleteWs(id){ if(!confirm('Hapus workshop ini?')) return; try{ await sbDeleteIds('workshop',[id]); await paramReload(); showToast('Workshop dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
 function renderCust(){
   const q=($id('custSearch').value||'').toLowerCase(), rows=CUST_LIST.filter(a=>!q||[a.code,a.name].join(' ').toLowerCase().includes(q));
-  $id('custBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td><div class="spk-act"><button onclick="openCustForm('${a.id}')">Ubah</button><button class="del" onclick="deleteCust('${a.id}')">Hapus</button></div></td></tr>`).join('');
+  $id('custBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td>${spkEsc(a.ph||'-')}</td><td><div class="spk-act"><button onclick="openCustForm('${a.id}')">Ubah</button><button class="del" onclick="deleteCust('${a.id}')">Hapus</button></div></td></tr>`).join('');
   $id('custEmpty').style.display=rows.length?'none':'block';
 }
-function openCustForm(id){ const x=id? CUST_LIST.find(a=>a.id===id):null; custEditId=x? x.id:null; $id('cu_code').value=x?x.code:''; $id('cu_name').value=x?x.name:''; $id('custFormBg').classList.add('show'); }
+function openCustForm(id){
+  const x=id? CUST_LIST.find(a=>a.id===id):null; custEditId=x? x.id:null;
+  $id('cu_code').value=x?x.code:''; $id('cu_name').value=x?x.name:''; $id('cu_a1').value=x?x.a1:''; $id('cu_a2').value=x?x.a2:''; $id('cu_ph').value=x?x.ph:''; $id('cu_fx').value=x?x.fx:'';
+  $id('custFormBg').classList.add('show');
+}
 async function saveCust(){
   const code=$id('cu_code').value.trim(), name=$id('cu_name').value.trim();
   if(!code||!name){ showToast('Customer Code dan Customer Name wajib diisi.', true); return; }
   if(CUST_LIST.some(a=>a.code.toLowerCase()===code.toLowerCase() && a.id!==custEditId)){ showToast('Customer Code sudah dipakai.', true); return; }
-  try{ if(custEditId) await sbUpdate('customer',custEditId,{code,name}); else await sbInsert('customer',{code,name}); $id('custFormBg').classList.remove('show'); await paramReload(); showToast('Customer disimpan.'); }
-  catch(e){ showToast('Gagal menyimpan: '+e.message, true); }
+  const row={code,name,address1:$id('cu_a1').value.trim(),address2:$id('cu_a2').value.trim(),phone:$id('cu_ph').value.trim(),fax:$id('cu_fx').value.trim()};
+  try{ if(custEditId) await sbUpdate('customer',custEditId,row); else await sbInsert('customer',row); $id('custFormBg').classList.remove('show'); await paramReload(); showToast('Customer disimpan.'); }
+  catch(e){ showToast('Gagal menyimpan (sudah menjalankan 06-customer-kolom.sql?): '+e.message, true); }
 }
 async function deleteCust(id){ if(!confirm('Hapus customer ini?')) return; try{ await sbDeleteIds('customer',[id]); await paramReload(); showToast('Customer dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
+
+
+const BK_TABLES=['vehicles','service_history','bengkel_log','kwitansi_pengajuan','sparepart_pending','settings','spk','accident','workshop','customer','profiles'];
+const bkStamp=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const bkAllowed=()=>{ if(String(currentUser&&currentUser.role).toLowerCase()!=='maintenance'){ showToast('Backup hanya untuk akun Maintenance.', true); return false; } return true; };
+async function bkFetchAll(t){ const all=[]; for(let off=0;;off+=1000){ const r=await sbGet(t,`select=*&order=id.asc&limit=1000&offset=${off}`); all.push(...r); if(r.length<1000) break; } return all; }
+async function bkCollect(){
+  const out={_meta:{app:'FleetOps',dibuat:new Date().toISOString(),oleh:currentUser?currentUser.username:''},tables:{}}, st=$id('bkStatus');
+  for(const t of BK_TABLES){ st.textContent='Mengambil data: '+t+' ...'; try{ out.tables[t]=await bkFetchAll(t); }catch(e){ out.tables[t]=null; (out._gagal=out._gagal||[]).push(t); } }
+  st.textContent=''; return out;
+}
+const bkSummary=o=>{ const ok=Object.values(o.tables).filter(Boolean); return `${ok.reduce((s,r)=>s+r.length,0)} baris dari ${ok.length} tabel`+(o._gagal?` | Gagal: ${o._gagal.join(', ')}`:''); };
+async function backupJson(){
+  if(!bkAllowed()) return;
+  try{ const o=await bkCollect(), a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,1)],{type:'application/json'})); a.download=`fleetops-backup-${bkStamp()}.json`; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),5000); showToast('Backup selesai: '+bkSummary(o), !!o._gagal); }
+  catch(e){ showToast('Backup gagal: '+e.message, true); }
+}
+async function backupExcel(){
+  if(!bkAllowed()) return; if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
+  try{ const o=await bkCollect(), wb=XLSX.utils.book_new(), cell=v=>v===null||v===undefined?'':(typeof v==='object'?JSON.stringify(v):v), cut=v=>typeof v==='string'&&v.length>32000?v.slice(0,32000):v;
+    for(const [t,r] of Object.entries(o.tables)){ if(!r||!r.length) continue; XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(r.map(x=>{ const y={}; for(const k in x) y[k]=cut(cell(x[k])); return y; })),t.slice(0,31)); }
+    XLSX.writeFile(wb,`fleetops-backup-${bkStamp()}.xlsx`); showToast('Backup Excel selesai: '+bkSummary(o), !!o._gagal); }
+  catch(e){ showToast('Backup gagal: '+e.message, true); }
+}
 
 const xlVeh=n=>(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===String(n||'').toUpperCase())||{};
 const xlD=t=>{ const p=String(t||'').split('T'); return (p[0]?spkFmtDate(p[0]):'')+(p[1]?' '+p[1].slice(0,5):''); };
@@ -3686,14 +3724,39 @@ function exportSpk(){
   const mg=[...Array(13).keys()].filter(c=>c!==5&&c!==6).map(c=>({s:{r:1,c},e:{r:2,c}})).concat([{s:{r:1,c:5},e:{r:1,c:6}}]);
   xlSave(rows,mg,[5,14,11,11,16,18,16,18,14,9,34,34,24],'Master_Record_service.xlsx');
 }
+const SPK_LOGO='data:image/jpeg;base64,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';
 function printSpk(id){
   const a=spkLoad().find(x=>x.id===id); if(!a) return;
   const w=window.open('','_blank'); if(!w){ showToast('Pop-up diblokir browser.', true); return; }
-  const r=(l,v)=>`<tr><td style="width:170px;color:#555">${l}</td><td><b>${spkEsc(v||'-')}</b></td></tr>`;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${spkEsc(a.no)}</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#111}h1{margin:0 0 4px;font-size:22px}table{width:100%;border-collapse:collapse;margin-top:18px}td{padding:9px 6px;border-bottom:1px solid #ddd;vertical-align:top;font-size:14px}.sig{display:flex;justify-content:space-around;margin-top:70px;text-align:center;font-size:13px}.sig div{width:180px;border-top:1px solid #111;padding-top:6px}</style></head><body>
-  <h1>SPKLK &amp; DELIVERY FORM</h1><div style="color:#555">PT. Dokar Putra Mandiri</div>
-  <table>${r('SPKLK No.',a.no)}${r('Jenis',SPK_TYPE[a.type])}${r('Workshop',a.bengkel)}${r('Registration No.',a.nopol)}${r('Model / Brand / Type',[a.model,a.brand,a.vtype].filter(Boolean).join(' / '))}${r('Customer',a.pt)}${r('PIC / Handphone',[a.pic,a.phone].filter(Boolean).join(' / '))}${r('Km',a.km)}${r('Date In',String(a.din).replace('T',' '))}${r('Date Out',String(a.dout).replace('T',' '))}${r('Permintaan',a.job)}${r('Pengerjaan',a.work)}${r('Notes / Catatan',a.note)}${r('Alasan',a.alasan)}${r('Status',SPK_LBL[a.status])}</table>
-  <div class="sig"><div>Dibuat oleh<br>${spkEsc(a.by||'')}</div><div>Disetujui</div><div>Bengkel</div></div><script>window.onload=()=>window.print()<\/script></body></html>`);
+  const E=spkEsc, nm=t=>String(t||'').trim().toLowerCase();
+  const ws=WS_LIST.find(x=>nm(x.name)===nm(a.bengkel))||{}, cu=CUST_LIST.find(x=>nm(x.name)===nm(a.pt))||{};
+  const dt=t=>{ const p=String(t||'').split('T'); return p[0]? spkFmtDate(p[0])+(p[1]&&p[1].slice(0,5)!=='00:00'?' '+p[1].slice(0,5):''):''; };
+  const adr=(...l)=>l.filter(Boolean).map(E).join('<br>');
+  const tipe=[a.brand,a.model,a.vtype].filter(Boolean).join(' ');
+  const kv=(k,v)=>`<div class="ln"><span>${k}</span><span>: ${E(v||'')}</span></div>`;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>SPK ${E(a.no)}</title><style>
+  @page{size:A4;margin:10mm}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11.5px;color:#000}
+  .f{border:1.3px solid #000}.hd{display:grid;grid-template-columns:1.05fr 1.55fr 1.1fr;align-items:start;padding:8px 10px;min-height:94px}
+  .lg img{height:56px;display:block;margin-left:20px}.lg b{display:block;font-size:12px;margin-top:3px}
+  .tt{text-align:center;padding-top:6px}.tt h1{font-size:15px;margin:0 0 6px;line-height:1.3}.ad{line-height:1.3;padding-top:2px}
+  .rw{display:flex;gap:6px;padding:8px 10px;border-top:1.3px solid #000}.bx{flex:1;border:1.3px solid #000;padding:6px 9px;display:flex;flex-direction:column;line-height:1.35}
+  .bx u{font-size:12.5px;margin-bottom:2px}.ln{display:flex}.ln span:first-child{width:118px}.bt{margin-top:auto}
+  .h1{height:112px}.h2{height:90px}.h3{height:236px}.h3 .tx{white-space:pre-wrap;word-break:break-word;margin-top:6px}
+  .nt{border-top:1.3px solid #000;padding:8px 10px;height:176px;line-height:1.4}.nt .s{font-size:10.5px;margin-top:4px}
+  .sg{border-top:1.3px solid #000;padding:9px 10px;display:flex;justify-content:space-between}.sb{width:23%;border:1.3px solid #000}
+  .sb div:first-child{height:138px}.sb div:last-child{border-top:1.3px solid #000;text-align:center;padding:2px 0}
+  </style></head><body><div class="f">
+  <div class="hd"><div class="lg"><img src="${SPK_LOGO}"><b>PT. Dokar Putra Mandiri</b></div>
+   <div class="tt"><h1>SURAT PERINTAH KERJA<br>PERAWATAN&amp; PERBAIKAN KENDARAAN</h1>No. urut : ${E(a.no)}</div>
+   <div class="ad">Jl. Kelapa Dua Raya No. 28<br>Jakarta Barat 11550<br>Tel. 021-549 2988, 549 2932<br>Fax. 021-549 3092</div></div>
+  <div class="rw"><div class="bx h1"><u>Bengkel</u><div><b>${E(a.bengkel)}</b><br>${adr(ws.a1,ws.a2,ws.cn)}</div><div class="bt">Tel. ${E(ws.ph||'')} , Fax. ${E(ws.fx||'')}</div></div>
+   <div class="bx h1"><u>User</u><div><b>${E(a.pt)}</b><br>${adr(cu.a1,cu.a2)}</div><div class="bt">Telp. / Fax : ${E(cu.ph||'')} / ${E(cu.fx||'')}<br>PIC / HP : ${E(a.pic||'')} / ${E(a.phone||'')}</div></div></div>
+  <div class="rw"><div class="bx h2"><u>Kendaraan</u>${kv('Tipe Kendaraan',tipe)}${kv('No. Polisi',a.nopol)}${kv('KM',a.km)}</div>
+   <div class="bx h2"><u>Pengerjaan</u>${kv('Tgl. Masuk',dt(a.din))}${kv('Tgl Keluar',dt(a.dout))}</div></div>
+  <div class="rw"><div class="bx h3"><u>Permintaan</u><div class="tx">${E(a.job)}</div></div><div class="bx h3"><u>Pengerjaan</u><div class="tx">${E(a.work)}</div></div></div>
+  <div class="nt"><u>Note / Catatan</u><div class="s">&gt; Tagihan ke PT Dokar Putra Mandiri<br>&gt; Tidak tambal ban dan tidak tambah angin nitrogen(kecuali free)<br>&gt; Semua pengerjaaan dan penggantian part harus sesuai dengan SPK, jika ada perbedaan harus konfirmasi ke Dokar. perbedaan selisih harga diluar tanggung jawab kami.${a.note?'<br><br>'+E(a.note):''}</div></div>
+  <div class="sg"><div class="sb"><div></div><div>Pengguna</div></div><div class="sb"><div></div><div>Bengkel</div></div><div class="sb"><div></div><div>Diketahui</div></div></div>
+  </div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
   w.document.close();
 }
 document.addEventListener('keydown', e=>{ if(e.key==='Enter' && $id('spkGateBg').classList.contains('show')) submitSpkGate(); if(e.key==='Escape'){ closeSpkGate(); closeSpkForm(); } });
