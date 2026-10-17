@@ -3554,8 +3554,10 @@ function accFillVeh(){
   set('a_pengemudi',v.user); set('p1_nopol',v.nopol); set('p1_jenis',v.type); set('p1_merk',v.brand); set('p1_tahun',v.year);
 }
 function accNextNo(){
-  const pre='LK'+String(new Date().getFullYear()).slice(2)+'-', n=ACC_LIST.filter(x=>String(x.no).startsWith(pre)).map(x=>parseInt(String(x.no).slice(pre.length))||0);
-  return pre+String((n.length?Math.max(...n):0)+1).padStart(4,'0');
+  // Format: ACC-YYYY/MM-NNNNNN  (nomor urut berjalan per tahun, bulan mengikuti tanggal hari ini)
+  const d=new Date(), yr=String(d.getFullYear()), mm=String(d.getMonth()+1).padStart(2,'0'), pre='ACC-'+yr+'/';
+  const n=ACC_LIST.map(x=>String(x.no||'')).filter(v=>v.startsWith(pre)).map(v=>parseInt(v.split('-').pop())||0);
+  return pre+mm+'-'+String((n.length?Math.max(...n):0)+1).padStart(6,'0');
 }
 function openAccForm(id){
   accBuild(); const x=id? ACC_LIST.find(a=>a.id===id):null; accEditId=x? x.id:null;
