@@ -780,7 +780,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="spacer"></div>
             <button class="btn-outline" id="spExportBtn" onclick="exportSparepart()">⭳ Export Excel</button>
           </div>
-          <div class="small-note" id="spGudangHint" style="display:none;margin:0 0 10px;">Centang sparepart yang sudah <b>ready</b> di gudang. Data pending hanya bisa ditambah oleh admin maintenance.</div>
+          <div class="small-note" id="spGudangHint" style="display:none;margin:0 0 10px;">Centang sparepart yang sudah <b>ready</b> di gudang. Gudang juga bisa menambah data pending; edit &amp; hapus hanya oleh admin maintenance.</div>
           <div class="filter-row">
             <div class="search-box">🔍 <input id="sp_search" oninput="debSparepart()" placeholder="Cari nopol, PT, mekanik, atau sparepart..."></div>
           </div>
@@ -911,7 +911,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <div class="form-grid">
                 <div><label>Username Baru</label><input id="new_acc_user" type="text"></div>
                 <div><label>Password</label><input id="new_acc_pass" type="text"></div>
-                <div><label>Role</label><select id="new_acc_role"><option value="Maintenance">Maintenance (akses semua menu)</option><option value="Staff">Staff (hanya Keluar Masuk Bengkel)</option><option value="Gudang">Gudang (hanya ceklis Pending Sparepart)</option></select></div>
+                <div><label>Role</label><select id="new_acc_role"><option value="Maintenance">Maintenance (akses semua menu)</option><option value="Staff">Staff (hanya Keluar Masuk Bengkel)</option><option value="Gudang">Gudang (hanya Pending Sparepart: ceklis &amp; tambah)</option></select></div>
               </div>
               <div class="modal-actions" style="justify-content:flex-start;margin-top:14px;"><button class="btn-outline" onclick="addAccount()">+ Tambah Akun</button></div>
               <div class="hr"></div>
@@ -1694,7 +1694,7 @@ const titles = {
   akun:['Pengaturan Akun','Profil, akses pengguna, dan notifikasi reminder']
 };
 /* ================= HAK AKSES (Maintenance / Staff / Gudang) ================= */
-// Maintenance = semua menu. Staff/Viewer = hanya Keluar Masuk Bengkel. Gudang = hanya Pending Sparepart (ceklis ready).
+// Maintenance = semua menu. Staff/Viewer = hanya Keluar Masuk Bengkel. Gudang = hanya Pending Sparepart (ceklis ready + tambah data).
 // Akun bawaan DPM2026 selalu Maintenance supaya tidak bisa terkunci.
 const ROLE_PAGES = { staff:['bengkel'], gudang:['sparepart'] };
 function roleKind(a){
@@ -3025,12 +3025,12 @@ function spTimeLabel(iso){
   return d.toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 }
 function renderSparepart(){
-  const all = DB.sparepart, canEdit = isMaintenance();
+  const all = DB.sparepart, canEdit = isMaintenance(), canAdd = isMaintenance() || isGudang();
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
   const pend = all.filter(x=>!x.ready).length;
   set('sp_cnt_all', all.length); set('sp_cnt_pending', pend); set('sp_cnt_ready', all.length-pend); set('navSparepartCount', pend);
   const show = (id,on)=>{ const el=document.getElementById(id); if(el) el.style.display = on ? '' : 'none'; };
-  show('spAddBtn', canEdit); show('spExportBtn', canEdit); show('spGudangHint', !canEdit);
+  show('spAddBtn', canAdd); show('spExportBtn', canEdit); show('spGudangHint', !canEdit);
   const body = document.getElementById('sparepartBody'); if(!body) return;
   const list = filteredSparepart();
   if(!list.length){ body.innerHTML = `<div class="gal-empty" style="grid-column:1/-1;">Belum ada data pending sparepart yang cocok.</div>`; return; }
@@ -3061,7 +3061,7 @@ function renderSparepart(){
         <span class="nopol-badge" style="cursor:default;">${escH(g.nopol)||'-'}</span>
         <span class="sp-pt">${escH(g.pt)||'-'}</span>
         <span class="sp-prog ${allDone?'ok':''}">${done}/${total} ready</span>
-        ${canEdit ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}'})">＋</button>` : ''}
+        ${canAdd ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}'})">＋</button>` : ''}
       </div>${g.meks.size ? `<div class="sp-mek">🔧 Mekanik: ${escH([...g.meks].join(', '))}</div>` : ''}${items}</div>`;
   }).join('');
 }
@@ -3104,8 +3104,9 @@ function spAddItemRow(val, ready){
   wrap.appendChild(row); inp.focus();
 }
 function openSparepartModal(opt){
-  if(!isMaintenance()){ showToast('Hanya admin maintenance yang bisa menambah data pending sparepart.', true); return; }
+  if(!(isMaintenance() || isGudang())){ showToast('Anda tidak punya akses menambah data pending sparepart.', true); return; }
   opt = opt || {};
+  if(opt.editId && !isMaintenance()){ showToast('Hanya admin maintenance yang bisa mengedit data pending sparepart.', true); return; }
   spFillLists();
   const edit = opt.editId ? DB.sparepart.find(x=>x.id===opt.editId) : null;
   document.getElementById('sp_edit_id').value = edit ? edit.id : '';
@@ -3122,8 +3123,9 @@ function openSparepartModal(opt){
 }
 function closeSparepartModal(){ document.getElementById('spModalBg').classList.remove('show'); }
 async function saveSparepart(){
-  if(!isMaintenance()) return;
+  if(!(isMaintenance() || isGudang())) return;
   const id = document.getElementById('sp_edit_id').value;
+  if(id && !isMaintenance()) return; // edit hanya maintenance; gudang hanya boleh menambah
   const nopol = document.getElementById('sp_nopol').value.trim().toUpperCase();
   const pt = document.getElementById('sp_pt').value.trim();
   const mekanik = document.getElementById('sp_mekanik').value.trim();
@@ -3240,7 +3242,7 @@ function renderAccountPage(){
   list.innerHTML = DB.accounts.map((a,i)=>{
     const kind = roleKind(a);
     const locked = String(a.username||'').trim().toUpperCase()==='DPM2026' || (currentUser && a.username===currentUser.username);
-    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':(kind==='gudang'?'Hanya Pending Sparepart (ceklis ready)':'Hanya Keluar Masuk Bengkel')}</div></div>
+    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':(kind==='gudang'?'Hanya Pending Sparepart (ceklis ready &amp; tambah)':'Hanya Keluar Masuk Bengkel')}</div></div>
     <div style="display:flex;align-items:center;gap:8px;">
     <select class="filter-select" style="padding:5px 8px;font-size:11.5px;min-width:0;" ${locked?'disabled title="Akun ini tidak bisa diubah perannya"':''} onchange="changeAccountRole(${i}, this.value)"><option value="Maintenance" ${kind==='maintenance'?'selected':''}>Maintenance</option><option value="Staff" ${kind==='staff'?'selected':''}>Staff</option><option value="Gudang" ${kind==='gudang'?'selected':''}>Gudang</option></select><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
     <button class="edit-icon-btn" style="width:auto;padding:5px 10px;font-size:11px;" onclick="toggleAccount(${i})">${a.active!==false?'Nonaktifkan':'Aktifkan'}</button></div></div>`;
