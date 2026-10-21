@@ -462,6 +462,7 @@
   .spk-pill.proses{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-line);}
   .spk-pill.selesai{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-line);}
   .spk-act{display:flex;gap:6px;flex-wrap:nowrap;}
+  .spk-tbl input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--brand);margin:2px 0 0;}
   .spk-act button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;}
   .spk-act button:hover{border-color:var(--brand);color:var(--brand);}
   .spk-act button.del:hover{border-color:var(--bad);color:var(--bad);}
@@ -560,8 +561,8 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <p class="small-note" style="margin-top:10px;">Data SPK tersimpan di database dan bisa dibuka dari perangkat mana pun.</p>
     </div>
     <div id="wsPane" style="display:none">
-      <div class="spk-tools"><input id="wsSearch" placeholder="Cari kode, nama, kota..." oninput="renderWs()"><button class="btn btn-primary small" onclick="openWsForm()">＋ Tambah Workshop</button></div>
-      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CODE</th><th>WORKSHOP NAME</th><th>CITY</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="wsBody"></tbody></table>
+      <div class="spk-tools"><input id="wsSearch" placeholder="Cari kode, nama, kota..." oninput="renderWs()"><button class="btn-danger" id="wsDelSel" style="display:none" onclick="deleteWsSelected()">🗑 Hapus Terpilih (0)</button><label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" accept=".xlsx,.xls" onchange="importWs(event)"></label><button class="btn btn-primary small" onclick="openWsForm()">＋ Tambah Workshop</button></div>
+      <div class="spk-card"><table class="spk-tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="wsAll" title="Pilih semua" onchange="wsSelAll(this.checked)"></th><th>CODE</th><th>WORKSHOP NAME</th><th>CITY</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="wsBody"></tbody></table>
       <div id="wsEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada Workshop Parameter. Klik <b>Tambah Workshop</b>.</div></div>
     </div>
     <div id="custPane" style="display:none">
@@ -3628,7 +3629,7 @@ function printAcc(id){
 }
 
 
-let WS_LIST=[], CUST_LIST=[], wsEditId=null, custEditId=null;
+let WS_LIST=[], CUST_LIST=[], wsEditId=null, custEditId=null, WS_VIEW=[], WS_SEL=new Set();
 const openWsList=()=>spkTab('ws'), openCustList=()=>spkTab('cust');
 const wsFromDb=r=>({id:String(r.id),code:r.code,name:r.name,pks:!!r.pks,from:r.pks_from||'',to:r.pks_to||'',a1:r.address1||'',a2:r.address2||'',cc:r.city_code||'',cn:r.city_name||'',ph:r.phone||'',fx:r.fax||''});
 const wsCity=n=>{ const w=WS_LIST.find(x=>String(x.name).toLowerCase()===String(n||'').trim().toLowerCase()); return w? w.cn:''; };
@@ -3639,9 +3640,48 @@ async function paramReload(){
 }
 function renderWs(){
   const q=($id('wsSearch').value||'').toLowerCase(), rows=WS_LIST.filter(a=>!q||[a.code,a.name,a.cn,a.cc].join(' ').toLowerCase().includes(q));
-  $id('wsBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td>${spkEsc(a.cn||a.cc||'-')}</td><td>${spkEsc(a.ph||'-')}</td>
+  WS_VIEW=rows.map(a=>a.id); WS_SEL.forEach(i=>{ if(!WS_LIST.some(a=>a.id===i)) WS_SEL.delete(i); });
+  $id('wsBody').innerHTML=rows.map(a=>`<tr><td><input type="checkbox" ${WS_SEL.has(a.id)?'checked':''} onchange="wsToggle('${a.id}',this.checked)"></td><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td>${spkEsc(a.cn||a.cc||'-')}</td><td>${spkEsc(a.ph||'-')}</td>
     <td><div class="spk-act"><button onclick="openWsForm('${a.id}')">Ubah</button><button class="del" onclick="deleteWs('${a.id}')">Hapus</button></div></td></tr>`).join('');
   $id('wsEmpty').style.display=rows.length?'none':'block';
+  wsUpdateBulk();
+}
+function wsUpdateBulk(){
+  const n=WS_SEL.size, b=$id('wsDelSel'), all=$id('wsAll');
+  b.style.display=n?'':'none'; b.textContent='🗑 Hapus Terpilih ('+n+')';
+  const sel=WS_VIEW.filter(i=>WS_SEL.has(i)).length; all.checked=!!WS_VIEW.length&&sel===WS_VIEW.length; all.indeterminate=sel>0&&sel<WS_VIEW.length;
+}
+function wsToggle(id,on){ on?WS_SEL.add(id):WS_SEL.delete(id); wsUpdateBulk(); }
+function wsSelAll(on){ WS_VIEW.forEach(i=>on?WS_SEL.add(i):WS_SEL.delete(i)); renderWs(); }
+async function deleteWsSelected(){
+  const ids=[...WS_SEL]; if(!ids.length) return;
+  if(!confirm('Hapus '+ids.length+' workshop yang dipilih? Tindakan ini tidak bisa dibatalkan.')) return;
+  try{ await sbDeleteIds('workshop',ids); WS_SEL.clear(); await paramReload(); showToast(ids.length+' workshop dihapus.'); }
+  catch(e){ showToast('Gagal menghapus: '+e.message, true); }
+}
+async function importWs(evt){
+  const file=evt.target.files[0]; if(!file) return;
+  try{
+    const wb=XLSX.read(await file.arrayBuffer(),{type:'array'}), sh=wb.Sheets[wb.SheetNames[0]];
+    const aoa=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
+    const norm=v=>String(v).toLowerCase().replace(/[^a-z0-9]/g,'');
+    const pick={code:['kode','code','workshopcode'],name:['vendor','workshopname','nama','name','namaworkshop'],city:['lokasi','city','kota','cityname'],addr:['alamatlengkap','alamat','address','address1'],addr2:['address2','alamat2'],phone:['phone','telepon','telp','notelp'],fax:['fax']};
+    const hi=aoa.findIndex(r=>r.some(c=>pick.code.includes(norm(c)))&&r.some(c=>pick.name.includes(norm(c))));
+    if(hi<0){ showToast('Header tidak ditemukan. Wajib ada kolom Kode dan Vendor (Nama Workshop).', true); return; }
+    const idx={}; Object.keys(pick).forEach(k=>idx[k]=aoa[hi].findIndex(c=>pick[k].includes(norm(c))));
+    const get=(r,k)=>idx[k]>=0?String(r[idx[k]]==null?'':r[idx[k]]).trim():'';
+    const seen=new Set(WS_LIST.map(a=>String(a.code).toLowerCase())), rows=[]; let dup=0;
+    aoa.slice(hi+1).forEach(r=>{
+      const code=get(r,'code'), name=get(r,'name'); if(!code||!name) return;
+      if(seen.has(code.toLowerCase())){ dup++; return; } seen.add(code.toLowerCase());
+      rows.push({code,name,pks:false,pks_from:null,pks_to:null,address1:get(r,'addr'),address2:get(r,'addr2'),city_code:'',city_name:get(r,'city'),phone:get(r,'phone'),fax:get(r,'fax')});
+    });
+    if(!rows.length){ showToast(dup?('Semua '+dup+' kode sudah ada, tidak ada data baru.'):'Tidak ada data workshop di file.', true); return; }
+    if(!confirm('Import '+rows.length+' workshop baru'+(dup?' ('+dup+' kode sudah ada, dilewati)':'')+'?')) return;
+    await sbInsert('workshop',rows); await paramReload();
+    showToast('Import selesai: '+rows.length+' ditambahkan'+(dup?', '+dup+' dilewati (kode sudah ada).':'.'));
+  }catch(e){ showToast('Import gagal: '+e.message, true); }
+  finally{ evt.target.value=''; }
 }
 function wsDays(){ const f=$id('ws_from').value, t=$id('ws_to').value; $id('ws_days').value=($id('ws_pks').checked&&f&&t)? Math.max(0,Math.round((new Date(t)-new Date(f))/864e5)):0; }
 function wsPks(){ const on=$id('ws_pks').checked; $id('ws_from').disabled=$id('ws_to').disabled=!on; wsDays(); }
