@@ -561,7 +561,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <div id="wsPane" style="display:none">
       <div class="spk-tools"><input id="wsSearch" placeholder="Cari kode, nama, kota..." oninput="renderWs()"><button class="btn btn-primary small" onclick="openWsForm()">＋ Tambah Workshop</button></div>
-      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CODE</th><th>WORKSHOP NAME</th><th>PKS</th><th>CITY</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="wsBody"></tbody></table>
+      <div class="spk-card"><table class="spk-tbl"><thead><tr><th>CODE</th><th>WORKSHOP NAME</th><th>CITY</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="wsBody"></tbody></table>
       <div id="wsEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada Workshop Parameter. Klik <b>Tambah Workshop</b>.</div></div>
     </div>
     <div id="custPane" style="display:none">
@@ -3639,7 +3639,7 @@ async function paramReload(){
 }
 function renderWs(){
   const q=($id('wsSearch').value||'').toLowerCase(), rows=WS_LIST.filter(a=>!q||[a.code,a.name,a.cn,a.cc].join(' ').toLowerCase().includes(q));
-  $id('wsBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td>${a.pks?'Ya ('+spkFmtDate(a.from)+' s/d '+spkFmtDate(a.to)+')':'Tidak'}</td><td>${spkEsc(a.cn||a.cc||'-')}</td><td>${spkEsc(a.ph||'-')}</td>
+  $id('wsBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.code)}</b></td><td>${spkEsc(a.name)}</td><td>${spkEsc(a.cn||a.cc||'-')}</td><td>${spkEsc(a.ph||'-')}</td>
     <td><div class="spk-act"><button onclick="openWsForm('${a.id}')">Ubah</button><button class="del" onclick="deleteWs('${a.id}')">Hapus</button></div></td></tr>`).join('');
   $id('wsEmpty').style.display=rows.length?'none':'block';
 }
