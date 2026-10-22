@@ -3700,17 +3700,18 @@ async function importWs(evt){
     const hi=aoa.findIndex(r=>r.some(c=>pick.code.includes(norm(c)))&&r.some(c=>pick.name.includes(norm(c))));
     if(hi<0){ showToast('Header tidak ditemukan. Wajib ada kolom Kode dan Vendor (Nama Workshop).', true); return; }
     const idx={}; Object.keys(pick).forEach(k=>idx[k]=aoa[hi].findIndex(c=>pick[k].includes(norm(c))));
-    const get=(r,k)=>idx[k]>=0?String(r[idx[k]]==null?'':r[idx[k]]).trim():'';
-    const seen=new Set(WS_LIST.map(a=>String(a.code).toLowerCase())), rows=[]; let dup=0;
+    const get=(r,k)=>idx[k]>=0?String(r[idx[k]]==null?'':r[idx[k]]).replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim():'';
+    const seen=new Set(WS_LIST.map(a=>String(a.code).toLowerCase())), rows=[]; let dup=0, noAddr=0;
     aoa.slice(hi+1).forEach(r=>{
-      const code=get(r,'code'), name=get(r,'name'); if(!code||!name) return;
+      const code=get(r,'code'), name=get(r,'name'); if(!code||!name||pick.code.includes(norm(code))) return;
+      if(!get(r,'addr')){ noAddr++; return; }
       if(seen.has(code.toLowerCase())){ dup++; return; } seen.add(code.toLowerCase());
       rows.push({code,name,pks:false,pks_from:null,pks_to:null,address1:get(r,'addr'),address2:get(r,'addr2'),city_code:'',city_name:get(r,'city'),phone:get(r,'phone'),fax:get(r,'fax')});
     });
-    if(!rows.length){ showToast(dup?('Semua '+dup+' kode sudah ada, tidak ada data baru.'):'Tidak ada data workshop di file.', true); return; }
-    if(!confirm('Import '+rows.length+' workshop baru'+(dup?' ('+dup+' kode sudah ada, dilewati)':'')+'?')) return;
+    if(!rows.length){ showToast(dup?('Semua kode yang beralamat sudah ada ('+dup+'), tidak ada data baru.'):(noAddr?('Semua '+noAddr+' baris belum ada alamat, tidak ada yang diimport.'):'Tidak ada data workshop di file.'), true); return; }
+    if(!confirm('Import '+rows.length+' workshop baru?'+(dup?'\n- '+dup+' kode sudah ada, dilewati':'')+(noAddr?'\n- '+noAddr+' baris belum ada alamat, dilewati':''))) return;
     await sbInsert('workshop',rows); await paramReload();
-    showToast('Import selesai: '+rows.length+' ditambahkan'+(dup?', '+dup+' dilewati (kode sudah ada).':'.'));
+    showToast('Import selesai: '+rows.length+' ditambahkan'+(dup?', '+dup+' kode sudah ada':'')+(noAddr?', '+noAddr+' tanpa alamat dilewati':'')+'.');
   }catch(e){ showToast('Import gagal: '+e.message, true); }
   finally{ evt.target.value=''; }
 }
