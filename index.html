@@ -462,6 +462,7 @@
   .spk-pill.proses{background:var(--warn-bg);color:var(--warn);border-color:var(--warn-line);}
   .spk-pill.selesai{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-line);}
   .spk-act{display:flex;gap:6px;flex-wrap:nowrap;}
+  .sp-sel{width:16px;height:16px;flex:0 0 auto;cursor:pointer;accent-color:var(--bad);margin:0;}
   .spk-tbl input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--brand);margin:2px 0 0;}
   .spk-act button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;}
   .spk-act button:hover{border-color:var(--brand);color:var(--brand);}
@@ -778,6 +779,8 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         <div class="page" id="page-sparepart">
           <div class="toolbar">
             <button class="btn btn-primary small" id="spAddBtn" onclick="openSparepartModal()">+ Tambah Pending Sparepart</button>
+            <label id="spSelAllWrap" class="btn-outline" style="display:none;margin:0;cursor:pointer;"><input type="checkbox" id="spSelAll" style="display:inline-block;width:16px;height:16px;accent-color:var(--bad);" onchange="spSelAll(this.checked)"> Pilih semua</label>
+            <button class="btn-danger" id="spDelSel" style="display:none" onclick="deleteSparepartSelected()">🗑 Hapus Terpilih (0)</button>
             <div class="spacer"></div>
             <button class="btn-outline" id="spExportBtn" onclick="exportSparepart()">⭳ Export Excel</button>
           </div>
@@ -3025,6 +3028,7 @@ function spTimeLabel(iso){
   const d = new Date(iso); if(isNaN(d)) return '';
   return d.toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 }
+let SP_SEL = new Set(), SP_VIEW = [];
 function renderSparepart(){
   const all = DB.sparepart, canEdit = isMaintenance(), canAdd = isMaintenance() || isGudang();
   const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
@@ -3034,7 +3038,9 @@ function renderSparepart(){
   show('spAddBtn', canAdd); show('spExportBtn', canEdit); show('spGudangHint', !canEdit);
   const body = document.getElementById('sparepartBody'); if(!body) return;
   const list = filteredSparepart();
-  if(!list.length){ body.innerHTML = `<div class="gal-empty" style="grid-column:1/-1;">Belum ada data pending sparepart yang cocok.</div>`; return; }
+  SP_VIEW = list.map(x=>x.id); SP_SEL.forEach(i=>{ if(!all.some(x=>x.id===i)) SP_SEL.delete(i); });
+  if(!canEdit) SP_SEL.clear();
+  if(!list.length){ body.innerHTML = `<div class="gal-empty" style="grid-column:1/-1;">Belum ada data pending sparepart yang cocok.</div>`; spUpdateBulk(); return; }
   const groups = new Map();
   list.forEach(it=>{
     const k = normNopol(it.nopol) || it.id;
@@ -3052,6 +3058,7 @@ function renderSparepart(){
     const done = g.items.filter(i=>i.ready).length, total = g.items.length, allDone = done===total;
     const items = g.items.slice().sort((a,b)=>(a.ready-b.ready) || (a.createdAt||'').localeCompare(b.createdAt||'')).map(it=>`
       <div class="sp-item ${it.ready?'done':''}">
+        ${canEdit ? `<input type="checkbox" class="sp-sel" title="Pilih untuk dihapus" ${SP_SEL.has(it.id)?'checked':''} onchange="spSelToggle('${it.id}',this.checked)">` : ''}
         <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-name">${escH(it.name)}</span></label>
         <span class="sp-badge ${it.ready?'ready':'belum'}">${it.ready?'READY':'BELUM'}</span>
         <span class="sp-meta">${it.ready ? `${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang'}</span>
@@ -3059,12 +3066,35 @@ function renderSparepart(){
       </div>`).join('');
     return `<div class="sp-card ${allDone?'all-ready':''}">
       <div class="sp-head">
+        ${canEdit ? `<input type="checkbox" class="sp-sel" title="Pilih semua sparepart mobil ini" ${g.items.every(i=>SP_SEL.has(i.id))?'checked':''} onchange="spSelGroup('${g.items.map(i=>i.id).join(',')}',this.checked)">` : ''}
         <span class="nopol-badge" style="cursor:default;">${escH(g.nopol)||'-'}</span>
         <span class="sp-pt">${escH(g.pt)||'-'}</span>
         <span class="sp-prog ${allDone?'ok':''}">${done}/${total} ready</span>
         ${canAdd ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}'})">＋</button>` : ''}
       </div>${g.meks.size ? `<div class="sp-mek">🔧 Mekanik: ${escH([...g.meks].join(', '))}</div>` : ''}${items}</div>`;
   }).join('');
+  spUpdateBulk();
+}
+function spUpdateBulk(){
+  const canEdit = isMaintenance(), n = SP_SEL.size, b = document.getElementById('spDelSel'), w = document.getElementById('spSelAllWrap'), all = document.getElementById('spSelAll');
+  if(!b||!w||!all) return;
+  w.style.display = (canEdit && SP_VIEW.length) ? '' : 'none';
+  b.style.display = (canEdit && n) ? '' : 'none'; b.textContent = '🗑 Hapus Terpilih ('+n+')';
+  const sel = SP_VIEW.filter(i=>SP_SEL.has(i)).length;
+  all.checked = !!SP_VIEW.length && sel===SP_VIEW.length; all.indeterminate = sel>0 && sel<SP_VIEW.length;
+}
+function spSelToggle(id,on){ if(!isMaintenance()) return; on?SP_SEL.add(id):SP_SEL.delete(id); renderSparepart(); }
+function spSelGroup(csv,on){ if(!isMaintenance()) return; csv.split(',').forEach(i=>on?SP_SEL.add(i):SP_SEL.delete(i)); renderSparepart(); }
+function spSelAll(on){ if(!isMaintenance()) return; SP_VIEW.forEach(i=>on?SP_SEL.add(i):SP_SEL.delete(i)); renderSparepart(); }
+async function deleteSparepartSelected(){
+  if(!isMaintenance()) return;
+  const ids = [...SP_SEL]; if(!ids.length) return;
+  if(!confirm(`Hapus ${ids.length} data pending sparepart yang dipilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    await sbDeleteIds('sparepart_pending', ids);
+    DB.sparepart = DB.sparepart.filter(x=>!SP_SEL.has(x.id)); SP_SEL.clear();
+    renderSparepart(); showToast(`${ids.length} data berhasil dihapus.`);
+  }catch(e){ console.error(e); showToast('Gagal menghapus data: '+String(e.message||'').slice(0,140), true); }
 }
 async function toggleSparepartReady(id, checked){
   if(!(isMaintenance() || isGudang())) return;
