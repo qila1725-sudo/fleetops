@@ -3153,7 +3153,8 @@ async function saveSparepart(){
       showToast(`${items.length} sparepart untuk ${nopol} tersimpan.`);
     }
     closeSparepartModal(); renderSparepart();
-  }catch(e){ console.error(e); showToast(mekanik ? 'Gagal menyimpan. Pastikan SQL sparepart (termasuk kolom mekanik) sudah dijalankan di Supabase.' : 'Gagal menyimpan. Pastikan tabel sparepart_pending sudah dibuat di Supabase.', true); }
+  }catch(e){ console.error(e); const m=String(e.message||''), rls=/row-level security|42501|\b40[13]\b/i.test(m);
+    showToast(rls ? 'Akun ini belum diberi izin menambah data di Supabase (RLS). Jalankan SQL izin Gudang, lalu coba lagi.' : ('Gagal menyimpan. '+m.slice(0,160)+(mekanik?' (pastikan kolom mekanik sudah ada di tabel)':'')), true); }
 }
 async function deleteSparepart(id){
   if(!isMaintenance()) return;
