@@ -780,6 +780,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div class="toolbar">
             <button class="btn btn-primary small" id="spAddBtn" onclick="openSparepartModal()">+ Tambah Pending Sparepart</button>
             <label id="spSelAllWrap" class="btn-outline" style="display:none;margin:0;cursor:pointer;"><input type="checkbox" id="spSelAll" style="display:inline-block;width:16px;height:16px;accent-color:var(--bad);" onchange="spSelAll(this.checked)"> Pilih semua</label>
+            <button class="btn-outline" id="spCopySel" style="display:none" onclick="copySparepartSelected()">📋 Salin</button>
+            <button class="btn-outline" id="spImgSel" style="display:none" onclick="imageSparepartSelected()">🖼 Gambar</button>
+            <button class="btn-outline green" id="spXlsSel" style="display:none" onclick="exportSparepart(true)">⭳ Excel</button>
             <button class="btn-danger" id="spDelSel" style="display:none" onclick="deleteSparepartSelected()">🗑 Hapus Terpilih (0)</button>
             <div class="spacer"></div>
             <button class="btn-outline" id="spExportBtn" onclick="exportSparepart()">⭳ Export Excel</button>
@@ -3080,12 +3083,87 @@ function spUpdateBulk(){
   if(!b||!w||!all) return;
   w.style.display = (canEdit && SP_VIEW.length) ? '' : 'none';
   b.style.display = (canEdit && n) ? '' : 'none'; b.textContent = '🗑 Hapus Terpilih ('+n+')';
+  ['spCopySel','spImgSel','spXlsSel'].forEach(i=>{ const e=document.getElementById(i); if(e) e.style.display=(canEdit && n)?'':'none'; });
   const sel = SP_VIEW.filter(i=>SP_SEL.has(i)).length;
   all.checked = !!SP_VIEW.length && sel===SP_VIEW.length; all.indeterminate = sel>0 && sel<SP_VIEW.length;
 }
 function spSelToggle(id,on){ if(!isMaintenance()) return; on?SP_SEL.add(id):SP_SEL.delete(id); renderSparepart(); }
 function spSelGroup(csv,on){ if(!isMaintenance()) return; csv.split(',').forEach(i=>on?SP_SEL.add(i):SP_SEL.delete(i)); renderSparepart(); }
 function spSelAll(on){ if(!isMaintenance()) return; SP_VIEW.forEach(i=>on?SP_SEL.add(i):SP_SEL.delete(i)); renderSparepart(); }
+function spSelectedItems(){
+  return DB.sparepart.filter(x=>SP_SEL.has(x.id)).sort((a,b)=>String(a.nopol).localeCompare(String(b.nopol))||String(a.name).localeCompare(String(b.name)));
+}
+async function copySparepartSelected(){
+  if(!isMaintenance()) return;
+  const items = spSelectedItems(); if(!items.length) return;
+  const g = new Map();
+  items.forEach(it=>{ if(!g.has(it.nopol)) g.set(it.nopol,{pt:it.pt,mek:new Set(),list:[]}); const o=g.get(it.nopol); if(it.mekanik) o.mek.add(it.mekanik); o.list.push(it); });
+  let txt = '*PENDING SPAREPART*\n';
+  g.forEach((o,k)=>{ txt += `\n*${k}* - ${o.pt||'-'}${o.mek.size?' (Mekanik: '+[...o.mek].join(', ')+')':''}\n`; o.list.forEach(it=>{ txt += `- ${it.name} [${it.ready?'READY':'BELUM'}]\n`; }); });
+  const th = 'style="border:1px solid #999;padding:4px 8px;background:#1e293b;color:#fff;text-align:left"', td = 'style="border:1px solid #999;padding:4px 8px"';
+  const html = '<table style="border-collapse:collapse;font-family:Arial;font-size:13px"><tr>'+['No','Nopol','Nama PT / Standby','Mekanik','Sparepart','Status'].map(h=>`<th ${th}>${h}</th>`).join('')+'</tr>'
+    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(it.name)}</td><td ${td}>${it.ready?'READY':'BELUM'}</td></tr>`).join('')+'</table>';
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([txt],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]);
+    } else { await navigator.clipboard.writeText(txt); }
+    showToast(items.length+' sparepart disalin. Tinggal paste (WhatsApp / Excel / Word).');
+  }catch(e){
+    try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;opacity:0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); showToast(items.length+' sparepart disalin.'); }
+    catch(e2){ showToast('Gagal menyalin. Izinkan akses clipboard di browser.', true); }
+  }
+}
+function spBuildImage(items){
+  const S=2, cp=10, lh=18, fN='13px Arial, Helvetica, sans-serif', fB='bold 13px Arial, Helvetica, sans-serif';
+  const m = document.createElement('canvas').getContext('2d');
+  const heads = ['No','Nopol','Nama PT / Standby','Mekanik','Sparepart','Status'], caps = [44,110,240,150,360,80];
+  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', it.name||'', it.ready?'READY':'BELUM']);
+  const cw = heads.map((h,c)=>{ m.font=fB; let mx=m.measureText(h).width; m.font=fB; rows.forEach(r=>{ mx=Math.max(mx,m.measureText(r[c]).width); }); return Math.min(caps[c], Math.ceil(mx)+cp*2); });
+  const wrap = (t,maxW)=>{ m.font=fB; const out=[]; let line=''; String(t).split(/\s+/).forEach(wd=>{ const tt=line?line+' '+wd:wd; if(m.measureText(tt).width>maxW && line){ out.push(line); line=wd; } else line=tt; }); out.push(line); return out; };
+  const lines = rows.map(r=>r.map((t,c)=>wrap(t,cw[c]-cp*2)));
+  const rh = lines.map(l=>Math.max(...l.map(a=>a.length))*lh+16), headH=32, M=16, titleH=50;
+  const tableW = cw.reduce((a,b)=>a+b,0), W = tableW+M*2, H = M+titleH+headH+rh.reduce((a,b)=>a+b,0)+M;
+  const cv = document.createElement('canvas'); cv.width=W*S; cv.height=H*S;
+  const x = cv.getContext('2d'); x.scale(S,S); x.textBaseline='top';
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  x.fillStyle='#0f172a'; x.font='bold 18px Arial, Helvetica, sans-serif'; x.fillText('Pending Sparepart',M,M);
+  x.fillStyle='#64748b'; x.font='12px Arial, Helvetica, sans-serif'; x.fillText(new Date().toLocaleString('id-ID')+'  ·  '+items.length+' sparepart',M,M+26);
+  let y = M+titleH;
+  x.fillStyle='#1e293b'; x.fillRect(M,y,tableW,headH);
+  let cx = M; x.fillStyle='#fff'; x.font=fB;
+  heads.forEach((h,c)=>{ x.fillText(h,cx+cp,y+9); cx+=cw[c]; });
+  y += headH;
+  rows.forEach((r,i)=>{
+    x.fillStyle = i%2 ? '#f1f5f9' : '#fff'; x.fillRect(M,y,tableW,rh[i]);
+    cx = M;
+    r.forEach((t,c)=>{
+      x.font=fB; x.fillStyle = c===5 ? (t==='READY'?'#15803d':'#b45309') : '#0f172a';
+      lines[i][c].forEach((ln,k)=>x.fillText(ln,cx+cp,y+8+k*lh)); cx+=cw[c];
+    });
+    y += rh[i];
+  });
+  x.strokeStyle='#cbd5e1'; x.lineWidth=1;
+  let gy = M+titleH, gx = M; x.strokeRect(M+.5,gy+.5,tableW-1,H-M-gy-1);
+  gy += headH; x.beginPath(); x.moveTo(M,gy+.5); x.lineTo(M+tableW,gy+.5);
+  rh.forEach((h,i)=>{ gy+=h; x.moveTo(M,gy+.5); x.lineTo(M+tableW,gy+.5); });
+  cw.slice(0,-1).forEach(w=>{ gx+=w; x.moveTo(gx+.5,M+titleH); x.lineTo(gx+.5,H-M); });
+  x.stroke();
+  return cv;
+}
+async function imageSparepartSelected(){
+  if(!isMaintenance()) return;
+  const items = spSelectedItems(); if(!items.length) return;
+  const cv = spBuildImage(items), blobP = new Promise(res=>cv.toBlob(res,'image/png'));
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({'image/png':blobP})]);
+      showToast('Gambar ('+items.length+' sparepart) disalin. Tinggal paste (Ctrl+V).'); return;
+    }
+  }catch(e){ console.warn(e); }
+  const blob = await blobP, a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'pending-sparepart.png'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),3000); showToast('Gambar diunduh: pending-sparepart.png');
+}
 async function deleteSparepartSelected(){
   if(!isMaintenance()) return;
   const ids = [...SP_SEL]; if(!ids.length) return;
@@ -3196,11 +3274,11 @@ async function deleteSparepart(id){
     renderSparepart(); showToast('Data berhasil dihapus.');
   }catch(e){ console.error(e); showToast('Gagal menghapus data.', true); }
 }
-function exportSparepart(){
+function exportSparepart(onlySel){
   if(!isMaintenance()) return;
-  const rows = filteredSparepart().map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
+  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, 'pending-sparepart.xlsx');
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, onlySel===true ? 'pending-sparepart-terpilih.xlsx' : 'pending-sparepart.xlsx');
 }
 
 /* ================= EXCEL ================= */
