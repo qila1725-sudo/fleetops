@@ -1536,7 +1536,7 @@ function drawDataImage(pt, arr){
   const cols = [
     {t:'No',w:44,f:(v,i)=>String(i+1)},
     {t:'Nopol',w:130,f:v=>v.nopol||'-',b:true},
-    {t:'Kendaraan',w:250,f:v=>vLabel(v)},
+    {t:'Kendaraan',w:250,f:v=>v.type||vLabel(v)},
     {t:'Terakhir Service',w:160,f:v=>`${fmtDate(v.lastdate)}`, sub:v=>`${(v.lastkm||0).toLocaleString('id-ID')} KM`},
     {t:'KM Aktual',w:130,f:v=>v.currentkm ? `${Number(v.currentkm).toLocaleString('id-ID')} KM` : '-', b:true,
       sub:v=>{ if(!v.currentkm || !v.nextkm) return ''; const d = Number(v.nextkm)-Number(v.currentkm); return d>=0 ? `sisa ${d.toLocaleString('id-ID')} KM` : `lewat ${Math.abs(d).toLocaleString('id-ID')} KM`; }},
