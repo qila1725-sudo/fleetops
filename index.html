@@ -789,7 +789,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           </div>
           <div class="small-note" id="spGudangHint" style="display:none;margin:0 0 10px;">Centang sparepart yang sudah <b>ready</b> di gudang. Gudang juga bisa menambah data pending; edit &amp; hapus hanya oleh admin maintenance.</div>
           <div class="filter-row">
-            <div class="search-box">🔍 <input id="sp_search" oninput="debSparepart()" placeholder="Cari nopol, PT, mekanik, atau sparepart..."></div>
+            <div class="search-box">🔍 <input id="sp_search" oninput="debSparepart()" placeholder="Cari nopol, PT, mekanik, area, atau sparepart..."></div>
           </div>
           <div class="tabs-row">
             <div class="tab-pill active" data-tab="all" onclick="setSpTab('all')">Semua <span class="cnt" id="sp_cnt_all">0</span></div>
@@ -1106,6 +1106,11 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         <datalist id="spMekList"></datalist>
       </div>
       <div class="full">
+        <label>Keterangan Area</label>
+        <input id="sp_area" list="spAreaList" placeholder="mis. Jakarta, Lampung, Cikarang">
+        <datalist id="spAreaList"></datalist>
+      </div>
+      <div class="full">
         <label id="spItemsLabel">Sparepart yang pending</label>
         <div id="spItems"></div>
         <button type="button" class="btn-outline" id="spAddItemBtn" onclick="spAddItemRow()">+ Tambah sparepart lagi</button>
@@ -1299,7 +1304,7 @@ const toDbAccount = a => ({ username:a.username, password:a.password, role:a.rol
 const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file), pic:r.pic||'', picPhone:r.pic_phone||'', picCol:('pic' in r) });
 const fromDbKwitansi = r => ({ id:r.id, tanggal:r.tanggal||(r.created_at?String(r.created_at).slice(0,10):''), toko:r.toko||'', nopol:r.nopol||'', pt:r.pt||'', note:r.keterangan||'', bayar:r.pembayaran||'Paid Bu Ika' });
 const toDbKwitansi = k => ({ tanggal:k.tanggal||null, toko:k.toko||'', nopol:k.nopol||'', pt:k.pt||'', keterangan:k.note||'', pembayaran:k.bayar||'Paid Bu Ika' });
-const fromDbSparepart = r => ({ id:r.id, nopol:r.nopol||'', pt:r.pt||'', name:r.sparepart||'', ready:!!r.ready, readyBy:r.ready_by||'', readyAt:r.ready_at||'', createdBy:r.created_by||'', createdAt:r.created_at||'', mekanik:r.mekanik||'', mekanikCol:('mekanik' in r) });
+const fromDbSparepart = r => ({ id:r.id, nopol:r.nopol||'', pt:r.pt||'', name:r.sparepart||'', ready:!!r.ready, readyBy:r.ready_by||'', readyAt:r.ready_at||'', createdBy:r.created_by||'', createdAt:r.created_at||'', mekanik:r.mekanik||'', mekanikCol:('mekanik' in r), area:r.area||'', areaCol:('area' in r) });
 const toDbBengkel = b => { const o = { vehicle_id:b.vehicleId||null, nopol:b.nopol, pt:b.pt, bengkel:b.bengkel, tanggal_masuk:b.tglMasuk||null, tanggal_keluar:b.tglKeluar||null, keterangan:b.note||'', harga_or:b.hargaOR||0, kwitansi:b.kwitansi||'Belum', status_bayar:b.statusBayar||'Belum Bayar' };
   if(b.pic || b.picPhone || b.picCol){ o.pic = b.pic||''; o.pic_phone = b.picPhone||''; }
   return o; };
@@ -3022,7 +3027,7 @@ function filteredSparepart(){
   return DB.sparepart.filter(it=>{
     if(spTab==='pending' && it.ready) return false;
     if(spTab==='ready' && !it.ready) return false;
-    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik}`.toLowerCase().includes(q)) return false;
+    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik} ${it.area}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -3047,9 +3052,10 @@ function renderSparepart(){
   const groups = new Map();
   list.forEach(it=>{
     const k = normNopol(it.nopol) || it.id;
-    if(!groups.has(k)) groups.set(k, { nopol:it.nopol, pt:it.pt, items:[], newest:'', meks:new Set() });
+    if(!groups.has(k)) groups.set(k, { nopol:it.nopol, pt:it.pt, items:[], newest:'', meks:new Set(), areas:new Set() });
     const g = groups.get(k); g.items.push(it);
     if(it.mekanik) g.meks.add(it.mekanik);
+    if(it.area) g.areas.add(it.area);
     if(!g.pt && it.pt) g.pt = it.pt;
     if((it.createdAt||'') > g.newest) g.newest = it.createdAt||'';
   });
@@ -3073,8 +3079,8 @@ function renderSparepart(){
         <span class="nopol-badge" style="cursor:default;">${escH(g.nopol)||'-'}</span>
         <span class="sp-pt">${escH(g.pt)||'-'}</span>
         <span class="sp-prog ${allDone?'ok':''}">${done}/${total} ready</span>
-        ${canAdd ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}'})">＋</button>` : ''}
-      </div>${g.meks.size ? `<div class="sp-mek">🔧 Mekanik: ${escH([...g.meks].join(', '))}</div>` : ''}${items}</div>`;
+        ${canAdd ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}', area:'${escH([...g.areas][0]||'')}'})">＋</button>` : ''}
+      </div>${(g.meks.size||g.areas.size) ? `<div class="sp-mek">${g.meks.size?'🔧 Mekanik: '+escH([...g.meks].join(', ')):''}${(g.meks.size&&g.areas.size)?' &nbsp;•&nbsp; ':''}${g.areas.size?'📍 Area: '+escH([...g.areas].join(', ')):''}</div>` : ''}${items}</div>`;
   }).join('');
   spUpdateBulk();
 }
@@ -3097,12 +3103,12 @@ async function copySparepartSelected(){
   if(!isMaintenance()) return;
   const items = spSelectedItems(); if(!items.length) return;
   const g = new Map();
-  items.forEach(it=>{ if(!g.has(it.nopol)) g.set(it.nopol,{pt:it.pt,mek:new Set(),list:[]}); const o=g.get(it.nopol); if(it.mekanik) o.mek.add(it.mekanik); o.list.push(it); });
+  items.forEach(it=>{ if(!g.has(it.nopol)) g.set(it.nopol,{pt:it.pt,mek:new Set(),area:new Set(),list:[]}); const o=g.get(it.nopol); if(it.mekanik) o.mek.add(it.mekanik); if(it.area) o.area.add(it.area); o.list.push(it); });
   let txt = '*PENDING SPAREPART*\n';
-  g.forEach((o,k)=>{ txt += `\n*${k}* - ${o.pt||'-'}${o.mek.size?' (Mekanik: '+[...o.mek].join(', ')+')':''}\n`; o.list.forEach(it=>{ txt += `- ${it.name} [${it.ready?'READY':'BELUM'}]\n`; }); });
+  g.forEach((o,k)=>{ txt += `\n*${k}* - ${o.pt||'-'}${(o.mek.size||o.area.size)?' ('+[o.mek.size?'Mekanik: '+[...o.mek].join(', '):'', o.area.size?'Area: '+[...o.area].join(', '):''].filter(Boolean).join(' | ')+')':''}\n`; o.list.forEach(it=>{ txt += `- ${it.name} [${it.ready?'READY':'BELUM'}]\n`; }); });
   const th = 'style="border:1px solid #999;padding:4px 8px;background:#1e293b;color:#fff;text-align:left"', td = 'style="border:1px solid #999;padding:4px 8px"';
-  const html = '<table style="border-collapse:collapse;font-family:Arial;font-size:13px"><tr>'+['No','Nopol','Nama PT / Standby','Mekanik','Sparepart','Status'].map(h=>`<th ${th}>${h}</th>`).join('')+'</tr>'
-    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(it.name)}</td><td ${td}>${it.ready?'READY':'BELUM'}</td></tr>`).join('')+'</table>';
+  const html = '<table style="border-collapse:collapse;font-family:Arial;font-size:13px"><tr>'+['No','Nopol','Nama PT / Standby','Mekanik','Area','Sparepart','Status'].map(h=>`<th ${th}>${h}</th>`).join('')+'</tr>'
+    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(it.area)}</td><td ${td}>${escH(it.name)}</td><td ${td}>${it.ready?'READY':'BELUM'}</td></tr>`).join('')+'</table>';
   try{
     if(navigator.clipboard && window.ClipboardItem){
       await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([txt],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]);
@@ -3116,8 +3122,8 @@ async function copySparepartSelected(){
 function spBuildImage(items){
   const S=2, cp=10, lh=18, fN='13px Arial, Helvetica, sans-serif', fB='bold 13px Arial, Helvetica, sans-serif';
   const m = document.createElement('canvas').getContext('2d');
-  const heads = ['No','Nopol','Nama PT / Standby','Mekanik','Sparepart','Status'], caps = [44,110,240,150,360,80];
-  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', it.name||'', it.ready?'READY':'BELUM']);
+  const heads = ['No','Nopol','Nama PT / Standby','Mekanik','Area','Sparepart','Status'], caps = [44,110,240,150,150,360,80];
+  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', it.area||'', it.name||'', it.ready?'READY':'BELUM']);
   const cw = heads.map((h,c)=>{ m.font=fB; let mx=m.measureText(h).width; m.font=fB; rows.forEach(r=>{ mx=Math.max(mx,m.measureText(r[c]).width); }); return Math.min(caps[c], Math.ceil(mx)+cp*2); });
   const wrap = (t,maxW)=>{ m.font=fB; const out=[]; let line=''; String(t).split(/\s+/).forEach(wd=>{ const tt=line?line+' '+wd:wd; if(m.measureText(tt).width>maxW && line){ out.push(line); line=wd; } else line=tt; }); out.push(line); return out; };
   const lines = rows.map(r=>r.map((t,c)=>wrap(t,cw[c]-cp*2)));
@@ -3137,7 +3143,7 @@ function spBuildImage(items){
     x.fillStyle = i%2 ? '#f1f5f9' : '#fff'; x.fillRect(M,y,tableW,rh[i]);
     cx = M;
     r.forEach((t,c)=>{
-      x.font=fB; x.fillStyle = c===5 ? (t==='READY'?'#15803d':'#b45309') : '#0f172a';
+      x.font=fB; x.fillStyle = c===6 ? (t==='READY'?'#15803d':'#b45309') : '#0f172a';
       lines[i][c].forEach((ln,k)=>x.fillText(ln,cx+cp,y+8+k*lh)); cx+=cw[c];
     });
     y += rh[i];
@@ -3192,6 +3198,8 @@ function spFillLists(){
   document.getElementById('spPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
   const meks = [...new Set(DB.sparepart.map(x=>x.mekanik).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
   document.getElementById('spMekList').innerHTML = meks.map(n=>`<option value="${escH(n)}">`).join('');
+  const areas = [...new Set(DB.sparepart.map(x=>x.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+  document.getElementById('spAreaList').innerHTML = areas.map(n=>`<option value="${escH(n)}">`).join('');
 }
 function spAutofill(){
   const k = normNopol(document.getElementById('sp_nopol').value); if(!k) return;
@@ -3226,6 +3234,7 @@ function openSparepartModal(opt){
   document.getElementById('sp_nopol').value = edit ? edit.nopol : (opt.nopol||'');
   const ptEl = document.getElementById('sp_pt'); ptEl.value = edit ? edit.pt : (opt.pt||''); ptEl.dataset.auto = '';
   document.getElementById('sp_mekanik').value = edit ? edit.mekanik : (opt.mekanik||'');
+  document.getElementById('sp_area').value = edit ? edit.area : (opt.area||'');
   document.getElementById('spItems').innerHTML = '';
   spAddItemRow(edit ? edit.name : '', edit ? edit.ready : false);
   document.getElementById('spModalBg').classList.add('show');
@@ -3238,6 +3247,7 @@ async function saveSparepart(){
   const nopol = document.getElementById('sp_nopol').value.trim().toUpperCase();
   const pt = document.getElementById('sp_pt').value.trim();
   const mekanik = document.getElementById('sp_mekanik').value.trim();
+  const area = document.getElementById('sp_area').value.trim();
   const items = [...document.querySelectorAll('#spItems .sp-row')].map(r=>({ name:r.querySelector('.sp-item-input').value.trim(), ready:r.querySelector('.sp-status').value==='ready' })).filter(x=>x.name);
   if(!nopol){ showToast('Isi nopol terlebih dahulu.'); return; }
   if(!items.length){ showToast('Isi minimal satu sparepart.'); return; }
@@ -3248,21 +3258,22 @@ async function saveSparepart(){
       const it = items[0];
       const patch = { nopol, pt, sparepart:it.name };
       if(mekanik || prev.mekanik || prev.mekanikCol) patch.mekanik = mekanik;
+      if(area || prev.area || prev.areaCol) patch.area = area;
       if(it.ready !== prev.ready){ patch.ready = it.ready; patch.ready_by = it.ready ? user : null; patch.ready_at = it.ready ? nowIso : null; }
       const rows = await sbUpdate('sparepart_pending', id, patch);
       const idx = DB.sparepart.findIndex(x=>x.id===id);
-      DB.sparepart[idx] = fromDbSparepart((rows&&rows[0]) || { id, nopol, pt, sparepart:it.name, mekanik:('mekanik' in patch)?patch.mekanik:prev.mekanik,
+      DB.sparepart[idx] = fromDbSparepart((rows&&rows[0]) || { id, nopol, pt, sparepart:it.name, mekanik:('mekanik' in patch)?patch.mekanik:prev.mekanik, area:('area' in patch)?patch.area:prev.area,
         ready:('ready' in patch)?patch.ready:prev.ready, ready_by:('ready' in patch)?patch.ready_by:prev.readyBy, ready_at:('ready' in patch)?patch.ready_at:prev.readyAt,
         created_by:prev.createdBy, created_at:prev.createdAt });
       showToast('Pending sparepart diperbarui.');
     } else {
-      const rows = await sbInsert('sparepart_pending', items.map(it=>({ nopol, pt, ...(mekanik ? { mekanik } : {}), sparepart:it.name, ready:it.ready, ready_by:it.ready?user:null, ready_at:it.ready?nowIso:null, created_by:user })));
+      const rows = await sbInsert('sparepart_pending', items.map(it=>({ nopol, pt, ...(mekanik ? { mekanik } : {}), ...(area ? { area } : {}), sparepart:it.name, ready:it.ready, ready_by:it.ready?user:null, ready_at:it.ready?nowIso:null, created_by:user })));
       DB.sparepart = (rows||[]).map(fromDbSparepart).concat(DB.sparepart);
       showToast(`${items.length} sparepart untuk ${nopol} tersimpan.`);
     }
     closeSparepartModal(); renderSparepart();
   }catch(e){ console.error(e); const m=String(e.message||''), rls=/row-level security|42501|\b40[13]\b/i.test(m);
-    showToast(rls ? 'Akun ini belum diberi izin menambah data di Supabase (RLS). Jalankan SQL izin Gudang, lalu coba lagi.' : ('Gagal menyimpan. '+m.slice(0,160)+(mekanik?' (pastikan kolom mekanik sudah ada di tabel)':'')), true); }
+    showToast(rls ? 'Akun ini belum diberi izin menambah data di Supabase (RLS). Jalankan SQL izin Gudang, lalu coba lagi.' : ('Gagal menyimpan. '+m.slice(0,160)+((mekanik||area)?' (pastikan kolom mekanik & area sudah ada di tabel)':'')), true); }
 }
 async function deleteSparepart(id){
   if(!isMaintenance()) return;
@@ -3276,7 +3287,7 @@ async function deleteSparepart(id){
 }
 function exportSparepart(onlySel){
   if(!isMaintenance()) return;
-  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
+  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Area':it.area, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, onlySel===true ? 'pending-sparepart-terpilih.xlsx' : 'pending-sparepart.xlsx');
 }
