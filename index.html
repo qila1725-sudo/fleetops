@@ -1110,7 +1110,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div class="full">
         <label>Keterangan Area</label>
-        <input id="sp_area" list="spAreaList" placeholder="mis. Jakarta, Lampung, Cikarang">
+        <input id="sp_area" list="spAreaList" placeholder="Terisi otomatis dari data Reminder" oninput="this.dataset.auto=''">
         <datalist id="spAreaList"></datalist>
       </div>
       <div class="full">
@@ -3031,7 +3031,7 @@ function filteredSparepart(){
   return DB.sparepart.filter(it=>{
     if(spTab==='pending' && it.ready) return false;
     if(spTab==='ready' && !it.ready) return false;
-    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik} ${it.area}`.toLowerCase().includes(q)) return false;
+    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik} ${spAreaOf(it)}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -3059,7 +3059,7 @@ function renderSparepart(){
     if(!groups.has(k)) groups.set(k, { nopol:it.nopol, pt:it.pt, items:[], newest:'', meks:new Set(), areas:new Set() });
     const g = groups.get(k); g.items.push(it);
     if(it.mekanik) g.meks.add(it.mekanik);
-    if(it.area) g.areas.add(it.area);
+    { const ar = spAreaOf(it); if(ar) g.areas.add(ar); }
     if(!g.pt && it.pt) g.pt = it.pt;
     if((it.createdAt||'') > g.newest) g.newest = it.createdAt||'';
   });
@@ -3109,12 +3109,12 @@ async function copySparepartSelected(){
   if(!isMaintenance()) return;
   const items = spSelectedItems(); if(!items.length) return;
   const g = new Map();
-  items.forEach(it=>{ if(!g.has(it.nopol)) g.set(it.nopol,{pt:it.pt,mek:new Set(),area:new Set(),list:[]}); const o=g.get(it.nopol); if(it.mekanik) o.mek.add(it.mekanik); if(it.area) o.area.add(it.area); o.list.push(it); });
+  items.forEach(it=>{ if(!g.has(it.nopol)) g.set(it.nopol,{pt:it.pt,mek:new Set(),area:new Set(),list:[]}); const o=g.get(it.nopol); if(it.mekanik) o.mek.add(it.mekanik); { const ar = spAreaOf(it); if(ar) o.area.add(ar); } o.list.push(it); });
   let txt = '*PENDING SPAREPART*\n';
   g.forEach((o,k)=>{ txt += `\n*${k}* - ${o.pt||'-'}${(o.mek.size||o.area.size)?' ('+[o.mek.size?'Mekanik: '+[...o.mek].join(', '):'', o.area.size?'Area: '+[...o.area].join(', '):''].filter(Boolean).join(' | ')+')':''}\n`; o.list.forEach(it=>{ txt += `- ${it.name} [${it.ready?'READY':'BELUM'}]\n`; }); });
   const th = 'style="border:1px solid #999;padding:4px 8px;background:#1e293b;color:#fff;text-align:left"', td = 'style="border:1px solid #999;padding:4px 8px"';
   const html = '<table style="border-collapse:collapse;font-family:Arial;font-size:13px"><tr>'+['No','Nopol','Nama PT / Standby','Mekanik','Area','Sparepart','Status'].map(h=>`<th ${th}>${h}</th>`).join('')+'</tr>'
-    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(it.area)}</td><td ${td}>${escH(it.name)}</td><td ${td}>${it.ready?'READY':'BELUM'}</td></tr>`).join('')+'</table>';
+    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(spAreaOf(it))}</td><td ${td}>${escH(it.name)}</td><td ${td}>${it.ready?'READY':'BELUM'}</td></tr>`).join('')+'</table>';
   try{
     if(navigator.clipboard && window.ClipboardItem){
       await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([txt],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]);
@@ -3129,7 +3129,7 @@ function spBuildImage(items){
   const S=2, cp=10, lh=18, fN='13px Arial, Helvetica, sans-serif', fB='bold 13px Arial, Helvetica, sans-serif';
   const m = document.createElement('canvas').getContext('2d');
   const heads = ['No','Nopol','Nama PT / Standby','Mekanik','Area','Sparepart','Status'], caps = [44,110,240,150,150,360,80];
-  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', it.area||'', it.name||'', it.ready?'READY':'BELUM']);
+  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', spAreaOf(it), it.name||'', it.ready?'READY':'BELUM']);
   const cw = heads.map((h,c)=>{ m.font=fB; let mx=m.measureText(h).width; m.font=fB; rows.forEach(r=>{ mx=Math.max(mx,m.measureText(r[c]).width); }); return Math.min(caps[c], Math.ceil(mx)+cp*2); });
   const wrap = (t,maxW)=>{ m.font=fB; const out=[]; let line=''; String(t).split(/\s+/).forEach(wd=>{ const tt=line?line+' '+wd:wd; if(m.measureText(tt).width>maxW && line){ out.push(line); line=wd; } else line=tt; }); out.push(line); return out; };
   const lines = rows.map(r=>r.map((t,c)=>wrap(t,cw[c]-cp*2)));
@@ -3179,7 +3179,7 @@ async function imageSparepartSelected(){
 async function spSetArea(csv){
   if(!isMaintenance()) return;
   const ids = csv.split(','), list = DB.sparepart.filter(x=>ids.includes(x.id)); if(!list.length) return;
-  const cur = [...new Set(list.map(x=>x.area).filter(Boolean))].join(', ');
+  const cur = [...new Set(list.map(x=>spAreaOf(x)).filter(Boolean))].join(', ');
   const v = prompt('Keterangan area / posisi mobil (mis. Jakarta, Lampung, Cikarang).\nKosongkan untuk menghapus.', cur);
   if(v===null) return;
   const area = v.trim();
@@ -3216,17 +3216,25 @@ function spFillLists(){
   document.getElementById('spPtList').innerHTML = ['Standby', ...pts].map(n=>`<option value="${escH(n)}">`).join('');
   const meks = [...new Set(DB.sparepart.map(x=>x.mekanik).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
   document.getElementById('spMekList').innerHTML = meks.map(n=>`<option value="${escH(n)}">`).join('');
-  const areas = [...new Set(DB.sparepart.map(x=>x.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
+  const areas = [...new Set([...DB.sparepart.map(x=>x.area), ...DB.vehicles.map(x=>x.area)].map(a=>String(a||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
   document.getElementById('spAreaList').innerHTML = areas.map(n=>`<option value="${escH(n)}">`).join('');
 }
+function spVehArea(nopol){ const k = normNopol(nopol); if(!k) return ''; const v = DB.vehicles.find(x=>normNopol(x.nopol)===k); return (v && v.area) ? String(v.area).trim() : ''; }
+function spAreaOf(it){ return ((it && it.area) ? String(it.area).trim() : '') || spVehArea(it && it.nopol); }
 function spAutofill(){
   const k = normNopol(document.getElementById('sp_nopol').value); if(!k) return;
-  const ptEl = document.getElementById('sp_pt');
-  if(ptEl.value.trim() && ptEl.dataset.auto!=='1') return;
   const v = DB.vehicles.find(x=>normNopol(x.nopol)===k);
-  const b = !v && DB.bengkel.find(x=>normNopol(x.nopol)===k);
-  const pt = (v && v.pt) || (b && b.pt) || '';
-  if(pt){ ptEl.value = pt; ptEl.dataset.auto = '1'; }
+  const ptEl = document.getElementById('sp_pt');
+  if(!ptEl.value.trim() || ptEl.dataset.auto==='1'){
+    const b = !v && DB.bengkel.find(x=>normNopol(x.nopol)===k);
+    const pt = (v && v.pt) || (b && b.pt) || '';
+    if(pt){ ptEl.value = pt; ptEl.dataset.auto = '1'; }
+  }
+  const arEl = document.getElementById('sp_area');
+  if(!arEl.value.trim() || arEl.dataset.auto==='1'){
+    const ar = (v && v.area) ? String(v.area).trim() : '';
+    if(ar){ arEl.value = ar; arEl.dataset.auto = '1'; }
+  }
 }
 function spAddItemRow(val, ready){
   const wrap = document.getElementById('spItems');
@@ -3252,7 +3260,8 @@ function openSparepartModal(opt){
   document.getElementById('sp_nopol').value = edit ? edit.nopol : (opt.nopol||'');
   const ptEl = document.getElementById('sp_pt'); ptEl.value = edit ? edit.pt : (opt.pt||''); ptEl.dataset.auto = '';
   document.getElementById('sp_mekanik').value = edit ? edit.mekanik : (opt.mekanik||'');
-  document.getElementById('sp_area').value = edit ? edit.area : (opt.area||'');
+  const arEl0 = document.getElementById('sp_area'); arEl0.dataset.auto = '';
+  arEl0.value = edit ? (edit.area||spVehArea(edit.nopol)) : (opt.area||spVehArea(opt.nopol));
   document.getElementById('spItems').innerHTML = '';
   spAddItemRow(edit ? edit.name : '', edit ? edit.ready : false);
   document.getElementById('spModalBg').classList.add('show');
@@ -3305,7 +3314,7 @@ async function deleteSparepart(id){
 }
 function exportSparepart(onlySel){
   if(!isMaintenance()) return;
-  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Area':it.area, 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
+  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Area':spAreaOf(it), 'Sparepart':it.name, 'Status':it.ready?'Ready':'Belum Ready', 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, onlySel===true ? 'pending-sparepart-terpilih.xlsx' : 'pending-sparepart.xlsx');
 }
