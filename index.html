@@ -293,7 +293,10 @@
   .sp-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px;box-shadow:0 1px 3px rgba(16,24,40,.04);}
   .sp-card.all-ready{opacity:.8;}
   .sp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
-  .sp-pt{font-size:13px;color:var(--ink);font-weight:800;flex:1;min-width:0;}
+  .sp-pt{font-size:13px;color:var(--ink);font-weight:800;flex:0 1 auto;min-width:0;}
+  .sp-area{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:999px;padding:2px 10px;white-space:nowrap;font-family:inherit;}
+  .sp-area.clk{cursor:pointer;} .sp-area.clk:hover{filter:brightness(.96);}
+  .sp-area.empty{color:var(--ink-soft);background:#fff;border:1px dashed var(--line);font-weight:700;}
   .sp-prog{font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;background:var(--warn-bg);color:var(--warn);}
   .sp-prog.ok{background:var(--ok-bg);color:var(--ok);}
   .sp-item{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:9px 0;border-top:1px solid var(--line);}
@@ -3079,9 +3082,11 @@ function renderSparepart(){
         ${canEdit ? `<input type="checkbox" class="sp-sel" title="Pilih semua sparepart mobil ini" ${g.items.every(i=>SP_SEL.has(i.id))?'checked':''} onchange="spSelGroup('${g.items.map(i=>i.id).join(',')}',this.checked)">` : ''}
         <span class="nopol-badge" style="cursor:default;">${escH(g.nopol)||'-'}</span>
         <span class="sp-pt">${escH(g.pt)||'-'}</span>
+        ${g.areas.size ? `<span class="sp-area ${canEdit?'clk':''}" ${canEdit?`title="Klik untuk ubah area" onclick="spSetArea('${g.items.map(i=>i.id).join(',')}')"`:''}>📍 ${escH([...g.areas].join(', '))}</span>` : (canEdit ? `<button class="sp-area empty clk" title="Isi area / posisi mobil" onclick="spSetArea('${g.items.map(i=>i.id).join(',')}')">＋ Area</button>` : '')}
+        <span style="flex:1"></span>
         <span class="sp-prog ${allDone?'ok':''}">${done}/${total} ready</span>
         ${canAdd ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}', area:'${escH([...g.areas][0]||'')}'})">＋</button>` : ''}
-      </div>${(g.meks.size||g.areas.size) ? `<div class="sp-mek">${g.meks.size?'🔧 Mekanik: '+escH([...g.meks].join(', ')):''}${(g.meks.size&&g.areas.size)?' &nbsp;•&nbsp; ':''}${g.areas.size?'📍 Area: '+escH([...g.areas].join(', ')):''}</div>` : ''}${items}</div>`;
+      </div>${g.meks.size ? `<div class="sp-mek">🔧 Mekanik: ${escH([...g.meks].join(', '))}</div>` : ''}${items}</div>`;
   }).join('');
   spUpdateBulk();
 }
@@ -3170,6 +3175,18 @@ async function imageSparepartSelected(){
   const blob = await blobP, a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'pending-sparepart.png'; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),3000); showToast('Gambar diunduh: pending-sparepart.png');
+}
+async function spSetArea(csv){
+  if(!isMaintenance()) return;
+  const ids = csv.split(','), list = DB.sparepart.filter(x=>ids.includes(x.id)); if(!list.length) return;
+  const cur = [...new Set(list.map(x=>x.area).filter(Boolean))].join(', ');
+  const v = prompt('Keterangan area / posisi mobil (mis. Jakarta, Lampung, Cikarang).\nKosongkan untuk menghapus.', cur);
+  if(v===null) return;
+  const area = v.trim();
+  try{
+    for(const it of list){ if((it.area||'')!==area){ await sbUpdate('sparepart_pending', it.id, { area }); it.area = area; it.areaCol = true; } }
+    renderSparepart(); showToast(area ? 'Area diperbarui: '+area : 'Area dihapus.');
+  }catch(e){ console.error(e); showToast('Gagal menyimpan area. Pastikan kolom area sudah ada di tabel (jalankan SQL tambah kolom area). '+String(e.message||'').slice(0,100), true); }
 }
 async function deleteSparepartSelected(){
   if(!isMaintenance()) return;
