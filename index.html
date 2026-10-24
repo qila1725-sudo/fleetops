@@ -1100,12 +1100,12 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       </div>
       <div>
         <label>Nama PT / Standby</label>
-        <input id="sp_pt" list="spPtList" placeholder="Terisi otomatis dari nopol">
+        <input id="sp_pt" list="spPtList" placeholder="Terisi otomatis dari nopol" oninput="this.dataset.auto=''">
         <datalist id="spPtList"></datalist>
       </div>
       <div class="full">
         <label>Nama Mekanik</label>
-        <input id="sp_mekanik" list="spMekList" placeholder="Nama mekanik yang menangani / meminta sparepart">
+        <input id="sp_mekanik" list="spMekList" placeholder="Nama mekanik yang menangani / meminta sparepart" oninput="this.dataset.auto=''">
         <datalist id="spMekList"></datalist>
       </div>
       <div class="full">
@@ -3222,19 +3222,19 @@ function spFillLists(){
 function spVehArea(nopol){ const k = normNopol(nopol); if(!k) return ''; const v = DB.vehicles.find(x=>normNopol(x.nopol)===k); return (v && v.area) ? String(v.area).trim() : ''; }
 function spAreaOf(it){ return ((it && it.area) ? String(it.area).trim() : '') || spVehArea(it && it.nopol); }
 function spAutofill(){
-  const k = normNopol(document.getElementById('sp_nopol').value); if(!k) return;
+  const k = normNopol(document.getElementById('sp_nopol').value);
+  const fillAuto = (id, val)=>{ // isi otomatis; jangan timpa isian manual; bersihkan isian otomatis lama bila tak ada data baru
+    const el = document.getElementById(id); if(!el) return;
+    if(el.value.trim() && el.dataset.auto!=='1') return;
+    if(val){ el.value = val; el.dataset.auto = '1'; } else if(el.dataset.auto==='1'){ el.value = ''; el.dataset.auto = ''; }
+  };
+  if(!k){ fillAuto('sp_pt',''); fillAuto('sp_area',''); fillAuto('sp_mekanik',''); return; }
   const v = DB.vehicles.find(x=>normNopol(x.nopol)===k);
-  const ptEl = document.getElementById('sp_pt');
-  if(!ptEl.value.trim() || ptEl.dataset.auto==='1'){
-    const b = !v && DB.bengkel.find(x=>normNopol(x.nopol)===k);
-    const pt = (v && v.pt) || (b && b.pt) || '';
-    if(pt){ ptEl.value = pt; ptEl.dataset.auto = '1'; }
-  }
-  const arEl = document.getElementById('sp_area');
-  if(!arEl.value.trim() || arEl.dataset.auto==='1'){
-    const ar = (v && v.area) ? String(v.area).trim() : '';
-    if(ar){ arEl.value = ar; arEl.dataset.auto = '1'; }
-  }
+  const b = !v && DB.bengkel.find(x=>normNopol(x.nopol)===k);
+  const prev = DB.sparepart.filter(x=>normNopol(x.nopol)===k).sort((a,c)=>(c.createdAt||'').localeCompare(a.createdAt||''));
+  fillAuto('sp_pt', (v && v.pt) || (b && b.pt) || (prev[0] && prev[0].pt) || '');
+  fillAuto('sp_area', (v && v.area ? String(v.area).trim() : '') || spAreaOf(prev[0]) || '');
+  fillAuto('sp_mekanik', (prev.find(x=>x.mekanik)||{}).mekanik || '');
 }
 function spAddItemRow(val, ready){
   const wrap = document.getElementById('spItems');
@@ -3259,7 +3259,7 @@ function openSparepartModal(opt){
   document.getElementById('spSaveBtn').textContent = edit ? 'Simpan Perubahan' : 'Simpan';
   document.getElementById('sp_nopol').value = edit ? edit.nopol : (opt.nopol||'');
   const ptEl = document.getElementById('sp_pt'); ptEl.value = edit ? edit.pt : (opt.pt||''); ptEl.dataset.auto = '';
-  document.getElementById('sp_mekanik').value = edit ? edit.mekanik : (opt.mekanik||'');
+  const mekEl0 = document.getElementById('sp_mekanik'); mekEl0.dataset.auto = ''; mekEl0.value = edit ? edit.mekanik : (opt.mekanik||'');
   const arEl0 = document.getElementById('sp_area'); arEl0.dataset.auto = '';
   arEl0.value = edit ? (edit.area||spVehArea(edit.nopol)) : (opt.area||spVehArea(opt.nopol));
   document.getElementById('spItems').innerHTML = '';
