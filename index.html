@@ -298,26 +298,26 @@
   .sp-area.clk{cursor:pointer;} .sp-area.clk:hover{filter:brightness(.96);}
   .sp-area.empty{color:var(--ink-soft);background:#fff;border:1px dashed var(--line);font-weight:700;}
   .sp-prog{font-size:11px;font-weight:800;padding:3px 9px;border-radius:100px;background:var(--warn-bg);color:var(--warn);}
-  .sp-prog.ok{background:var(--ok-bg);color:var(--ok);}
+  .sp-prog.ok{background:#dbeafe;color:#1d4ed8;}
   .sp-item{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;padding:9px 0;border-top:1px solid var(--line);}
   .sp-chk{display:flex;align-items:center;gap:10px;flex:1 1 260px;min-width:0;cursor:pointer;}
   .sp-chk input{width:20px;height:20px;accent-color:var(--ok);cursor:pointer;flex:none;}
   .sp-name{font-size:14.5px;font-weight:800;color:var(--ink);word-break:normal;overflow-wrap:break-word;line-height:1.35;}
   .sp-item.done .sp-name{text-decoration:line-through;color:var(--ink-soft);}
   .sp-meta{font-size:11.5px;color:var(--ink);font-weight:800;text-align:right;white-space:nowrap;}
-  .sp-item.done .sp-meta{color:var(--ok);}
+  .sp-item.done .sp-meta{color:#1d4ed8;}
   .sp-row{display:flex;gap:8px;margin-bottom:8px;}
   .form-grid .sp-row .sp-item-input{flex:1 1 auto;min-width:0;width:auto;}
   .form-grid .sp-row .sp-status{flex:none;width:112px;font-weight:800;}
   .sp-mek{font-size:12.5px;font-weight:800;color:var(--ink);margin:-4px 0 8px;}
   .sp-badge{font-size:10.5px;font-weight:800;letter-spacing:.3px;padding:3px 9px;border-radius:100px;flex:none;}
-  .sp-badge.ready{background:var(--ok-bg);color:var(--ok);}
+  .sp-badge.ready{background:#dbeafe;color:#1d4ed8;}
   .sp-badge.belum{background:var(--warn-bg);color:var(--warn);}
   .sp-badge.selesai{background:var(--ok-bg);color:var(--ok);font-weight:900;}
   .sp-item.selesai .sp-meta{color:var(--ok);font-weight:900;}
   .sp-item.selesai .sp-name{color:var(--ok);font-weight:900;}
   .sp-prog.fin{background:var(--ok-bg);color:var(--ok);font-weight:900;}
-  .sp-fin{flex:none;font-family:inherit;font-size:11px;font-weight:800;padding:5px 10px;border-radius:8px;border:1px solid var(--ok-line);background:var(--ok-bg);color:var(--ok);cursor:pointer;white-space:nowrap;}
+  .sp-fin{flex:none;font-family:inherit;font-size:11px;font-weight:800;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;white-space:nowrap;}
   .sp-fin:hover{filter:brightness(.96);} .sp-fin.undo{background:#fff;border-color:var(--line);color:var(--ink-soft);}
   .sp-x{border:1px solid var(--bad-line);color:var(--bad);background:#fff;border-radius:10px;width:40px;flex:none;cursor:pointer;}
   .inl-sel{appearance:none;-webkit-appearance:none;border:none;border-radius:100px;padding:5px 22px 5px 10px;font-size:10.8px;font-weight:800;cursor:pointer;font-family:inherit;background-repeat:no-repeat;background-position:right 8px center;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' stroke='%23667085' stroke-width='1.6' fill='none' stroke-linecap='round'/></svg>");max-width:150px;}
@@ -803,7 +803,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div class="tabs-row">
             <div class="tab-pill active" data-tab="all" onclick="setSpTab('all')">Semua <span class="cnt" id="sp_cnt_all">0</span></div>
             <div class="tab-pill" data-tab="pending" onclick="setSpTab('pending')"><span class="cdot" style="background:var(--warn);"></span> Belum Ready <span class="cnt" id="sp_cnt_pending">0</span></div>
-            <div class="tab-pill" data-tab="ready" onclick="setSpTab('ready')"><span class="cdot" style="background:var(--ok);"></span> Sudah Ready <span class="cnt" id="sp_cnt_ready">0</span></div>
+            <div class="tab-pill" data-tab="ready" onclick="setSpTab('ready')"><span class="cdot" style="background:#2563eb;"></span> Sudah Ready <span class="cnt" id="sp_cnt_ready">0</span></div>
             <div class="tab-pill" data-tab="selesai" onclick="setSpTab('selesai')"><span class="cdot" style="background:var(--ok);"></span> Selesai <span class="cnt" id="sp_cnt_selesai">0</span></div>
           </div>
           <div class="sp-list" id="sparepartBody"></div>
@@ -3159,7 +3159,7 @@ function spBuildImage(items){
     x.fillStyle = i%2 ? '#f1f5f9' : '#fff'; x.fillRect(M,y,tableW,rh[i]);
     cx = M;
     r.forEach((t,c)=>{
-      x.font=fB; x.fillStyle = c===6 ? (t==='SELESAI'?'#15803d':(t==='READY'?'#15803d':'#b45309')) : '#0f172a';
+      x.font=fB; x.fillStyle = c===6 ? (t==='SELESAI'?'#15803d':(t==='READY'?'#1d4ed8':'#b45309')) : '#0f172a';
       lines[i][c].forEach((ln,k)=>x.fillText(ln,cx+cp,y+8+k*lh)); cx+=cw[c];
     });
     y += rh[i];
