@@ -1605,6 +1605,7 @@ function openDataImageModal(onlyKey){
     const bar = document.createElement('div'); bar.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;';
     bar.innerHTML = `<button class="btn-primary small" onclick="copyDataImage(${idx})">📋 Salin Gambar</button>
       <button class="btn-outline" onclick="downloadDataImage(${idx})">⭳ Simpan PNG</button>
+      <button class="btn-outline green" onclick="downloadDataExcel(${idx})">📊 Simpan Excel</button>
       <button class="btn-green" onclick="openWaForDataImage(${idx})">💬 Buka Chat WA</button>`;
     wrap.appendChild(bar);
     box.appendChild(wrap);
@@ -1626,6 +1627,25 @@ async function downloadDataImage(idx){
   const blob = await canvasBlob(it.cv);
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = it.name; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+function downloadDataExcel(idx){
+  const it = window._dataImgCanvases[idx]; if(!it) return;
+  const num = n => (n===null||n===undefined||n==='') ? '' : Number(n);
+  const rows = it.list.map((v,i)=>{
+    const sisa = (v.currentkm && v.nextkm) ? Number(v.nextkm)-Number(v.currentkm) : '';
+    return {
+      'No': i+1, 'Nopol': v.nopol||'', 'Kendaraan': vLabel(v),
+      'Terakhir Service': fmtDate(v.lastdate), 'KM Terakhir Service': num(v.lastkm),
+      'KM Aktual': num(v.currentkm), 'Sisa / Lewat KM': sisa,
+      'Estimasi Berikutnya': fmtDate(v.nextdate), 'KM Berikutnya': num(v.nextkm),
+      'Status': statusLabel(statusOf(v))
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:5},{wch:14},{wch:34},{wch:16},{wch:18},{wch:12},{wch:16},{wch:20},{wch:14},{wch:12}];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Data Unit');
+  XLSX.writeFile(wb, it.name.replace(/\.png$/i,'.xlsx'));
+  showToast(`Excel ${rows.length} unit diunduh.`);
 }
 function openWaForDataImage(idx){
   const it = window._dataImgCanvases[idx]; if(!it) return;
