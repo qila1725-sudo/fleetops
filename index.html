@@ -267,6 +267,18 @@
   thead th{background:#fafbfd;font-weight:800;color:var(--ink-faint);font-size:10.8px;letter-spacing:.04em;position:sticky;top:0;white-space:nowrap;}
   thead th.sortable{cursor:pointer;user-select:none;}
   thead th.sortable:hover{color:var(--ink);}
+  /* Tabel Keluar Masuk Bengkel: isi sel rata tengah secara vertikal & tidak menumpuk */
+  #page-bengkel tbody td{vertical-align:middle;}
+  #page-bengkel thead th{vertical-align:middle;}
+  #page-bengkel td{line-height:1.35;}
+  #page-bengkel .status-badge{white-space:nowrap;}
+  #page-bengkel tbody td:nth-child(1){white-space:nowrap;}
+  #page-bengkel tbody td:nth-child(2){min-width:190px;}
+  #page-bengkel tbody td:nth-child(3){min-width:110px;}
+  #page-bengkel tbody td:nth-child(4), #page-bengkel tbody td:nth-child(5), #page-bengkel tbody td:nth-child(6), #page-bengkel tbody td:nth-child(8){white-space:nowrap;}
+  #page-bengkel tbody td.row-note{min-width:170px;}
+  #page-bengkel tbody td .inl-sel{vertical-align:middle;}
+  #page-bengkel .aksi-cell{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
   .sort-ic{display:inline-block;margin-left:3px;opacity:.55;}
   .sort-ic.active{opacity:1;color:var(--brand);}
   tbody tr:hover{background:#fafcff;}
