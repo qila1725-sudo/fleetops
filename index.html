@@ -279,6 +279,12 @@
   #page-bengkel tbody td.row-note{min-width:170px;}
   #page-bengkel tbody td .inl-sel{vertical-align:middle;}
   #page-bengkel .aksi-cell{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;}
+  .cb-pop{position:fixed;z-index:100000;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.18);max-height:300px;overflow:auto;padding:4px;display:none;}
+  .cb-item{padding:8px 12px;border-radius:8px;cursor:pointer;}
+  .cb-item.act,.cb-item:hover{background:#eef1f6;}
+  .cb-name{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;}
+  .cb-code{font-size:12px;font-weight:600;color:#4f6ba3;margin-top:1px;}
+  .cb-empty{padding:10px 12px;font-size:12.5px;color:var(--ink-soft);}
   .sort-ic{display:inline-block;margin-left:3px;opacity:.55;}
   .sort-ic.active{opacity:1;color:var(--brand);}
   tbody tr:hover{background:#fafcff;}
@@ -647,11 +653,11 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="sp-body"><div class="sp-g">
       <label>SPKLK No.</label><input id="spk_no" readonly>
       <div class="sp-rad" style="grid-column:3 / -1;"><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="bengkel" checked>Bengkel</label><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="luar">Kerja Luar</label><label><input type="radio" name="spk_type" onchange="spkTypeChanged()" value="luarkota">Kerja Luar Kota</label></div>
-      <label>Workshop</label><input id="spk_bengkel" class="sp-f" list="spkWsList"><datalist id="spkWsList"></datalist>
+      <label>Workshop</label><input id="spk_bengkel" class="sp-f" data-combo="ws" autocomplete="off" placeholder="Pilih / ketik nama atau kode workshop"><datalist id="spkWsList"></datalist>
       <label>Registration No.</label><input id="spk_nopol" list="spkNopolList" oninput="spkFillFromNopol()" placeholder="Pilih / ketik nopol"><datalist id="spkNopolList"></datalist><span></span><span></span>
       <label>Model</label><input id="spk_model" readonly><label>Brand</label><input id="spk_brand" readonly>
       <label>Type</label><input id="spk_vtype" readonly><span></span><span></span>
-      <label>Customer</label><input id="spk_pt" class="sp-f" list="spkCustList"><datalist id="spkCustList"></datalist>
+      <label>Customer</label><input id="spk_pt" class="sp-f" data-combo="cust" autocomplete="off" placeholder="Pilih / ketik nama atau kode customer"><datalist id="spkCustList"></datalist>
       <label>PIC</label><input id="spk_pic"><label>Handphone</label><input id="spk_phone">
       <label>Km</label><input id="spk_km" type="text" inputmode="numeric" autocomplete="off" placeholder="mis. 25.654" oninput="spkKmInput(this)"><span></span><span></span>
       <label>Date In</label><div class="sp-dt"><input id="spk_din" type="date"><input id="spk_tin" type="time"></div>
@@ -1780,6 +1786,32 @@ function applyAccess(){
   ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
   const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
 }
+/* ===== Dropdown pilihan Workshop/Customer: nama tebal, kode di bawahnya ===== */
+let CB_EL=null, CB_ITEMS=[], CB_IDX=-1;
+function cbPop(){ let p=document.getElementById('cbPop'); if(!p){ p=document.createElement('div'); p.id='cbPop'; p.className='cb-pop'; document.body.appendChild(p); p.addEventListener('mousedown', ev=>{ ev.preventDefault(); const it=ev.target.closest('.cb-item'); if(it) cbPick(+it.dataset.i); }); } return p; }
+function cbSource(el){ return (el.dataset.combo==='ws' ? WS_LIST : CUST_LIST) || []; }
+function cbPlace(){ if(!CB_EL) return; const p=cbPop(), r=CB_EL.getBoundingClientRect(); p.style.left=r.left+'px'; p.style.width=Math.max(r.width,260)+'px'; const below=window.innerHeight-r.bottom; if(below<220 && r.top>below){ p.style.top='auto'; p.style.bottom=(window.innerHeight-r.top+4)+'px'; p.style.maxHeight=Math.min(300,r.top-12)+'px'; } else { p.style.bottom='auto'; p.style.top=(r.bottom+4)+'px'; p.style.maxHeight=Math.min(300,below-12)+'px'; } }
+function cbRender(){
+  const p=cbPop(), q=(CB_EL.value||'').trim().toLowerCase();
+  CB_ITEMS=cbSource(CB_EL).filter(x=>!q || String(x.name||'').toLowerCase().includes(q) || String(x.code||'').toLowerCase().includes(q)).slice(0,80);
+  CB_IDX=-1;
+  p.innerHTML = CB_ITEMS.length ? CB_ITEMS.map((x,i)=>`<div class="cb-item" data-i="${i}"><div class="cb-name">${spkEsc(x.name)}</div><div class="cb-code">${spkEsc(x.code||'')}</div></div>`).join('') : '<div class="cb-empty">Tidak ada yang cocok — teks yang diketik tetap bisa dipakai.</div>';
+  p.style.display='block'; cbPlace();
+}
+function cbClose(){ const p=document.getElementById('cbPop'); if(p) p.style.display='none'; CB_EL=null; }
+function cbPick(i){ const x=CB_ITEMS[i]; if(!x||!CB_EL) return; const el=CB_EL; el.value=x.name; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); cbClose(); }
+function cbMove(d){ const p=cbPop(), n=CB_ITEMS.length; if(!n) return; CB_IDX=(CB_IDX+d+n)%n; p.querySelectorAll('.cb-item').forEach((e,i)=>e.classList.toggle('act',i===CB_IDX)); const a=p.querySelector('.cb-item.act'); if(a) a.scrollIntoView({block:'nearest'}); }
+document.addEventListener('focusin', e=>{ const t=e.target; if(t && t.dataset && t.dataset.combo){ CB_EL=t; cbRender(); } });
+document.addEventListener('input', e=>{ const t=e.target; if(t && t.dataset && t.dataset.combo){ CB_EL=t; cbRender(); } });
+document.addEventListener('keydown', e=>{
+  if(!CB_EL || e.target!==CB_EL) return;
+  if(e.key==='ArrowDown'){ e.preventDefault(); cbMove(1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); cbMove(-1); }
+  else if(e.key==='Enter' && CB_IDX>=0){ e.preventDefault(); cbPick(CB_IDX); }
+  else if(e.key==='Escape' || e.key==='Tab'){ cbClose(); }
+});
+document.addEventListener('mousedown', e=>{ const t=e.target; if(t && t.dataset && t.dataset.combo) return; const p=document.getElementById('cbPop'); if(p && p.contains(t)) return; cbClose(); });
+window.addEventListener('resize', cbPlace); window.addEventListener('scroll', cbPlace, true);
 function applySidebar(c){ const sh=document.querySelector('.shell'); if(sh) sh.classList.toggle('sb-collapsed', !!c); }
 function toggleSidebar(){
   const sh=document.querySelector('.shell'); if(!sh) return;
