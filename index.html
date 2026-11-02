@@ -941,7 +941,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
               <p class="small-note" style="margin:0 0 10px;">Ubah kalimat pengingat yang dikirim lewat tombol WA Reminder. Pakai kode di bawah ini, nanti otomatis diganti sistem sesuai data kendaraan. Khusus untuk pesan yang digabung banyak unit sekaligus (lebih dari 1 kendaraan dari PT yang sama), hanya baris pembuka & penutup yang ikut dipakai — daftar unitnya tetap format baku dari sistem.</p>
               <div class="form-grid">
                 <div class="full"><label>Baris Pembuka (setelah salam)</label><textarea id="wa_opening" rows="2" placeholder="Mengingatkan untuk jadwal service berkala kendaraan {kendaraan} Anda:"></textarea></div>
-                <div class="full"><label>Baris Penutup</label><textarea id="wa_closing" rows="3" placeholder="Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.&#10;&#10;Terima kasih!"></textarea></div>
+                <div class="full"><label>Baris Penutup</label><textarea id="wa_closing" rows="3" placeholder="Mohon informasikan KM aktual kendaraan saat ini (ketik angka KM atau kirim foto odometer) dengan membalas pesan ini.&#10;&#10;Terima kasih!"></textarea></div>
               </div>
               <p class="small-note" style="margin:10px 0;">Kode yang bisa dipakai: <code>{nama}</code> nama user/driver, <code>{pt}</code> nama PT, <code>{nopol}</code> nomor polisi, <code>{kendaraan}</code> Brand/Model/Type, <code>{tgl_terakhir}</code> & <code>{km_terakhir}</code> service terakhir, <code>{tgl_berikutnya}</code> & <code>{km_berikutnya}</code> estimasi berikutnya. Kode <code>{kendaraan}</code>/<code>{nopol}</code>/<code>{tgl_terakhir}</code>/dst hanya berlaku di pesan 1 unit, pada pesan gabungan baris pembuka cukup pakai <code>{nama}</code> & <code>{pt}</code> saja.</p>
               <div class="modal-actions" style="justify-content:flex-start;">
@@ -1454,7 +1454,10 @@ Terakhir Service: ${fmtDate(v.lastdate)} (${(v.lastkm||0).toLocaleString('id-ID'
 Estimasi Service Berikutnya: ${fmtDate(v.nextdate)} atau di ${(v.nextkm||0).toLocaleString('id-ID')} KM`;
 }
 const WA_DEFAULT_OPENING = 'Mengingatkan untuk jadwal service berkala kendaraan {kendaraan} Anda:';
-const WA_DEFAULT_CLOSING = 'Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.\n\nTerima kasih!';
+const WA_OLD_CLOSING = 'Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.\n\nTerima kasih!';
+const WA_DEFAULT_CLOSING = 'Mohon informasikan KM aktual kendaraan saat ini (ketik angka KM atau kirim foto odometer) dengan membalas pesan ini.\n\nTerima kasih!';
+// Template penutup yang dipakai: bila kosong / masih teks default lama, otomatis pakai default baru (yang menanyakan KM aktual)
+function waClosingTpl(){ const c = DB.settings.waClosing; return (!c || String(c).trim()===WA_OLD_CLOSING.trim()) ? WA_DEFAULT_CLOSING : c; }
 function waFillTokens(tpl, v){
   return String(tpl||'')
     .replace(/\{nama\}/g, v?.user||'-')
@@ -1474,7 +1477,7 @@ function waGreetLine(v){
 function waMessageFor(list){
   const v = list[0];
   const opening = waFillTokens(DB.settings.waOpening || WA_DEFAULT_OPENING, v);
-  const closing = waFillTokens(DB.settings.waClosing || WA_DEFAULT_CLOSING, v);
+  const closing = waFillTokens(waClosingTpl(), v);
   if(list.length>1){
     const blocks = list.map((x,i)=>`${i+1}) ${waVehicleBlock(x)}`).join('\n\n');
     // baris pembuka untuk pesan gabungan: pakai kalimat custom tapi ganti sebutan ke jamak
@@ -1612,7 +1615,7 @@ function drawDataImage(pt, arr){
     y+=rowH;
   });
   x.fillStyle='#5b6472'; x.font=`600 13px ${font}`;
-  x.fillText('Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply. Terima kasih!', 28, y+34);
+  x.fillText('Mohon informasikan KM aktual kendaraan saat ini (ketik angka KM atau kirim foto odometer) dengan membalas pesan ini. Terima kasih!', 28, y+34);
   return c;
 }
 function openDataImageModal(onlyKey){
@@ -1681,7 +1684,7 @@ function openWaForDataImage(idx){
   const msg = `${waGreetLine(v)}
 Berikut kami kirimkan data jadwal service berkala ${it.list.length} kendaraan Anda (lihat gambar).
 
-Mohon dapat melakukan pengecekan kilometer, jika sudah waktunya mohon dapat Reply.
+Mohon informasikan KM aktual kendaraan saat ini (ketik angka KM atau kirim foto odometer) dengan membalas pesan ini.
 
 Terima kasih!`;
   window.open(`https://wa.me/${waPhoneKey(v)}?text=${encodeURIComponent(msg)}`,'_blank');
@@ -3145,7 +3148,8 @@ function renderSparepart(){
   if(!list.length){ body.innerHTML = `<div class="gal-empty" style="grid-column:1/-1;">Belum ada data pending sparepart yang cocok.</div>`; spUpdateBulk(); return; }
   const groups = new Map();
   list.forEach(it=>{
-    const k = normNopol(it.nopol) || it.id;
+    // Sparepart yang sudah SELESAI dipisah dari yang masih berjalan, supaya input baru untuk nopol yang sama tidak menyatu dengan yang sudah selesai
+    const k = (normNopol(it.nopol) || it.id) + (it.selesai ? '|selesai' : '|aktif');
     if(!groups.has(k)) groups.set(k, { nopol:it.nopol, pt:it.pt, items:[], newest:'', meks:new Set(), areas:new Set() });
     const g = groups.get(k); g.items.push(it);
     if(it.mekanik) g.meks.add(it.mekanik);
@@ -3154,7 +3158,8 @@ function renderSparepart(){
     if((it.createdAt||'') > g.newest) g.newest = it.createdAt||'';
   });
   const arr = [...groups.values()].sort((a,b)=>{
-    const pa = a.items.some(i=>!i.ready) ? 0 : 1, pb = b.items.some(i=>!i.ready) ? 0 : 1;
+    const rank = g => g.items.every(i=>i.selesai) ? 2 : (g.items.some(i=>!i.ready) ? 0 : 1);
+    const pa = rank(a), pb = rank(b);
     return pa-pb || (b.newest||'').localeCompare(a.newest||'');
   });
   body.innerHTML = arr.map(g=>{
@@ -3489,7 +3494,7 @@ function renderAccountPage(){
   document.getElementById('acc_username').value = currentUser?.username||'';
   document.getElementById('acc_reminderdays').value = DB.settings.reminderDays||14;
   document.getElementById('wa_opening').value = DB.settings.waOpening || WA_DEFAULT_OPENING;
-  document.getElementById('wa_closing').value = DB.settings.waClosing || WA_DEFAULT_CLOSING;
+  document.getElementById('wa_closing').value = waClosingTpl();
   updateDesktopNotifBtnUI();
   const list = document.getElementById('acctList');
   list.innerHTML = DB.accounts.map((a,i)=>{
