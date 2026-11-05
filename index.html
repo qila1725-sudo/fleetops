@@ -3125,7 +3125,7 @@ function filteredSparepart(){
     if(spTab==='pending' && it.ready) return false;
     if(spTab==='ready' && (!it.ready || it.selesai)) return false;
     if(spTab==='selesai' && !it.selesai) return false;
-    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik} ${spAreaOf(it)} ${it.createdBy}`.toLowerCase().includes(q)) return false;
+    if(q && !`${it.nopol} ${it.pt} ${it.name} ${it.mekanik} ${spAreaOf(it)} ${spUserOf(it.nopol)}`.toLowerCase().includes(q)) return false;
     return true;
   });
 }
@@ -3169,7 +3169,7 @@ function renderSparepart(){
     const items = g.items.slice().sort((a,b)=>(a.ready-b.ready) || ((a.selesai?1:0)-(b.selesai?1:0)) || (a.createdAt||'').localeCompare(b.createdAt||'')).map(it=>`
       <div class="sp-item ${it.ready?'done':''} ${it.selesai?'selesai':''}">
         ${canEdit ? `<input type="checkbox" class="sp-sel" title="Pilih untuk dihapus" ${SP_SEL.has(it.id)?'checked':''} onchange="spSelToggle('${it.id}',this.checked)">` : ''}
-        <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-nm"><span class="sp-name">${escH(it.name)}</span>${it.createdBy ? `<span class="sp-by">👤 Diinput: ${escH(it.createdBy)}${it.createdAt?' • '+spTimeLabel(it.createdAt):''}</span>` : ''}</span></label>
+        <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-nm"><span class="sp-name">${escH(it.name)}</span></span></label>
         <span class="sp-badge ${it.selesai?'selesai':(it.ready?'ready':'belum')}">${spStatusLabel(it)}</span>
         <span class="sp-meta">${it.selesai ? `Selesai • ${escH(it.selesaiBy||'-')} • ${spTimeLabel(it.selesaiAt)}` : (it.ready ? `${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang')}</span>
         ${canEdit && it.ready ? `<button class="sp-fin ${it.selesai?'undo':''}" onclick="toggleSparepartSelesai('${it.id}', ${it.selesai?'false':'true'})" title="${it.selesai?'Batalkan status selesai':'Tandai sudah dikerjakan / selesai'}">${it.selesai?'↩ Batal':'✔ Selesai'}</button>` : ''}
@@ -3184,7 +3184,7 @@ function renderSparepart(){
         <span style="flex:1"></span>
         <span class="sp-prog ${allFin?'fin':(allDone?'ok':'')}">${allFin ? '✔ SELESAI' : `${done}/${total} ready${finN?` • ${finN} selesai`:''}`}</span>
         ${canAdd ? `<button class="edit-icon-btn" title="Tambah sparepart untuk nopol ini" onclick="openSparepartModal({nopol:'${escH(g.nopol)}', pt:'${escH(g.pt)}', mekanik:'${escH([...g.meks][0]||'')}', area:'${escH([...g.areas][0]||'')}'})">＋</button>` : ''}
-      </div>${g.meks.size ? `<div class="sp-mek">🔧 Mekanik: ${escH([...g.meks].join(', '))}</div>` : ''}${items}</div>`;
+      </div>${(g.meks.size || spUserOf(g.nopol)) ? `<div class="sp-mek">${g.meks.size ? '🔧 Mekanik: '+escH([...g.meks].join(', ')) : ''}${(g.meks.size && spUserOf(g.nopol)) ? ' &nbsp;•&nbsp; ' : ''}${spUserOf(g.nopol) ? '👤 User: '+escH(spUserOf(g.nopol)) : ''}</div>` : ''}${items}</div>`;
   }).join('');
   spUpdateBulk();
 }
@@ -3209,10 +3209,10 @@ async function copySparepartSelected(){
   const g = new Map();
   items.forEach(it=>{ if(!g.has(it.nopol)) g.set(it.nopol,{pt:it.pt,mek:new Set(),area:new Set(),list:[]}); const o=g.get(it.nopol); if(it.mekanik) o.mek.add(it.mekanik); { const ar = spAreaOf(it); if(ar) o.area.add(ar); } o.list.push(it); });
   let txt = '*PENDING SPAREPART*\n';
-  g.forEach((o,k)=>{ txt += `\n*${k}* - ${o.pt||'-'}${(o.mek.size||o.area.size)?' ('+[o.mek.size?'Mekanik: '+[...o.mek].join(', '):'', o.area.size?'Area: '+[...o.area].join(', '):''].filter(Boolean).join(' | ')+')':''}\n`; o.list.forEach(it=>{ txt += `- ${it.name} [${spStatusLabel(it)}]\n`; }); });
+  g.forEach((o,k)=>{ txt += `\n*${k}* - ${o.pt||'-'}${(o.mek.size||o.area.size||spUserOf(k))?' ('+[o.mek.size?'Mekanik: '+[...o.mek].join(', '):'', spUserOf(k)?'User: '+spUserOf(k):'', o.area.size?'Area: '+[...o.area].join(', '):''].filter(Boolean).join(' | ')+')':''}\n`; o.list.forEach(it=>{ txt += `- ${it.name} [${spStatusLabel(it)}]\n`; }); });
   const th = 'style="border:1px solid #999;padding:4px 8px;background:#1e293b;color:#fff;text-align:left"', td = 'style="border:1px solid #999;padding:4px 8px"';
-  const html = '<table style="border-collapse:collapse;font-family:Arial;font-size:13px"><tr>'+['No','Nopol','Nama PT / Standby','Mekanik','Area','Sparepart','Status'].map(h=>`<th ${th}>${h}</th>`).join('')+'</tr>'
-    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(spAreaOf(it))}</td><td ${td}>${escH(it.name)}</td><td ${td}>${spStatusLabel(it)}</td></tr>`).join('')+'</table>';
+  const html = '<table style="border-collapse:collapse;font-family:Arial;font-size:13px"><tr>'+['No','Nopol','Nama PT / Standby','Mekanik','User','Area','Sparepart','Status'].map(h=>`<th ${th}>${h}</th>`).join('')+'</tr>'
+    + items.map((it,i)=>`<tr><td ${td}>${i+1}</td><td ${td}><b>${escH(it.nopol)}</b></td><td ${td}>${escH(it.pt)}</td><td ${td}>${escH(it.mekanik)}</td><td ${td}>${escH(spUserOf(it.nopol))}</td><td ${td}>${escH(spAreaOf(it))}</td><td ${td}>${escH(it.name)}</td><td ${td}>${spStatusLabel(it)}</td></tr>`).join('')+'</table>';
   try{
     if(navigator.clipboard && window.ClipboardItem){
       await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([txt],{type:'text/plain'}),'text/html':new Blob([html],{type:'text/html'})})]);
@@ -3226,8 +3226,8 @@ async function copySparepartSelected(){
 function spBuildImage(items){
   const S=2, cp=10, lh=18, fN='13px Arial, Helvetica, sans-serif', fB='bold 13px Arial, Helvetica, sans-serif';
   const m = document.createElement('canvas').getContext('2d');
-  const heads = ['No','Nopol','Nama PT / Standby','Mekanik','Area','Sparepart','Status'], caps = [44,110,240,150,150,360,80];
-  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', spAreaOf(it), it.name||'', spStatusLabel(it)]);
+  const heads = ['No','Nopol','Nama PT / Standby','Mekanik','User','Area','Sparepart','Status'], caps = [44,110,240,150,150,150,360,80];
+  const rows = items.map((it,i)=>[String(i+1), it.nopol||'', it.pt||'', it.mekanik||'', spUserOf(it.nopol), spAreaOf(it), it.name||'', spStatusLabel(it)]);
   const cw = heads.map((h,c)=>{ m.font=fB; let mx=m.measureText(h).width; m.font=fB; rows.forEach(r=>{ mx=Math.max(mx,m.measureText(r[c]).width); }); return Math.min(caps[c], Math.ceil(mx)+cp*2); });
   const wrap = (t,maxW)=>{ m.font=fB; const out=[]; let line=''; String(t).split(/\s+/).forEach(wd=>{ const tt=line?line+' '+wd:wd; if(m.measureText(tt).width>maxW && line){ out.push(line); line=wd; } else line=tt; }); out.push(line); return out; };
   const lines = rows.map(r=>r.map((t,c)=>wrap(t,cw[c]-cp*2)));
@@ -3247,7 +3247,7 @@ function spBuildImage(items){
     x.fillStyle = i%2 ? '#f1f5f9' : '#fff'; x.fillRect(M,y,tableW,rh[i]);
     cx = M;
     r.forEach((t,c)=>{
-      x.font=fB; x.fillStyle = c===6 ? (t==='SELESAI'?'#15803d':(t==='READY'?'#1d4ed8':'#b45309')) : '#0f172a';
+      x.font=fB; x.fillStyle = c===7 ? (t==='SELESAI'?'#15803d':(t==='READY'?'#1d4ed8':'#b45309')) : '#0f172a';
       lines[i][c].forEach((ln,k)=>x.fillText(ln,cx+cp,y+8+k*lh)); cx+=cw[c];
     });
     y += rh[i];
@@ -3331,6 +3331,7 @@ function spFillLists(){
   const areas = [...new Set([...DB.sparepart.map(x=>x.area), ...DB.vehicles.map(x=>x.area)].map(a=>String(a||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'id'));
   document.getElementById('spAreaList').innerHTML = areas.map(n=>`<option value="${escH(n)}">`).join('');
 }
+function spUserOf(nopol){ const k = normNopol(nopol); if(!k) return ''; const v = DB.vehicles.find(x=>normNopol(x.nopol)===k); const u = (v && v.user) ? String(v.user).trim() : ''; return (u && u!=='-') ? u : ''; }
 function spVehArea(nopol){ const k = normNopol(nopol); if(!k) return ''; const v = DB.vehicles.find(x=>normNopol(x.nopol)===k); return (v && v.area) ? String(v.area).trim() : ''; }
 function spAreaOf(it){ return ((it && it.area) ? String(it.area).trim() : '') || spVehArea(it && it.nopol); }
 function spAutofill(){
@@ -3426,7 +3427,7 @@ async function deleteSparepart(id){
 }
 function exportSparepart(onlySel){
   if(!isMaintenance()) return;
-  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'Area':spAreaOf(it), 'Sparepart':it.name, 'Status':it.selesai?'Selesai':(it.ready?'Ready':'Belum Ready'), 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diselesaikan Oleh':it.selesaiBy, 'Waktu Selesai':spTimeLabel(it.selesaiAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
+  const rows = (onlySel===true ? spSelectedItems() : filteredSparepart()).map(it=>({ 'Nopol':it.nopol, 'Nama PT / Standby':it.pt, 'Mekanik':it.mekanik, 'User / Driver':spUserOf(it.nopol), 'Area':spAreaOf(it), 'Sparepart':it.name, 'Status':it.selesai?'Selesai':(it.ready?'Ready':'Belum Ready'), 'Dicentang Oleh':it.readyBy, 'Waktu Ready':spTimeLabel(it.readyAt), 'Diselesaikan Oleh':it.selesaiBy, 'Waktu Selesai':spTimeLabel(it.selesaiAt), 'Diinput Oleh':it.createdBy, 'Tanggal Input':(it.createdAt||'').slice(0,10) }));
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Pending Sparepart'); XLSX.writeFile(wb, onlySel===true ? 'pending-sparepart-terpilih.xlsx' : 'pending-sparepart.xlsx');
 }
