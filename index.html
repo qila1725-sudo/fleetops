@@ -298,6 +298,10 @@
   .status-badge.ok{background:var(--ok-bg);color:var(--ok);}
   .status-badge.warn{background:var(--warn-bg);color:var(--warn);}
   .status-badge.bad{background:var(--bad-bg);color:var(--bad);}
+  .status-badge.sold{background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;}
+  tr.sold-row td{background:#fff5f5;}
+  tr.sold-row .cell-primary, tr.sold-row .cell-sub, tr.sold-row .nopol-badge{color:#b91c1c;}
+  tr.sold-row .nopol-badge{background:#fee2e2;border:1px solid #fecaca;}
   .status-badge.info{background:#e8f0ff;color:#1d4ed8;}
   thead th.th-filter{cursor:pointer;user-select:none;vertical-align:top;}
   thead th.th-filter:hover{color:var(--ink);}
@@ -790,6 +794,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="tab-pill" data-tab="warn" onclick="setQuickTab('warn')"><span class="cdot"></span> Mendekati <span class="cnt" id="cnt_warn">0</span></div>
             <div class="tab-pill" data-tab="ok" onclick="setQuickTab('ok')"><span class="cdot"></span> Aman <span class="cnt" id="cnt_ok">0</span></div>
             <div class="tab-pill" data-tab="standby" onclick="setQuickTab('standby')"><span class="cdot" style="background:#8b5cf6;"></span> Standby (Belum Ada PT) <span class="cnt" id="cnt_standby">0</span></div>
+            <div class="tab-pill" data-tab="sold" onclick="setQuickTab('sold')"><span class="cdot" style="background:#dc2626;"></span> Terjual <span class="cnt" id="cnt_sold">0</span></div>
           </div>
 
           <div class="bulk-bar" id="bulkBar">
@@ -1437,7 +1442,7 @@ function waIndex(){
   (DB.bengkel||[]).forEach(b=>{ if(!b.tglKeluar){ if(b.vehicleId) ws.ids.add(b.vehicleId); ws.nopols.add((b.nopol||'').trim().toUpperCase()); } });
   const groups = new Map();
   DB.vehicles.forEach(x=>{
-    if(isStandby(x) || !waPhoneKey(x) || statusOf(x)==='ok') return;
+    if(isSold(x) || isStandby(x) || !waPhoneKey(x) || statusOf(x)==='ok') return;
     if((x.id&&ws.ids.has(x.id)) || ws.nopols.has((x.nopol||'').trim().toUpperCase())) return;
     const k=waGroupKey(x); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(x);
   });
@@ -1507,7 +1512,7 @@ ${closing}`;
 function waMessage(v){ return waMessageFor(waGroup(v)); }
 function waLinkFor(list){ return `https://wa.me/${waPhoneKey(list[0])}?text=${encodeURIComponent(waMessageFor(list))}`; }
 function waLink(v){ return waLinkFor(waGroup(v)); }
-function openWaVehicle(id){ const v=DB.vehicles.find(x=>x.id===id); if(v) window.open(waLink(v),'_blank'); }
+function openWaVehicle(id){ const v=DB.vehicles.find(x=>x.id===id); if(v && !isSold(v)) window.open(waLink(v),'_blank'); }
 function waBtnLabel(v, base){ const n=waGroup(v).length; return n>1 ? `${base} (${n} unit)` : base; }
 // untuk kirim massal dari dashboard: 1 chat per PT+nomor WA (tidak dobel), kecuali PT yang diatur "per unit"
 function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ const k=(waPhoneKey(v)&&waPrefFor(v)!=='single')?waGroupKey(v):'id:'+v.id; if(seen.has(k)) return false; seen.add(k); return true; }); }
@@ -1515,8 +1520,8 @@ function dedupeWaTargets(list){ const seen=new Set(); return list.filter(v=>{ co
 /* ===== Bulk WA: pilih cara kirim per PT ===== */
 let waBulkModes = {};
 function bulkWaReminder(){
-  const list = DB.vehicles.filter(v=>selectedIds.has(v.id));
-  if(list.length===0) return;
+  const list = DB.vehicles.filter(v=>selectedIds.has(v.id) && !isSold(v));
+  if(list.length===0){ if(selectedIds.size) showToast('Unit yang dipilih sudah terjual, tidak dikirimi reminder.', true); return; }
   const byPt = {};
   list.forEach(v=>{ const k=waPtKey(v)||('id:'+v.id); (byPt[k]=byPt[k]||[]).push(v); });
   waBulkModes = {};
@@ -1562,7 +1567,7 @@ function renderWaBulkModal(){
 }
 /* ===== Foto Data Unit per PT (gambar tabel untuk dikirim via WA) ===== */
 function dataImgGroups(onlyKey){
-  const list = DB.vehicles.filter(v=>selectedIds.has(v.id));
+  const list = DB.vehicles.filter(v=>selectedIds.has(v.id) && !isSold(v));
   const byPt = {};
   list.forEach(v=>{ const k=waPtKey(v)||('id:'+v.id); (byPt[k]=byPt[k]||[]).push(v); });
   if(onlyKey && byPt[onlyKey]) return {[onlyKey]:byPt[onlyKey]};
@@ -1597,7 +1602,7 @@ function drawDataImage(pt, arr){
   x.fillStyle='#5b6472'; x.font=`800 12px ${font}`;
   let cx=28; cols.forEach(cl=>{ x.fillText(cl.t.toUpperCase(), cx, y+27); cx+=cl.w; });
   y += colHead;
-  const colors = {bad:['#fdecec','#c62828'],warn:['#fff4e0','#b26a00'],ok:['#e6f6ec','#1b7a3e']};
+  const colors = {bad:['#fdecec','#c62828'],warn:['#fff4e0','#b26a00'],ok:['#e6f6ec','#1b7a3e'],sold:['#fee2e2','#b91c1c']};
   arr.forEach((v,i)=>{
     if(i%2===1){ x.fillStyle='#fafbfd'; x.fillRect(0,y,W,rowH); }
     x.strokeStyle='#e8ebf1'; x.beginPath(); x.moveTo(0,y+rowH); x.lineTo(W,y+rowH); x.stroke();
@@ -1708,7 +1713,9 @@ function executeBulkWa(){
   showToast(`Membuka ${plan.length} chat WhatsApp reminder secara berurutan...`);
 }
 function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastdate? addDays(lastdate, interval||180):''; const nextkm=(Number(lastkm)||0)+(Number(kmstep)||10000); return {nextdate,nextkm}; }
+function isSold(v){ return /terjual/i.test(String(v && v.pt || '')); }
 function statusOf(v){
+  if(isSold(v)) return 'sold';
   if(!v.nextdate) return 'ok';
   const rd = DB.settings.reminderDays||14, key = v.nextdate+'|'+rd+'|'+today();
   if(v._stk===key) return v._st;
@@ -1716,7 +1723,7 @@ function statusOf(v){
   const st = d<0 ? 'bad' : (d<=rd ? 'warn' : 'ok');
   v._stk=key; v._st=st; return st;
 }
-function statusLabel(s){ return s==='bad'?'Overdue':(s==='warn'?'Mendekati':'Aman'); }
+function statusLabel(s){ return s==='sold'?'Terjual':(s==='bad'?'Overdue':(s==='warn'?'Mendekati':'Aman')); }
 function isStandby(v){ const pt=(v.pt||'').trim().toLowerCase(); return pt==='' || pt==='standby' || pt==='stanby'; }
 
 /* ================= AUTH ================= */
@@ -1849,13 +1856,13 @@ function renderAll(){ renderDashboard(); populateFilterOptions(); renderTable();
 function renderDashboard(){
   invalidateWaIdx();
   const vs = DB.vehicles;
-  document.getElementById('kpiTotal').textContent = vs.length;
+  document.getElementById('kpiTotal').textContent = vs.filter(v=>!isSold(v)).length;
   document.getElementById('navReminderCount').textContent = vs.length;
   document.getElementById('bellCount').textContent = vs.filter(v=>{ const s=statusOf(v); return s==='bad'||s==='warn'; }).length;
   renderNotifPanel();
   document.getElementById('kpiSoonLabel').textContent = `MENDEKATI (${DB.settings.reminderDays||14} HARI)`;
   let bad=0,warn=0,ok=0;
-  vs.forEach(v=>{ const s=statusOf(v); if(s==='bad')bad++; else if(s==='warn')warn++; else ok++; });
+  vs.forEach(v=>{ const s=statusOf(v); if(s==='bad')bad++; else if(s==='warn')warn++; else if(s!=='sold')ok++; });
   document.getElementById('kpiOverdue').textContent = bad;
   document.getElementById('kpiSoon').textContent = warn;
   document.getElementById('kpiSafe').textContent = ok;
@@ -1998,13 +2005,13 @@ function renderTable(){
   const body = document.getElementById('vehicleBody');
   if(list.length===0){ body.innerHTML=`<tr class="empty-row"><td colspan="11">Tidak ada data kendaraan yang cocok. Coba ubah pencarian/filter, atau tambahkan data baru.</td></tr>`; renderBulkBar(); return; }
   body.innerHTML = list.map(v=>{
-    const s = statusOf(v);
+    const s = statusOf(v), sold = s==='sold';
     const code = v.code || ptCode(v.pt, 0);
     const kmLeft = (Number(v.nextkm)||0) - (Number(v.currentkm)||0);
     const kmLeftTxt = v.nextkm ? (kmLeft<=0 ? `<span style="color:var(--bad);font-weight:700;">sudah lewat ${Math.abs(kmLeft).toLocaleString('id-ID')} KM</span>` : `sisa ${kmLeft.toLocaleString('id-ID')} KM`) : '';
-    return `<tr>
+    return `<tr class="${sold?'sold-row':''}">
       <td><input type="checkbox" class="rowchk" data-id="${v.id}" ${selectedIds.has(v.id)?'checked':''} onchange="onRowCheck('${v.id}',this.checked)"></td>
-      <td><div class="cell-primary">${isStandby(v) ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Standby</span>' : v.pt}</div><div class="cell-sub">ID: ${code}</div></td>
+      <td><div class="cell-primary">${sold ? `<span class="status-badge sold">${v.pt}</span>` : (isStandby(v) ? '<span class="status-badge" style="background:#f3e8ff;color:#7c3aed;">Standby</span>' : v.pt)}</div><div class="cell-sub">ID: ${code}</div></td>
       <td><div class="cell-primary">${v.user||'-'}</div><div class="cell-phone-row"><span class="cell-sub">${v.phone||'-'}</span><button class="note-btn" title="Keterangan: ${(v.note||'-').replace(/"/g,'&quot;')}">💬</button></div></td>
       <td><button class="nopol-badge" onclick="openHistoryModal('${v.id}')">${v.nopol||'-'}</button></td>
       <td><div class="cell-primary">${v.type||vLabel(v)}</div><div class="cell-sub">${v.color||'-'} • ${v.year||'-'}</div></td>
@@ -2014,7 +2021,7 @@ function renderTable(){
       <td>${v.interval||'-'} Hari</td>
       <td><span class="status-badge ${s}">${statusLabel(s)}</span>${inWorkshopNow(v) ? '<br><span class="status-badge" style="background:#fff4e0;color:#b26a00;margin-top:4px;">🔧 Di Bengkel</span>' : ''}</td>
       <td><div class="aksi-cell">
-        <a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WA Reminder')}</a>
+        ${sold ? `<span class="wa-btn" style="opacity:.4;cursor:not-allowed;" title="Unit sudah terjual — tidak dikirimi reminder">💬 WA Reminder</span>` : `<a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WA Reminder')}</a>`}
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
         <button class="edit-icon-btn" onclick="openVehicleModal('${v.id}')" title="Edit">✎</button>
       </div></td>
@@ -2031,12 +2038,13 @@ function populateTabCounts(){
     if(area && v.area!==area) return false;
     return true;
   });
-  let bad=0,warn=0,ok=0,standby=0; base.forEach(v=>{ if(isStandby(v)){ standby++; return; } const s=statusOf(v); if(s==='bad')bad++; else if(s==='warn')warn++; else ok++; });
+  let bad=0,warn=0,ok=0,standby=0,sold=0; base.forEach(v=>{ if(isSold(v)){ sold++; return; } if(isStandby(v)){ standby++; return; } const s=statusOf(v); if(s==='bad')bad++; else if(s==='warn')warn++; else ok++; });
   document.getElementById('cnt_all').textContent=base.length;
   document.getElementById('cnt_bad').textContent=bad;
   document.getElementById('cnt_warn').textContent=warn;
   document.getElementById('cnt_ok').textContent=ok;
   document.getElementById('cnt_standby').textContent=standby;
+  document.getElementById('cnt_sold').textContent=sold;
 }
 function onRowCheck(id, checked){ if(checked) selectedIds.add(id); else selectedIds.delete(id); renderBulkBar(); }
 function toggleAll(box){ document.querySelectorAll('.rowchk').forEach(c=>{ c.checked=box.checked; if(box.checked) selectedIds.add(c.dataset.id); else selectedIds.delete(c.dataset.id); }); renderBulkBar(); }
