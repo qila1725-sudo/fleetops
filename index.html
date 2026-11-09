@@ -468,12 +468,12 @@
   .btn-spk-entry .ic{font-size:22px;}
   #spkChoiceScreen{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;
     background-color:#1c2f52;background-image:radial-gradient(ellipse 520px 640px at 50% 0%, rgba(255,205,120,.28), rgba(255,205,120,0) 68%),linear-gradient(165deg,#24406e 0%,#0e1c36 100%);}
-  .choice-wrap{width:100%;max-width:980px;position:relative;z-index:1;}
+  .choice-wrap{width:100%;max-width:1240px;position:relative;z-index:1;}
   .choice-head{color:#fff;text-align:center;margin-bottom:22px;}
   .choice-head h1{margin:0 0 4px;font-size:24px;}
   .choice-head p{margin:0;color:rgba(255,255,255,.7);font-size:13.5px;}
-  .choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
-  .choice-card{background:#fff;border:none;border-radius:16px;padding:28px 22px;text-align:left;box-shadow:0 24px 50px rgba(0,0,0,.35);transition:transform .15s;}
+  .choice-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .choice-card{display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;background:#fff;border:none;border-radius:16px;padding:28px 22px;text-align:left;font-family:inherit;box-shadow:0 24px 50px rgba(0,0,0,.35);transition:transform .15s;}
   .choice-card:hover{transform:translateY(-3px);}
   .choice-card .ic{width:54px;height:54px;border-radius:14px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:14px;}
   .choice-card.green .ic{background:var(--ok-bg);}
@@ -481,7 +481,8 @@
   .choice-card p{margin:0;font-size:12.8px;color:var(--ink-soft);line-height:1.5;}
   .choice-back{display:block;margin:20px auto 0;background:none;border:none;color:rgba(255,255,255,.75);font-size:13px;font-weight:700;}
   .choice-back:hover{color:#fff;}
-  @media(max-width:820px){.choice-grid{grid-template-columns:1fr;}}
+  @media(max-width:1100px){.choice-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:640px){.choice-grid{grid-template-columns:1fr;}}
   #spkScreen{display:none;min-height:100vh;background:var(--paper);}
   .spk-top{background:var(--card);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
   .spk-top h2{margin:0;font-size:20px;font-weight:800;}
@@ -573,6 +574,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <button class="choice-card" onclick="openSpkWork()"><div class="ic">📝</div><h3>Mengerjakan SPK</h3><p>Buat, ubah, cetak, dan pantau Surat Perintah Kerja untuk tiap unit.</p></button>
       <button class="choice-card green" onclick="openReminderFromSpk('jabodetabek')"><div class="ic">🚗</div><h3>Data Reminder Jabodetabek</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit wilayah Jabodetabek.</p></button>
       <button class="choice-card green" onclick="openReminderFromSpk('jabanusul')"><div class="ic">🗺️</div><h3>Data Reminder Jabanusul</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, dan Sulawesi.</p></button>
+      <button class="choice-card green" onclick="openReminderFromSpk('nonjawa')"><div class="ic">🏝️</div><h3>Data Reminder Non Jawa</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit seluruh Sumatera, Kalimantan, dan Batam.</p></button>
     </div>
     <button class="choice-back" onclick="leaveSpk()">← Keluar</button>
   </div>
@@ -692,7 +694,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
         <div class="names"><span class="t1">FleetOps</span><span class="pro">PRO</span><span class="t2">Fleet Maintenance Suite</span></div>
         <button class="sb-toggle" onclick="toggleSidebar()" title="Tutup menu" aria-label="Tutup menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
       </div>
-      <div class="region-sw"><label for="regionSw">Wilayah data</label><select id="regionSw" onchange="setRegion(this.value)"><option value="all">Semua Wilayah</option><option value="jabodetabek">Jabodetabek</option><option value="jabanusul">Jabanusul</option></select></div>
+      <div class="region-sw"><label for="regionSw">Wilayah data</label><select id="regionSw" onchange="setRegion(this.value)"><option value="all">Semua Wilayah</option><option value="jabodetabek">Jabodetabek</option><option value="jabanusul">Jabanusul</option><option value="nonjawa">Non Jawa</option></select></div>
       <div class="nav-item active" data-page="dashboard" onclick="goPage('dashboard')"><span class="l"><span class="ic">📊</span> Dashboard</span></div>
       <div class="nav-item" data-page="reminder" onclick="goPage('reminder')"><span class="l"><span class="ic">🚗</span> Reminder / Data Kendaraan</span><span class="count" id="navReminderCount">0</span></div>
       <div class="nav-item" data-page="sparepart" onclick="goPage('sparepart')"><span class="l"><span class="ic">🔩</span> Pending Sparepart</span><span class="count" id="navSparepartCount">0</span></div>
@@ -1720,7 +1722,7 @@ function executeBulkWa(){
 function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastdate? addDays(lastdate, interval||180):''; const nextkm=(Number(lastkm)||0)+(Number(kmstep)||10000); return {nextdate,nextkm}; }
 /* ===== Wilayah data: Jabodetabek / Jabanusul (di luar Jabodetabek) ===== */
 let REGION = 'all';
-try{ const r = localStorage.getItem('fleetops_region'); if(r==='jabodetabek'||r==='jabanusul'||r==='all') REGION = r; }catch(e){}
+try{ const r = localStorage.getItem('fleetops_region'); if(r==='jabodetabek'||r==='jabanusul'||r==='nonjawa'||r==='all') REGION = r; }catch(e){}
 const JABODETABEK_RE = /jakarta|bogor|depok|tangerang|tangsel|bekasi|cikarang|serpong|bsd|cibubur|sentul|cileungsi|jabodetabek|lebak bulus|imperium|mampang|kebon jeruk|kuningan|sudirman|thamrin|senayan|kemang|cilandak|pluit|kelapa gading|cengkareng|tomang|slipi|tebet|pasar minggu|kalideres|ciputat|pamulang|karawaci|ancol|menteng|gambir|kemayoran|cawang|halim|pondok indah|pantai indah kapuk|pik\b/i;
 // Jabanusul = khusus Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, Sulawesi
 const JABANUSUL_RE = new RegExp('\\b(?:' + [
@@ -1735,10 +1737,20 @@ const JABANUSUL_RE = new RegExp('\\b(?:' + [
   // Sulawesi
   'sulawesi|sulsel|sulut|sulteng|sultra|sulbar|makassar|manado|gorontalo|palu|kendari|mamuju|parepare|bitung|tomohon|luwuk|palopo|gowa|maros|toraja|minahasa|kotamobagu'
 ].join('|') + ')\\b', 'i');
+// Non Jawa = seluruh Pulau Sumatera, Kalimantan, dan Batam
+const NONJAWA_RE = new RegExp('\\b(?:' + [
+  // Sumatera
+  'sumatera|sumatra|aceh|banda aceh|lhokseumawe|langsa|meulaboh|medan|sumut|binjai|deli serdang|pematang siantar|siantar|tebing tinggi|kisaran|rantau prapat|rantauprapat|padang sidempuan|sibolga|tarutung|balige|padang|sumbar|bukittinggi|payakumbuh|solok|pariaman|pekanbaru|riau|dumai|duri|bengkalis|siak|kampar|pelalawan|rokan|indragiri|kepulauan riau|kepri|tanjung pinang|tanjungpinang|bintan|karimun|jambi|bungo|muaro bungo|kerinci|sumsel|palembang|lubuk linggau|lubuklinggau|prabumulih|pagar alam|muara enim|lahat|baturaja|bengkulu|bangka|belitung|pangkal pinang|pangkalpinang|lampung|bandar lampung|kotabumi|tulang bawang|pringsewu|natar|metro lampung',
+  // Kalimantan
+  'kalimantan|kalbar|kalteng|kalsel|kaltim|kaltara|pontianak|singkawang|ketapang|sanggau|sintang|palangkaraya|palangka raya|sampit|pangkalan bun|banjarmasin|banjarbaru|martapura|barabai|balikpapan|samarinda|bontang|tenggarong|kutai|berau|tarakan|nunukan|bulungan|penajam|sangatta|tanah grogot|paser',
+  // Batam
+  'batam|batam center|batu ampar|nagoya|sekupang'
+].join('|') + ')\\b', 'i');
 function regionOfArea(a){
   const t = String(a||'').trim();
   if(!t || t==='-') return 'jabodetabek';           // unit tanpa area (mis. Standby) ikut Jabodetabek
   if(JABANUSUL_RE.test(t)) return 'jabanusul';       // khusus Jateng, Jatim, Bali, Nusa Tenggara, Sulawesi
+  if(NONJAWA_RE.test(t)) return 'nonjawa';           // seluruh Sumatera, Kalimantan, Batam
   return 'jabodetabek';                               // selain itu tetap di Jabodetabek (isi lama tidak dipindah)
 }
 function inRegion(area){ return REGION==='all' || regionOfArea(area)===REGION; }
@@ -1748,7 +1760,7 @@ function scopedVehicles(){ return DB.vehicles.filter(vInScope); }
 function spRegionArea(it){ return areaOfNopol(it && it.nopol) || (it && it.area) || ''; }
 function areaOfNopol(n){ const k = normNopol(n); if(!k) return ''; const v = DB.vehicles.find(x=>normNopol(x.nopol)===k); return v ? v.area : ''; }
 function setRegion(r, rerender){
-  REGION = (r==='jabodetabek'||r==='jabanusul') ? r : 'all';
+  REGION = (r==='jabodetabek'||r==='jabanusul'||r==='nonjawa') ? r : 'all';
   try{ localStorage.setItem('fleetops_region', REGION); }catch(e){}
   const sel = document.getElementById('regionSw'); if(sel) sel.value = REGION;
   if(rerender!==false){ selectedIds.clear(); renderAll(); }
@@ -2045,7 +2057,7 @@ function renderTable(){
   populateTabCounts();
   const list = filteredVehicles();
   const body = document.getElementById('vehicleBody');
-  if(list.length===0){ const emptyMsg = (REGION==='jabanusul' && !DB.vehicles.some(vInScope)) ? 'Belum ada unit Jabanusul (Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, Sulawesi). Klik <b>+ Tambah Kendaraan</b> atau <b>Import Excel</b> dan isi Area dengan daerah tersebut.' : 'Tidak ada data kendaraan yang cocok. Coba ubah pencarian/filter, atau tambahkan data baru.';
+  if(list.length===0){ const emptyMsg = (REGION!=='all' && REGION!=='jabodetabek' && !DB.vehicles.some(vInScope)) ? (REGION==='nonjawa' ? 'Belum ada unit Non Jawa (seluruh Sumatera, Kalimantan, dan Batam). Klik <b>+ Tambah Kendaraan</b> atau <b>Import Excel</b> dan isi Area dengan daerah tersebut.' : 'Belum ada unit Jabanusul (Jawa Tengah, Yogyakarta, Jawa Timur, Bali, Nusa Tenggara, Sulawesi). Klik <b>+ Tambah Kendaraan</b> atau <b>Import Excel</b> dan isi Area dengan daerah tersebut.') : 'Tidak ada data kendaraan yang cocok. Coba ubah pencarian/filter, atau tambahkan data baru.';
     body.innerHTML=`<tr class="empty-row"><td colspan="11">${emptyMsg}</td></tr>`; renderBulkBar(); return; }
   body.innerHTML = list.map(v=>{
     const s = statusOf(v), sold = s==='sold';
@@ -2127,10 +2139,12 @@ function guessVehicleTypeSelects(v){
   document.getElementById('v_model').value = v?.model || '';
   document.getElementById('v_type').value = v?.type || '';
 }
+const NONJAWA_AREA_HINTS = ['Sumatera','Aceh','Medan','Padang','Pekanbaru','Jambi','Palembang','Bengkulu','Lampung','Bangka Belitung','Batam','Kalimantan','Pontianak','Palangkaraya','Banjarmasin','Balikpapan','Samarinda'];
 const JABANUSUL_AREA_HINTS = ['Jawa Tengah','Yogyakarta','Jawa Timur','Bali','Nusa Tenggara','Sulawesi','Semarang','Solo','Surabaya','Malang','Denpasar','Mataram','Kupang','Makassar','Manado'];
 function fillVAreaList(){
   const known = [...new Set(DB.vehicles.map(x=>x.area).filter(a=>a && a!=='-'))];
-  const list = REGION==='jabanusul' ? [...new Set([...JABANUSUL_AREA_HINTS, ...known.filter(a=>regionOfArea(a)==='jabanusul')])] : known.filter(a=>REGION==='all' || regionOfArea(a)===REGION);
+  const hints = REGION==='jabanusul' ? JABANUSUL_AREA_HINTS : (REGION==='nonjawa' ? NONJAWA_AREA_HINTS : null);
+  const list = hints ? [...new Set([...hints, ...known.filter(a=>regionOfArea(a)===REGION)])] : known.filter(a=>REGION==='all' || regionOfArea(a)===REGION);
   const dl = document.getElementById('vAreaList'); if(dl) dl.innerHTML = list.sort((a,b)=>a.localeCompare(b,'id')).map(a=>`<option value="${String(a).replace(/"/g,'&quot;')}">`).join('');
 }
 function openVehicleModal(id){
@@ -2188,7 +2202,7 @@ async function saveVehicle(logHistory){
       if(logHistory) await recordHistory(v);
     }
     closeVehicleModal(); populateFilterOptions(); renderTable(); renderDashboard(); renderHistory();
-    const otherReg = (REGION!=='all' && regionOfArea(v.area)!==REGION) ? (regionOfArea(v.area)==='jabanusul' ? 'Jabanusul' : 'Jabodetabek') : '';
+    const otherReg = (REGION!=='all' && regionOfArea(v.area)!==REGION) ? ({jabanusul:'Jabanusul', nonjawa:'Non Jawa'}[regionOfArea(v.area)] || 'Jabodetabek') : '';
     showToast((logHistory? 'Data tersimpan & dicatat sebagai update service.':'Data kendaraan tersimpan.') + (otherReg ? ` Area "${v.area||'-'}" masuk wilayah ${otherReg} — ganti "Wilayah data" di menu kiri untuk melihatnya.` : ''));
   }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
 }
