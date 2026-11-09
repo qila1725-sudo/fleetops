@@ -466,13 +466,14 @@
   .btn-spk-entry:hover{background:#dce8fd;border-color:var(--brand);}
   .btn-spk-entry small{display:block;font-weight:500;font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
   .btn-spk-entry .ic{font-size:22px;}
-  #spkChoiceScreen{display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;
+  #spkChoiceScreen{overflow-y:auto;display:none;min-height:100vh;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden;
     background-color:#1c2f52;background-image:radial-gradient(ellipse 520px 640px at 50% 0%, rgba(255,205,120,.28), rgba(255,205,120,0) 68%),linear-gradient(165deg,#24406e 0%,#0e1c36 100%);}
   .choice-wrap{width:100%;max-width:1240px;position:relative;z-index:1;}
   .choice-head{color:#fff;text-align:center;margin-bottom:22px;}
   .choice-head h1{margin:0 0 4px;font-size:24px;}
   .choice-head p{margin:0;color:rgba(255,255,255,.7);font-size:13.5px;}
-  .choice-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+  .choice-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;}
+  .choice-card{min-width:0;}
   .choice-card{display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start;background:#fff;border:none;border-radius:16px;padding:28px 22px;text-align:left;font-family:inherit;box-shadow:0 24px 50px rgba(0,0,0,.35);transition:transform .15s;}
   .choice-card:hover{transform:translateY(-3px);}
   .choice-card .ic{width:54px;height:54px;border-radius:14px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:14px;}
@@ -481,7 +482,7 @@
   .choice-card p{margin:0;font-size:12.8px;color:var(--ink-soft);line-height:1.5;}
   .choice-back{display:block;margin:20px auto 0;background:none;border:none;color:rgba(255,255,255,.75);font-size:13px;font-weight:700;}
   .choice-back:hover{color:#fff;}
-  @media(max-width:1100px){.choice-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:1200px){.choice-grid{grid-template-columns:repeat(2,minmax(0,1fr));}}
   @media(max-width:640px){.choice-grid{grid-template-columns:1fr;}}
   #spkScreen{display:none;min-height:100vh;background:var(--paper);}
   .spk-top{background:var(--card);border-bottom:1px solid var(--line);padding:14px 26px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
@@ -970,7 +971,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
                 <button class="btn-outline" onclick="resetWaTemplate()">Pakai Default</button>
               </div>
             </div>
-            <div class="panel">
+            <div class="panel" id="acctMgmtPanel">
               <h3>Manajemen Akun</h3>
               <div id="acctList"></div>
               <div class="hr"></div>
@@ -1361,7 +1362,9 @@ const fromDbHistory = r => ({ id:r.id, vehicleId:r.vehicle_id, pt:r.pt, nopol:r.
 const toDbHistory = h => ({ vehicle_id:h.vehicleId, pt:h.pt, nopol:h.nopol, vehicle_type:h.type, service_date:h.lastdate||null,
   service_km:h.lastkm||0, current_km:h.currentkm||0, interval_days:h.interval||180, notes:h.note||'', updated_by:h.by, input_at:h.inputAt });
 
-const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active });
+const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active, region:r.region||'' });
+// Akun yang terkunci ke satu dashboard wilayah (kolom profiles.region). Akun ini tidak bisa membuka wilayah lain, SPK, backup, atau manajemen akun.
+function acctRegion(a){ const r=String((a&&a.region)||'').toLowerCase(); return (r==='jabodetabek'||r==='jabanusul'||r==='nonjawa') ? r : ''; }
 const toDbAccount = a => ({ username:a.username, password:a.password, role:a.role, active:a.active });
 
 const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file), pic:r.pic||'', picPhone:r.pic_phone||'', picCol:('pic' in r) });
@@ -1847,6 +1850,7 @@ function regionPasswordPrompt(r){
 }
 async function switchRegion(r){
   const sel = document.getElementById('regionSw');
+  if(acctRegion(currentUser)){ if(sel) sel.value = REGION; return; }
   if(r===REGION) return;
   if(!(await regionUnlock(r))){ if(sel) sel.value = REGION; return; }
   setRegion(r);
@@ -1900,14 +1904,18 @@ async function doLogin(){
   await loadAll();
   const acc = DB.accounts.find(a=>a.id===user.id);
   if(!acc || acc.active===false){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; err.textContent='Akun tidak aktif atau belum terdaftar.'; err.style.display='block'; return; }
-  if(String(acc.role).toLowerCase()==='maintenance'){
+  if(acctRegion(acc)){
+    window._spkAcc = null; document.getElementById('loginPass').value='';
+    await enterApp(acc);
+  } else if(String(acc.role).toLowerCase()==='maintenance'){
     SPK_USER = acc.username; window._spkAcc = acc;
     document.getElementById('loginPass').value='';
     spkShowOnly('spkChoiceScreen');
   } else { await enterApp(acc); }
 }
 async function enterApp(acc){
-  if(!(await regionUnlock(REGION))){ if(window._spkAcc) spkShowOnly('spkChoiceScreen'); else leaveSpk(); return; }
+  if(acctRegion(acc)) setRegion(acctRegion(acc), false);
+  if(!acctRegion(acc) && !(await regionUnlock(REGION))){ if(window._spkAcc) spkShowOnly('spkChoiceScreen'); else leaveSpk(); return; }
   const u = acc.username;
   currentUser = acc;
   try{ await sbInsert('login_log', {username:u, logged_at:new Date().toISOString()}); DB.loginlog.unshift({user:u, time:new Date().toLocaleString('id-ID')}); }catch(e){ console.error(e); }
@@ -1966,6 +1974,10 @@ function applyAccess(){
   document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || allowed.includes(n.dataset.page)) ? '' : 'none'; });
   ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
   const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
+  const lockedReg = acctRegion(currentUser);
+  ['bkPanel','regPassPanel','acctMgmtPanel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = lockedReg ? 'none' : ''; });
+  const sw = document.getElementById('regionSw'); if(sw){ if(lockedReg) sw.value = lockedReg; sw.disabled = !!lockedReg; const box = sw.closest('.region-sw'); if(box) box.style.display = lockedReg ? 'none' : ''; }
+  if(lockedReg && r) r.textContent = 'Dashboard ' + (REGION_LABEL[lockedReg]||lockedReg);
 }
 /* ===== Dropdown pilihan Workshop/Customer: nama tebal, kode di bawahnya ===== */
 let CB_EL=null, CB_ITEMS=[], CB_IDX=-1;
@@ -3896,7 +3908,7 @@ async function submitSpkGate(){
   const user = await authSignIn(u, p);
   if(user) await loadAll();
   const acc = user ? DB.accounts.find(a=>a.id===user.id) : null;
-  if(!acc || String(acc.role).toLowerCase()!=='maintenance' || acc.active===false){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; $id('spkGateErr').style.display='block'; return; }
+  if(!acc || acctRegion(acc) || String(acc.role).toLowerCase()!=='maintenance' || acc.active===false){ ACCESS_TOKEN=null; REFRESH_TOKEN=null; $id('spkGateErr').style.display='block'; return; }
   SPK_USER = acc.username; window._spkAcc = acc; closeSpkGate(); spkShowOnly('spkChoiceScreen');
 }
 function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; window._spkAcc=null; currentUser=null; spkShowOnly('loginScreen'); }
@@ -4213,7 +4225,7 @@ async function deleteCust(id){ if(!confirm('Hapus customer ini?')) return; try{ 
 
 const BK_TABLES=['vehicles','service_history','bengkel_log','kwitansi_pengajuan','sparepart_pending','settings','spk','accident','workshop','customer','profiles'];
 const bkStamp=()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-const bkAllowed=()=>{ if(String(currentUser&&currentUser.role).toLowerCase()!=='maintenance'){ showToast('Backup hanya untuk akun Maintenance.', true); return false; } return true; };
+const bkAllowed=()=>{ if(acctRegion(currentUser) || String(currentUser&&currentUser.role).toLowerCase()!=='maintenance'){ showToast('Backup hanya untuk akun Maintenance.', true); return false; } return true; };
 async function bkFetchAll(t){ const all=[]; for(let off=0;;off+=1000){ const r=await sbGet(t,`select=*&order=id.asc&limit=1000&offset=${off}`); all.push(...r); if(r.length<1000) break; } return all; }
 async function bkCollect(){
   const out={_meta:{app:'FleetOps',dibuat:new Date().toISOString(),oleh:currentUser?currentUser.username:''},tables:{}}, st=$id('bkStatus');
