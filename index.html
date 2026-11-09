@@ -1724,8 +1724,8 @@ try{ const r = localStorage.getItem('fleetops_region'); if(r==='jabodetabek'||r=
 const JABODETABEK_RE = /jakarta|bogor|depok|tangerang|tangsel|bekasi|cikarang|serpong|bsd|cibubur|sentul|cileungsi|jabodetabek|lebak bulus|imperium|mampang|kebon jeruk|kuningan|sudirman|thamrin|senayan|kemang|cilandak|pluit|kelapa gading|cengkareng|tomang|slipi|tebet|pasar minggu|kalideres|ciputat|pamulang|karawaci|ancol|menteng|gambir|kemayoran|cawang|halim|pondok indah|pantai indah kapuk|pik\b/i;
 // Jabanusul = khusus Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, Sulawesi
 const JABANUSUL_RE = new RegExp('\\b(?:' + [
-  // Jawa Tengah
-  'jawa tengah|jateng|semarang|solo|surakarta|kudus|pati|cilacap|purwokerto|banyumas|magelang|salatiga|pekalongan|tegal|klaten|boyolali|sukoharjo|karanganyar|wonosobo|temanggung|kendal|demak|jepara|rembang|blora|purwodadi|grobogan|batang|pemalang|brebes|kebumen|purworejo|banjarnegara|purbalingga|sragen|wonogiri',
+  // Jawa Tengah (termasuk DI Yogyakarta)
+  'jogja|jogjakarta|yogya|yogyakarta|diy|sleman|bantul|kulon progo|gunung kidul|jawa tengah|jateng|semarang|solo|surakarta|kudus|pati|cilacap|purwokerto|banyumas|magelang|salatiga|pekalongan|tegal|klaten|boyolali|sukoharjo|karanganyar|wonosobo|temanggung|kendal|demak|jepara|rembang|blora|purwodadi|grobogan|batang|pemalang|brebes|kebumen|purworejo|banjarnegara|purbalingga|sragen|wonogiri',
   // Jawa Timur
   'jawa timur|jatim|surabaya|malang|sidoarjo|gresik|kediri|nganjuk|mojokerto|jombang|madiun|ngawi|pasuruan|probolinggo|jember|banyuwangi|blitar|tulungagung|lamongan|tuban|bojonegoro|ponorogo|magetan|pacitan|lumajang|situbondo|bondowoso|madura|bangkalan|sumenep|pamekasan|sampang|trenggalek',
   // Bali
@@ -2127,7 +2127,7 @@ function guessVehicleTypeSelects(v){
   document.getElementById('v_model').value = v?.model || '';
   document.getElementById('v_type').value = v?.type || '';
 }
-const JABANUSUL_AREA_HINTS = ['Jawa Tengah','Jawa Timur','Bali','Nusa Tenggara','Sulawesi','Semarang','Solo','Surabaya','Malang','Denpasar','Mataram','Kupang','Makassar','Manado'];
+const JABANUSUL_AREA_HINTS = ['Jawa Tengah','Yogyakarta','Jawa Timur','Bali','Nusa Tenggara','Sulawesi','Semarang','Solo','Surabaya','Malang','Denpasar','Mataram','Kupang','Makassar','Manado'];
 function fillVAreaList(){
   const known = [...new Set(DB.vehicles.map(x=>x.area).filter(a=>a && a!=='-'))];
   const list = REGION==='jabanusul' ? [...new Set([...JABANUSUL_AREA_HINTS, ...known.filter(a=>regionOfArea(a)==='jabanusul')])] : known.filter(a=>REGION==='all' || regionOfArea(a)===REGION);
