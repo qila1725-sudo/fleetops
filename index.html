@@ -550,6 +550,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div id="loginDebugBox" style="display:none;background:#1a2233;color:#9ad1ff;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;margin-bottom:14px;white-space:pre-wrap;word-break:break-all;line-height:1.5;"></div>
     <div class="field"><label>Username</label><input id="loginUser" type="text" placeholder="Username" autocomplete="username"></div>
     <div class="field"><label>Password</label><input id="loginPass" type="password" placeholder="Password" autocomplete="current-password"></div>
+    <label style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink-soft);margin:-4px 0 6px;cursor:pointer;"><input type="checkbox" style="width:15px;height:15px;" onchange="document.getElementById('loginPass').type=this.checked?'text':'password'"> Tampilkan kata sandi</label>
     <button class="btn btn-primary btn-block" onclick="doLogin()">Masuk</button>
   </div>
 </div>
