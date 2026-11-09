@@ -1778,7 +1778,7 @@ async function regionUnlock(r){
   if(UNLOCKED.has(r)) return true;
   let has = false;
   try{ has = await rpc('region_has_password', { p_region:r }); }
-  catch(e){ console.warn('Proteksi kata sandi dashboard belum aktif (jalankan kata-sandi-dashboard.sql):', e); return true; }
+  catch(e){ console.warn('Proteksi kata sandi dashboard belum aktif:', e); showToast('Dashboard tidak dibuka: fitur kata sandi belum aktif di database. Jalankan kata-sandi-dashboard.sql di Supabase. ('+rpcMsg(e)+')', true); return false; }
   if(!has) return await regionCreatePrompt(r);
   return await regionPasswordPrompt(r);
 }
@@ -1806,7 +1806,7 @@ function regionCreatePrompt(r){
       if(a.value.length<4) return fail('Kata sandi minimal 4 karakter.');
       if(a.value!==b.value) return fail('Konfirmasi kata sandi tidak sama.');
       ok.disabled = true; err.style.display='none';
-      try{ await rpc('set_region_password', { p_region:r, p_new:a.value, p_old:null }); UNLOCKED.add(r); showToast('Kata sandi dashboard '+(REGION_LABEL[r]||r)+' dibuat.'); done(true); }
+      try{ await rpc('set_region_password', { p_region:r, p_new:a.value, p_old:null }); UNLOCKED.clear(); UNLOCKED.add(r); showToast('Kata sandi dashboard '+(REGION_LABEL[r]||r)+' dibuat.'); done(true); }
       catch(e){ fail('Gagal menyimpan: '+rpcMsg(e)+' (hanya akun Maintenance yang bisa membuat kata sandi)'); }
     };
     bg.querySelector('#regNewCancel').onclick = ()=>done(false);
@@ -1837,7 +1837,7 @@ function regionPasswordPrompt(r){
       if(busy || !inp.value) return; busy = true; ok.disabled = true; err.style.display='none';
       try{
         const good = await rpc('check_region_password', { p_region:r, p_password:inp.value });
-        if(good === true){ UNLOCKED.add(r); done(true); return; }
+        if(good === true){ UNLOCKED.clear(); UNLOCKED.add(r); done(true); return; }
         tries++; inp.value=''; err.textContent = 'Kata sandi salah.'; err.style.display='block';
         if(tries>=3){ err.textContent = 'Terlalu banyak percobaan salah. Tunggu 10 detik.'; setTimeout(()=>{ tries=0; ok.disabled=false; busy=false; err.style.display='none'; inp.focus(); }, 10000); return; }
       }catch(e){ err.textContent = 'Gagal memeriksa kata sandi: '+rpcMsg(e); err.style.display='block'; }
