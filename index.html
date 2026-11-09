@@ -572,7 +572,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="choice-grid">
       <button class="choice-card" onclick="openSpkWork()"><div class="ic">📝</div><h3>Mengerjakan SPK</h3><p>Buat, ubah, cetak, dan pantau Surat Perintah Kerja untuk tiap unit.</p></button>
       <button class="choice-card green" onclick="openReminderFromSpk('jabodetabek')"><div class="ic">🚗</div><h3>Data Reminder Jabodetabek</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit wilayah Jabodetabek.</p></button>
-      <button class="choice-card green" onclick="openReminderFromSpk('jabanusul')"><div class="ic">🗺️</div><h3>Data Reminder Jabanusul</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit di luar Jabodetabek.</p></button>
+      <button class="choice-card green" onclick="openReminderFromSpk('jabanusul')"><div class="ic">🗺️</div><h3>Data Reminder Jabanusul</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, dan Sulawesi.</p></button>
     </div>
     <button class="choice-back" onclick="leaveSpk()">← Keluar</button>
   </div>
@@ -989,7 +989,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <input type="hidden" id="v_id">
     <div class="form-grid">
       <div><label>Nama PT</label><input id="v_pt"></div>
-      <div><label>Area</label><input id="v_area"></div>
+      <div><label>Area</label><input id="v_area" list="vAreaList" autocomplete="off"><datalist id="vAreaList"></datalist></div>
       <div><label>Nama User / Driver</label><input id="v_user"></div>
       <div><label>Nomor Telepon (format 08xx / 62xx)</label><input id="v_phone"></div>
       <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase"></div>
@@ -1721,8 +1721,26 @@ function computeNext(lastdate, interval, lastkm, kmstep){ const nextdate = lastd
 /* ===== Wilayah data: Jabodetabek / Jabanusul (di luar Jabodetabek) ===== */
 let REGION = 'all';
 try{ const r = localStorage.getItem('fleetops_region'); if(r==='jabodetabek'||r==='jabanusul'||r==='all') REGION = r; }catch(e){}
-const JABODETABEK_RE = /jakarta|bogor|depok|tangerang|tangsel|bekasi|cikarang|serpong|bsd|cibubur|sentul|cileungsi|jabodetabek/i;
-function regionOfArea(a){ const t = String(a||'').trim(); if(!t || t==='-') return 'jabodetabek'; return JABODETABEK_RE.test(t) ? 'jabodetabek' : 'jabanusul'; }
+const JABODETABEK_RE = /jakarta|bogor|depok|tangerang|tangsel|bekasi|cikarang|serpong|bsd|cibubur|sentul|cileungsi|jabodetabek|lebak bulus|imperium|mampang|kebon jeruk|kuningan|sudirman|thamrin|senayan|kemang|cilandak|pluit|kelapa gading|cengkareng|tomang|slipi|tebet|pasar minggu|kalideres|ciputat|pamulang|karawaci|ancol|menteng|gambir|kemayoran|cawang|halim|pondok indah|pantai indah kapuk|pik\b/i;
+// Jabanusul = khusus Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, Sulawesi
+const JABANUSUL_RE = new RegExp('\\b(?:' + [
+  // Jawa Tengah
+  'jawa tengah|jateng|semarang|solo|surakarta|kudus|pati|cilacap|purwokerto|banyumas|magelang|salatiga|pekalongan|tegal|klaten|boyolali|sukoharjo|karanganyar|wonosobo|temanggung|kendal|demak|jepara|rembang|blora|purwodadi|grobogan|batang|pemalang|brebes|kebumen|purworejo|banjarnegara|purbalingga|sragen|wonogiri',
+  // Jawa Timur
+  'jawa timur|jatim|surabaya|malang|sidoarjo|gresik|kediri|nganjuk|mojokerto|jombang|madiun|ngawi|pasuruan|probolinggo|jember|banyuwangi|blitar|tulungagung|lamongan|tuban|bojonegoro|ponorogo|magetan|pacitan|lumajang|situbondo|bondowoso|madura|bangkalan|sumenep|pamekasan|sampang|trenggalek',
+  // Bali
+  'bali|denpasar|badung|gianyar|tabanan|singaraja|buleleng|kuta|ubud|jimbaran|nusa dua|klungkung|karangasem',
+  // Nusa Tenggara
+  'nusa tenggara|ntb|ntt|lombok|mataram|sumbawa|bima|kupang|flores|labuan bajo|maumere|ende|sumba',
+  // Sulawesi
+  'sulawesi|sulsel|sulut|sulteng|sultra|sulbar|makassar|manado|gorontalo|palu|kendari|mamuju|parepare|bitung|tomohon|luwuk|palopo|gowa|maros|toraja|minahasa|kotamobagu'
+].join('|') + ')\\b', 'i');
+function regionOfArea(a){
+  const t = String(a||'').trim();
+  if(!t || t==='-') return 'jabodetabek';           // unit tanpa area (mis. Standby) ikut Jabodetabek
+  if(JABANUSUL_RE.test(t)) return 'jabanusul';       // khusus Jateng, Jatim, Bali, Nusa Tenggara, Sulawesi
+  return 'jabodetabek';                               // selain itu tetap di Jabodetabek (isi lama tidak dipindah)
+}
 function inRegion(area){ return REGION==='all' || regionOfArea(area)===REGION; }
 function vInScope(v){ return inRegion(v && v.area); }
 function scopedVehicles(){ return DB.vehicles.filter(vInScope); }
@@ -2027,7 +2045,8 @@ function renderTable(){
   populateTabCounts();
   const list = filteredVehicles();
   const body = document.getElementById('vehicleBody');
-  if(list.length===0){ body.innerHTML=`<tr class="empty-row"><td colspan="11">Tidak ada data kendaraan yang cocok. Coba ubah pencarian/filter, atau tambahkan data baru.</td></tr>`; renderBulkBar(); return; }
+  if(list.length===0){ const emptyMsg = (REGION==='jabanusul' && !DB.vehicles.some(vInScope)) ? 'Belum ada unit Jabanusul (Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, Sulawesi). Klik <b>+ Tambah Kendaraan</b> atau <b>Import Excel</b> dan isi Area dengan daerah tersebut.' : 'Tidak ada data kendaraan yang cocok. Coba ubah pencarian/filter, atau tambahkan data baru.';
+    body.innerHTML=`<tr class="empty-row"><td colspan="11">${emptyMsg}</td></tr>`; renderBulkBar(); return; }
   body.innerHTML = list.map(v=>{
     const s = statusOf(v), sold = s==='sold';
     const code = v.code || ptCode(v.pt, 0);
@@ -2108,7 +2127,14 @@ function guessVehicleTypeSelects(v){
   document.getElementById('v_model').value = v?.model || '';
   document.getElementById('v_type').value = v?.type || '';
 }
+const JABANUSUL_AREA_HINTS = ['Jawa Tengah','Jawa Timur','Bali','Nusa Tenggara','Sulawesi','Semarang','Solo','Surabaya','Malang','Denpasar','Mataram','Kupang','Makassar','Manado'];
+function fillVAreaList(){
+  const known = [...new Set(DB.vehicles.map(x=>x.area).filter(a=>a && a!=='-'))];
+  const list = REGION==='jabanusul' ? [...new Set([...JABANUSUL_AREA_HINTS, ...known.filter(a=>regionOfArea(a)==='jabanusul')])] : known.filter(a=>REGION==='all' || regionOfArea(a)===REGION);
+  const dl = document.getElementById('vAreaList'); if(dl) dl.innerHTML = list.sort((a,b)=>a.localeCompare(b,'id')).map(a=>`<option value="${String(a).replace(/"/g,'&quot;')}">`).join('');
+}
 function openVehicleModal(id){
+  fillVAreaList();
   document.getElementById('vModalTitle').textContent = id? 'Edit / Update Kendaraan':'Tambah Kendaraan';
   const v = id? DB.vehicles.find(x=>x.id===id):null;
   document.getElementById('v_id').value = id||'';
@@ -2162,7 +2188,8 @@ async function saveVehicle(logHistory){
       if(logHistory) await recordHistory(v);
     }
     closeVehicleModal(); populateFilterOptions(); renderTable(); renderDashboard(); renderHistory();
-    showToast(logHistory? 'Data tersimpan & dicatat sebagai update service.':'Data kendaraan tersimpan.');
+    const otherReg = (REGION!=='all' && regionOfArea(v.area)!==REGION) ? (regionOfArea(v.area)==='jabanusul' ? 'Jabanusul' : 'Jabodetabek') : '';
+    showToast((logHistory? 'Data tersimpan & dicatat sebagai update service.':'Data kendaraan tersimpan.') + (otherReg ? ` Area "${v.area||'-'}" masuk wilayah ${otherReg} — ganti "Wilayah data" di menu kiri untuk melihatnya.` : ''));
   }catch(e){ console.error(e); showToast('Gagal menyimpan data ke database. Cek koneksi/konfigurasi Supabase.', true); }
 }
 async function recordHistory(v){
