@@ -660,6 +660,23 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   </div>
 </div>
 
+<div class="modal-bg" id="accBkBg">
+  <div class="modal sp-win" style="max-width:600px;">
+    <div class="sp-title">Keluar Masuk Bengkel</div>
+    <div class="sp-body"><div class="sp-g" style="grid-template-columns:130px minmax(0,1fr);">
+      <label>Klaim</label><div id="acbSub" style="font-weight:700;"></div>
+      <input type="hidden" id="acb_id">
+      <label>Bengkel</label><input id="acb_nama" data-combo="ws" autocomplete="off" placeholder="Pilih / ketik nama atau kode workshop">
+      <label>Status</label><select id="acb_status" onchange="accBkModalStatus()"><option>Belum Masuk Bengkel</option><option>Sedang di Bengkel</option><option>Sudah Keluar Bengkel</option></select>
+      <label>Masuk Bengkel</label><div class="sp-dt"><input type="date" id="acb_min" oninput="accBkModalCalc()"><input type="time" id="acb_mjam"></div>
+      <label>Keluar Bengkel</label><div class="sp-dt"><input type="date" id="acb_kout" oninput="accBkModalCalc()"><input type="time" id="acb_kjam"></div>
+      <label>Lama di Bengkel</label><input id="acb_lama" readonly>
+      <label>Catatan Bengkel</label><textarea id="acb_cat"></textarea>
+    </div></div>
+    <div class="sp-foot"><div></div><div><button class="btn-outline" onclick="$id('accBkBg').classList.remove('show')">Batal</button> <button class="btn btn-primary" onclick="saveAccBk()">Simpan</button></div></div>
+  </div>
+</div>
+
 <!-- FORM SPK -->
 <div class="modal-bg" id="spkFormBg">
   <div class="modal sp-win">
@@ -4003,7 +4020,6 @@ const ACC_TABS={
  'Pihak II':[['Nama/Umur','d','p2_nama','p2_umur'],['Alamat','t','p2_alamat'],['','t','p2_alamat2'],['No. Polisi/Jenis','d','p2_nopol','p2_jenis'],['Merk/Tahun','d','p2_merk','p2_tahun'],['No. Ka/No. Sin','d','p2_noka','p2_nosin'],['Jumlah Tuntutan','t','p2_tuntut']],
  'Kronologi':[['Tempat Kejadian','t','k_tempat'],['Hari/Tanggal','dt','k_hari','k_tgl','k_jam'],['Kondisi Jalan/Kecepatan','d','k_jalan','k_speed'],['Lapor Polisi/Tempat Pelaporan','sd','k_lapor','k_tlapor'],['Berita Acara Polisi','s','k_ba','YN'],['Kronologi','x','k_kronologi']],
  'Penanganan':[['Tipe Penanganan','s','n_tipe','JENIS'],['No. Dokumen','t','n_dok'],['Catatan','x','n_cat']],
- 'Keluar Masuk Bengkel':[['Bengkel','t','bk_nama'],['Status','s','bk_status','BKSTATUS'],['Masuk Bengkel','dt','bk_masuk_hari','bk_masuk_tgl','bk_masuk_jam'],['Keluar Bengkel','dt','bk_keluar_hari','bk_keluar_tgl','bk_keluar_jam'],['Lama di Bengkel','t','bk_lama'],['Catatan Bengkel','x','bk_cat']],
  'Asuransi':[['Nama Asuransi','t','s_nama'],['No. Polis','t','s_polis'],['Nama Tertanggung','t','s_tertanggung'],['Alamat','t','s_alamat'],['Penumpang','h'],['Nama','t','s_pnama'],['Alamat','t','s_palamat'],['Saksi','h'],['Nama','t','s_snama'],['Alamat','t','s_salamat']]};
 let ACC_LIST=[], accEditId=null, accBuilt=false;
 const accRowIds=r=>({t:[r[2]],x:[r[2]],s:[r[2]],d:[r[2],r[3]],sd:[r[2],r[3]],dt:[r[2],r[3],r[4]],h:[]}[r[1]]);
@@ -4064,7 +4080,7 @@ function openAccForm(id, tabName){
   const ti = tabName ? Object.keys(ACC_TABS).indexOf(tabName) : 0; accTab(ti>=0?ti:0); $id('accFormBg').classList.add('show');
 }
 async function saveAcc(){
-  const d={}; accIdsAll().forEach(n=>d[n]=$id('acc_'+n).value.trim()); d.a_nopol=d.a_nopol.toUpperCase();
+  const oldA=accEditId? ACC_LIST.find(a=>a.id===accEditId):null; const d={...(oldA?oldA.d:{})}; accIdsAll().forEach(n=>d[n]=$id('acc_'+n).value.trim()); d.a_nopol=d.a_nopol.toUpperCase();
   if(!d.a_nopol){ showToast('No. Polisi wajib diisi.', true); return; }
   if(ACC_LIST.some(a=>a.no===d.a_no && a.id!==accEditId)){ showToast('No. Kejadian sudah dipakai.', true); return; }
   const row={no_kejadian:d.a_no, tgl_lapor:d.a_tgl? d.a_tgl+'T'+(d.a_jam||'00:00'):null, nopol:d.a_nopol, pengemudi:d.a_pengemudi, made_by:$id('acc_by').textContent, data:d};
@@ -4078,19 +4094,52 @@ async function accReload(){
   renderAcc();
 }
 function accBkCell(a){
-  const d=a.d, st=d.bk_status||'Belum Masuk Bengkel';
-  const sty = st.startsWith('Sudah') ? 'background:#e7f7ec;color:#16803c' : (st.startsWith('Sedang') ? 'background:#fff4e0;color:#b26a00' : 'background:#eef1f6;color:#64748b');
+  const d=a.d, st=d.bk_status||ACC_BK_ST[0];
+  const cls = st.startsWith('Sudah') ? 'ok' : (st.startsWith('Sedang') ? 'warn' : 'off');
   const fd = v => v ? spkFmtDate(v) : '-';
-  return `<span style="${sty};display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap;">${spkEsc(st)}</span>`
+  return `<select class="inl-sel ${cls}" style="max-width:190px;" onchange="accBkQuick('${a.id}',this.value)" title="Ubah status bengkel">${ACC_BK_ST.map(o=>`<option ${o===st?'selected':''}>${o}</option>`).join('')}</select>`
     + (d.bk_nama ? `<div style="font-weight:700;margin-top:4px;">${spkEsc(d.bk_nama)}</div>` : '')
     + ((d.bk_masuk_tgl||d.bk_keluar_tgl) ? `<div style="font-size:11.5px;color:#64748b;margin-top:2px;">Masuk ${fd(d.bk_masuk_tgl)} • Keluar ${fd(d.bk_keluar_tgl)}${d.bk_lama?' • '+spkEsc(d.bk_lama):''}</div>` : '');
+}
+const ACC_BK_ST=['Belum Masuk Bengkel','Sedang di Bengkel','Sudah Keluar Bengkel'];
+function accLama(m,k){ if(!m) return ''; const end=k?new Date(k+'T00:00'):new Date(spkToday()+'T00:00'), n=Math.round((end-new Date(m+'T00:00'))/864e5); return n<0?'':(n+' hari'+(k?'':' (berjalan)')); }
+function accBkFill(d,st){
+  const now=new Date(), hm=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const f=p=>{ if(!d['bk_'+p+'_tgl']){ d['bk_'+p+'_tgl']=spkToday(); d['bk_'+p+'_jam']=hm; } };
+  if(st.startsWith('Sedang')) f('masuk'); else if(st.startsWith('Sudah')){ f('masuk'); f('keluar'); }
+  d.bk_lama=accLama(d.bk_masuk_tgl,d.bk_keluar_tgl);
+}
+async function accBkSave(a,d,msg){
+  try{ await sbUpdate('accident',a.id,{data:d}); a.d=d; renderAcc(); if(msg) showToast(msg); return true; }
+  catch(e){ showToast('Gagal menyimpan: '+e.message, true); renderAcc(); return false; }
+}
+function accBkQuick(id,st){ const a=ACC_LIST.find(x=>x.id===id); if(!a) return; const d={...a.d,bk_status:st}; accBkFill(d,st); accBkSave(a,d,'Status bengkel '+a.nopol+': '+st); }
+function accBkModalCalc(){ $id('acb_lama').value=accLama($id('acb_min').value,$id('acb_kout').value); }
+function accBkModalStatus(){
+  const d={bk_masuk_tgl:$id('acb_min').value,bk_masuk_jam:$id('acb_mjam').value,bk_keluar_tgl:$id('acb_kout').value,bk_keluar_jam:$id('acb_kjam').value};
+  accBkFill(d,$id('acb_status').value);
+  $id('acb_min').value=d.bk_masuk_tgl||''; $id('acb_mjam').value=d.bk_masuk_jam||''; $id('acb_kout').value=d.bk_keluar_tgl||''; $id('acb_kjam').value=d.bk_keluar_jam||''; accBkModalCalc();
+}
+function openAccBk(id){
+  const a=ACC_LIST.find(x=>x.id===id); if(!a) return; const d=a.d;
+  $id('acb_id').value=id; $id('acbSub').textContent=a.no+' • '+a.nopol+(a.peng?' • '+a.peng:'');
+  $id('acb_nama').value=d.bk_nama||''; $id('acb_status').value=d.bk_status||ACC_BK_ST[0];
+  $id('acb_min').value=d.bk_masuk_tgl||''; $id('acb_mjam').value=d.bk_masuk_jam||''; $id('acb_kout').value=d.bk_keluar_tgl||''; $id('acb_kjam').value=d.bk_keluar_jam||'';
+  $id('acb_cat').value=d.bk_cat||''; accBkModalCalc();
+  $id('accBkBg').classList.add('show');
+}
+async function saveAccBk(){
+  const a=ACC_LIST.find(x=>x.id===$id('acb_id').value); if(!a) return;
+  const d={...a.d,bk_nama:$id('acb_nama').value.trim(),bk_status:$id('acb_status').value,bk_masuk_tgl:$id('acb_min').value,bk_masuk_jam:$id('acb_mjam').value,bk_keluar_tgl:$id('acb_kout').value,bk_keluar_jam:$id('acb_kjam').value,bk_cat:$id('acb_cat').value.trim()};
+  d.bk_lama=accLama(d.bk_masuk_tgl,d.bk_keluar_tgl);
+  if(await accBkSave(a,d,'Data bengkel disimpan.')) $id('accBkBg').classList.remove('show');
 }
 function renderAcc(){
   const q=($id('accSearch').value||'').toLowerCase();
   const bf=($id('accBkFilter')||{}).value||'';
   const rows=ACC_LIST.filter(a=>(!bf||String(a.d.bk_status||'Belum Masuk Bengkel').startsWith(bf)) && (!q||[a.no,a.peng,a.nopol,a.d.k_tempat,a.d.p1_rusak,a.d.bk_nama,a.d.bk_status].join(' ').toLowerCase().includes(q)));
   $id('accBody').innerHTML=rows.map(a=>`<tr><td><b>${spkEsc(a.no)}</b></td><td>${spkFmtDate(String(a.tgl).split('T')[0])}</td><td>${spkEsc(a.peng||'-')}</td><td><b>${spkEsc(a.nopol)}</b></td><td>${spkEsc(a.d.k_tempat||'-')}</td><td style="min-width:180px;">${spkEsc(a.d.p1_rusak||'-')}</td><td style="min-width:190px;">${accBkCell(a)}</td>
-    <td><div class="spk-act"><button onclick="openAccForm('${a.id}','Keluar Masuk Bengkel')">Bengkel</button><button onclick="printAcc('${a.id}')">Cetak</button><button onclick="openAccForm('${a.id}')">Ubah</button><button class="del" onclick="deleteAcc('${a.id}')">Hapus</button></div></td></tr>`).join('');
+    <td><div class="spk-act"><button onclick="openAccBk('${a.id}')">Bengkel</button><button onclick="printAcc('${a.id}')">Cetak</button><button onclick="openAccForm('${a.id}')">Ubah</button><button class="del" onclick="deleteAcc('${a.id}')">Hapus</button></div></td></tr>`).join('');
   $id('accEmpty').style.display=rows.length?'none':'block';
 }
 async function deleteAcc(id){ if(!confirm('Hapus klaim Accident ini?')) return; try{ await sbDeleteIds('accident',[id]); await accReload(); showToast('Klaim dihapus.'); }catch(e){ showToast('Gagal menghapus: '+e.message, true); } }
