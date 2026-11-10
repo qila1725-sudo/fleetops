@@ -265,6 +265,8 @@
   .btn-green:hover{background:#106b34;}
 
   .table-wrap{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:auto;}
+  .page .table-wrap{max-height:calc(100vh - 140px);} /* batang geser kiri-kanan selalu terlihat di bawah layar, header tabel tetap */
+  .table-wrap::-webkit-scrollbar{height:14px;width:12px;} .table-wrap::-webkit-scrollbar-thumb{background:#aab4c5;border-radius:8px;border:3px solid #eef1f6;} .table-wrap::-webkit-scrollbar-track{background:#eef1f6;}
   table{border-collapse:collapse;width:100%;min-width:1280px;font-size:12.8px;}
   th,td{padding:13px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;}
   thead th{background:#fafbfd;font-weight:800;color:var(--ink-faint);font-size:10.8px;letter-spacing:.04em;position:sticky;top:0;white-space:nowrap;}
@@ -749,6 +751,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
       <div class="nav-item" data-page="akun" onclick="goPage('akun')"><span class="l"><span class="ic">⚙️</span> Pengaturan Akun</span></div>
 
+      <div class="nav-item" id="navHomeMenu" data-nohide="1" style="display:none" onclick="goHomeMenu()"><span class="l"><span class="ic">🏠</span> Beranda Menu</span></div>
       <div class="side-box">
         <div class="lab">KONEKSI DATABASE</div>
         <div class="row"><span>Supabase</span><span class="live-dot" id="dbLiveDot">Live</span></div>
@@ -2002,6 +2005,7 @@ function applyAccess(){
   const allowed = ROLE_PAGES[roleKind(currentUser)] || ['bengkel'];
   document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || allowed.includes(n.dataset.page)) ? '' : 'none'; });
   ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
+  { const hm=document.getElementById('navHomeMenu'); if(hm) hm.style.display = window._spkAcc ? '' : 'none'; }
   const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
   const lockedReg = acctRegion(currentUser);
   ['bkPanel','acctMgmtPanel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = lockedReg ? 'none' : ''; });
@@ -4045,6 +4049,7 @@ async function vehImport(evt){
   }catch(e){ showToast('Import gagal: '+String(e.message||e).slice(0,140), true); }
 }
 function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
+function goHomeMenu(){ if(!window._spkAcc){ showToast('Menu utama hanya untuk akun Maintenance.', true); return; } currentUser=null; spkShowOnly('spkChoiceScreen'); }
 async function openReminderFromSpk(r){ if(!r){ backToSpkChoice(); return; } setRegion(r,false); await enterApp(window._spkAcc); }
 function openSpkWork(){ spkShowOnly('spkScreen'); renderSpk(); spkReload(); }
 function spkNextNo(list,type){
