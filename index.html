@@ -751,14 +751,14 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
       <div class="nav-item" data-page="akun" onclick="goPage('akun')"><span class="l"><span class="ic">⚙️</span> Pengaturan Akun</span></div>
 
-      <div class="nav-item" id="navHomeMenu" data-nohide="1" style="display:none" onclick="goHomeMenu()"><span class="l"><span class="ic">🏠</span> Beranda Menu</span></div>
       <div class="side-box">
         <div class="lab">KONEKSI DATABASE</div>
         <div class="row"><span>Supabase</span><span class="live-dot" id="dbLiveDot">Live</span></div>
         <div class="note" id="dbNote">Data tersimpan terpusat di database Anda sendiri &amp; tetap ada saat dibuka di server, browser, atau perangkat lain.</div>
       </div>
 
-      <div class="sidebar-foot">
+      <div class="nav-item" id="navHomeMenu" data-nohide="1" style="display:none;margin-top:auto;margin-bottom:10px;" onclick="goHomeMenu()"><span class="l"><span class="ic">🏠</span> Beranda Menu</span></div>
+      <div class="sidebar-foot" style="margin-top:0;">
         <div class="avatar" id="avatarInit">AM</div>
         <div><div class="who" id="whoUser">-</div><div class="role" id="whoRole">Maintenance</div></div>
         <button class="logout-btn" onclick="doLogout()" title="Keluar">⏻</button>
