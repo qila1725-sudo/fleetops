@@ -575,10 +575,39 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="choice-grid">
       <button class="choice-card" onclick="openSpkWork()"><div class="ic">📝</div><h3>Mengerjakan SPK</h3><p>Buat, ubah, cetak, dan pantau Surat Perintah Kerja untuk tiap unit.</p></button>
       <button class="choice-card green" onclick="openReminderFromSpk('jabodetabek')"><div class="ic">🚗</div><h3>Data Reminder</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit Jabodetabek, Jabanusul, dan Non Jawa. Wilayah dipilih di dalam.</p></button>
+      <button class="choice-card green" onclick="openVehDash()"><div class="ic">🚙</div><h3>Dashboard Vehicle Mobil</h3><p>Mobil baru, polis asuransi mobil, unit standby, dan unit terjual. Bisa import &amp; export Excel.</p></button>
     </div>
     <button class="choice-back" onclick="leaveSpk()">← Keluar</button>
   </div>
 </div>
+
+<!-- DASHBOARD VEHICLE MOBIL -->
+<div id="vehScreen" style="display:none;min-height:100vh;background:var(--paper);">
+  <div class="spk-top">
+    <div><h2>🚙 Dashboard Vehicle Mobil</h2><div class="sub">Mobil baru, polis asuransi, unit standby, dan unit terjual</div></div>
+    <div class="acts"><button class="btn-outline" onclick="backToSpkChoice()">← Pilihan</button></div>
+  </div>
+  <div class="spk-body">
+    <div class="spk-kpis" id="vehKpis"></div>
+    <div class="sp-tabs" id="vehTabs" style="margin:0 0 14px;"></div>
+    <div class="spk-tools">
+      <input id="vehSearch" placeholder="Cari..." oninput="renderVeh()">
+      <button class="btn-outline" onclick="vehTemplate()">⬇ Template Excel</button>
+      <label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" id="vehImportFile" accept=".xlsx,.xls,.csv" onchange="vehImport(event)"></label>
+      <button class="btn-outline green" onclick="vehExport()">⬇ Export Excel</button>
+      <button class="btn btn-primary small" onclick="vehOpenForm()">＋ Tambah Data</button>
+    </div>
+    <div class="spk-card"><table class="spk-tbl"><thead id="vehHead"></thead><tbody id="vehBody"></tbody></table>
+      <div id="vehEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.</div></div>
+    <p class="small-note" id="vehNote" style="margin-top:10px;"></p>
+  </div>
+</div>
+
+<div class="modal-bg" id="vehFormBg"><div class="modal" style="max-width:640px;">
+  <h3 id="vehFormTitle">Tambah Data</h3><p class="sub">Isi data unit di bawah ini.</p>
+  <div class="form-grid" id="vehFormGrid"></div>
+  <div class="modal-actions"><button class="btn-outline" onclick="vehCloseForm()">Batal</button><button class="btn btn-primary" onclick="vehSave()">Simpan</button></div>
+</div></div>
 
 <!-- MENGERJAKAN SPK -->
 <div id="spkScreen">
@@ -3903,7 +3932,7 @@ async function spkReload(){
     }
   }catch(e){ console.error(e); showToast('Gagal memindahkan SPK lama: '+e.message, true); }
 }
-function spkShowOnly(id){ ['loginScreen','spkChoiceScreen','spkScreen','app'].forEach(i=>{ const e=$id(i); if(e) e.style.display = (i===id) ? (i==='app'?'block':(i==='spkScreen'?'block':'flex')) : 'none'; }); window.scrollTo(0,0); }
+function spkShowOnly(id){ ['loginScreen','spkChoiceScreen','spkScreen','vehScreen','app'].forEach(i=>{ const e=$id(i); if(e) e.style.display = (i===id) ? ((i==='app'||i==='spkScreen'||i==='vehScreen')?'block':'flex') : 'none'; }); window.scrollTo(0,0); }
 function openSpkGate(){ $id('spkGateErr').style.display='none'; $id('spkGateUser').value=''; $id('spkGatePass').value=''; $id('spkGateBg').classList.add('show'); setTimeout(()=>$id('spkGateUser').focus(),50); }
 function closeSpkGate(){ $id('spkGateBg').classList.remove('show'); }
 async function submitSpkGate(){
@@ -3915,6 +3944,108 @@ async function submitSpkGate(){
   SPK_USER = acc.username; window._spkAcc = acc; closeSpkGate(); spkShowOnly('spkChoiceScreen');
 }
 function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; window._spkAcc=null; currentUser=null; spkShowOnly('loginScreen'); }
+
+/* ================= DASHBOARD VEHICLE MOBIL ================= */
+const VEH_TABS = {
+  baru:    { label:'Mobil Baru',            cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['warna','Warna'],['noka','No. Rangka'],['nosin','No. Mesin'],['pt','PT / Customer'],['tgl','Tgl Masuk','date'],['ket','Keterangan']] },
+  polis:   { label:'Polis Asuransi Mobil',  cols:[['nopol','No. Polisi'],['nopolis','No. Polis'],['merk','Merk / Type'],['asuransi','Perusahaan Asuransi'],['jenis','Jenis Pertanggungan'],['mulai','Tgl Mulai','date'],['akhir','Tgl Berakhir','date'],['premi','Premi'],['ket','Keterangan']] },
+  standby: { label:'Unit Standby',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['lokasi','Lokasi'],['tgl','Tgl Standby','date'],['kondisi','Kondisi'],['ket','Keterangan']] },
+  terjual: { label:'Unit Terjual',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['tgl','Tgl Terjual','date'],['pembeli','Pembeli'],['harga','Harga Jual'],['ket','Keterangan']] }
+};
+let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
+const vehNorm = v => String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]/g,'');
+async function openVehDash(){ spkShowOnly('vehScreen'); renderVeh(); await vehReload(); }
+async function vehReload(){
+  try{ const r = await sbGet('vehicle_items','select=*&order=created_at.desc'); VEH_ITEMS = r||[]; VEH_READY = true; }
+  catch(e){ VEH_READY = false; console.warn('Tabel vehicle_items belum ada:', e); }
+  renderVeh();
+}
+function vehSetTab(t){ VEH_TAB = t; $id('vehSearch').value=''; renderVeh(); }
+function vehList(k){ return VEH_ITEMS.filter(x=>x.kind===(k||VEH_TAB)); }
+function vehFmt(v,type){ if(!v) return '-'; if(type==='date'){ const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:escH(v); } return escH(v); }
+function renderVeh(){
+  const T = VEH_TABS[VEH_TAB];
+  $id('vehKpis').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<div class="k" style="cursor:pointer;${k===VEH_TAB?'outline:2px solid var(--brand);':''}" onclick="vehSetTab('${k}')"><div class="l">${t.label.toUpperCase()}</div><div class="v">${vehList(k).length}</div></div>`).join('');
+  $id('vehTabs').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<button class="${k===VEH_TAB?'on':''}" onclick="vehSetTab('${k}')">${t.label}</button>`).join('');
+  $id('vehHead').innerHTML = '<tr>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
+  const q = vehNorm($id('vehSearch').value);
+  const rows = vehList().filter(x=>!q || vehNorm(Object.values(x.data||{}).join(' ')).includes(q));
+  $id('vehBody').innerHTML = rows.map(x=>`<tr>${T.cols.map(c=>`<td>${vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
+  $id('vehEmpty').style.display = rows.length ? 'none' : '';
+  $id('vehNote').innerHTML = VEH_READY ? 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
+}
+function vehOpenForm(id){
+  if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
+  const T = VEH_TABS[VEH_TAB]; VEH_EDIT = id || null;
+  const cur = id ? (VEH_ITEMS.find(x=>x.id===id)||{}).data||{} : {};
+  $id('vehFormTitle').textContent = (id?'Ubah ':'Tambah ')+T.label;
+  $id('vehFormGrid').innerHTML = T.cols.map(c=>{
+    const full = c[0]==='ket' ? ' class="full"' : '';
+    const inp = c[0]==='ket' ? `<textarea id="vf_${c[0]}">${escH(cur[c[0]]||'')}</textarea>` : `<input id="vf_${c[0]}" type="${c[2]==='date'?'date':'text'}" value="${escH(cur[c[0]]||'')}">`;
+    return `<div${full}><label>${c[1]}</label>${inp}</div>`;
+  }).join('');
+  $id('vehFormBg').classList.add('show');
+}
+function vehCloseForm(){ $id('vehFormBg').classList.remove('show'); VEH_EDIT = null; }
+async function vehSave(){
+  const T = VEH_TABS[VEH_TAB], d = {};
+  T.cols.forEach(c=>{ d[c[0]] = ($id('vf_'+c[0]).value||'').trim(); });
+  if(!d.nopol){ showToast('No. Polisi wajib diisi.', true); return; }
+  try{
+    if(VEH_EDIT){ const r = await sbUpdate('vehicle_items', VEH_EDIT, {data:d}); const i = VEH_ITEMS.findIndex(x=>x.id===VEH_EDIT); if(i>=0) VEH_ITEMS[i] = (r&&r[0])||{...VEH_ITEMS[i],data:d}; }
+    else { const r = await sbInsert('vehicle_items', {kind:VEH_TAB, data:d}); VEH_ITEMS.unshift(r[0]); }
+    vehCloseForm(); renderVeh(); showToast('Data tersimpan.');
+  }catch(e){ showToast('Gagal menyimpan: '+String(e.message).slice(0,140), true); }
+}
+async function vehDelete(id){
+  if(!confirm('Hapus data ini?')) return;
+  try{ await sbDeleteIds('vehicle_items',[id]); VEH_ITEMS = VEH_ITEMS.filter(x=>x.id!==id); renderVeh(); showToast('Data dihapus.'); }
+  catch(e){ showToast('Gagal menghapus: '+String(e.message).slice(0,140), true); }
+}
+function vehXlsxOk(){ if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return false; } return true; }
+function vehTemplate(){
+  if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([T.cols.map(c=>c[1])]), T.label.slice(0,31));
+  XLSX.writeFile(wb, 'template-'+VEH_TAB+'.xlsx');
+}
+function vehExport(){
+  if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB], list = vehList();
+  const rows = list.length ? list.map(x=>{ const o={}; T.cols.forEach(c=>o[c[1]]=(x.data||{})[c[0]]||''); return o; }) : [Object.fromEntries(T.cols.map(c=>[c[1],'']))];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), T.label.slice(0,31));
+  XLSX.writeFile(wb, 'vehicle-'+VEH_TAB+'.xlsx');
+}
+function vehDate(v){
+  if(v==null||v==='') return '';
+  if(typeof v==='number'){ const d = XLSX.SSF.parse_date_code(v); return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:''; }
+  const t = String(v).trim(), m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  return /^\d{4}-\d{2}-\d{2}/.test(t) ? t.slice(0,10) : t;
+}
+async function vehImport(evt){
+  const file = evt.target.files[0]; evt.target.value=''; if(!file) return;
+  if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
+  if(!vehXlsxOk()) return;
+  try{
+    const T = VEH_TABS[VEH_TAB];
+    const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+    const hi = aoa.findIndex(r=>r.some(c=>vehNorm(c)==='nopolisi'||vehNorm(c)==='nopol'));
+    if(hi<0){ showToast('Kolom "No. Polisi" tidak ditemukan. Pakai Template Excel.', true); return; }
+    const idx = T.cols.map(c=>aoa[hi].findIndex(h=>vehNorm(h)===vehNorm(c[1])));
+    const seen = new Set(vehList().map(x=>vehNorm((x.data||{}).nopol)+'|'+vehNorm((x.data||{}).nopolis)));
+    const out = []; let dup = 0;
+    aoa.slice(hi+1).forEach(r=>{
+      const d = {}; T.cols.forEach((c,i)=>{ const v = idx[i]>=0 ? r[idx[i]] : ''; d[c[0]] = c[2]==='date' ? vehDate(v) : String(v==null?'':v).replace(/\s+/g,' ').trim(); });
+      if(!d.nopol) return;
+      const key = vehNorm(d.nopol)+'|'+vehNorm(d.nopolis);
+      if(seen.has(key)){ dup++; return; } seen.add(key);
+      out.push({kind:VEH_TAB, data:d});
+    });
+    if(!out.length){ showToast(dup?`Semua ${dup} baris sudah ada (dilewati).`:'Tidak ada baris data yang bisa diimpor.', true); return; }
+    for(let i=0;i<out.length;i+=200){ const r = await sbInsert('vehicle_items', out.slice(i,i+200)); VEH_ITEMS = [...r, ...VEH_ITEMS]; }
+    renderVeh(); showToast(`Import selesai: ${out.length} data masuk${dup?`, ${dup} duplikat dilewati`:''}.`);
+  }catch(e){ showToast('Import gagal: '+String(e.message||e).slice(0,140), true); }
+}
 function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
 async function openReminderFromSpk(r){ if(!r){ backToSpkChoice(); return; } setRegion(r,false); await enterApp(window._spkAcc); }
 function openSpkWork(){ spkShowOnly('spkScreen'); renderSpk(); spkReload(); }
