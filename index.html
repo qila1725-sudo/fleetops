@@ -799,7 +799,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" id="importFile" accept=".xlsx,.xls" onchange="importExcel(event)"></label>
             <button class="btn-outline" onclick="exportExcel()">🗂 Export Excel</button>
             <div class="spacer"></div>
-            <button class="btn-outline wa-sender-btn" onclick="openWaSender()" title="Nama yang tampil di pesan WhatsApp: Saya ... dari PT.Dokar Putra Mandiri">👤 Pengirim WA: -</button>
+            <button class="btn-outline wa-sender-btn" style="cursor:default" title="Admin pengirim WA ditetapkan per wilayah: Jabodetabek Kila, Jabanusul Weny, Non Jawa Maya">👤 Pengirim WA: -</button>
             <button class="btn btn-primary small" onclick="openVehicleModal()">+ Tambah Kendaraan</button>
           </div>
 
@@ -885,7 +885,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
           <div class="toolbar">
             <button class="btn btn-primary small" onclick="openBengkelInModal()">+ Tambahkan Kendaraan</button>
             <div class="spacer"></div>
-            <button class="btn-outline wa-sender-btn" id="waSenderBtn" onclick="openWaSender()" title="Nama yang tampil di pesan WhatsApp reminder OR">👤 Pengirim WA: -</button>
+            <button class="btn-outline wa-sender-btn" id="waSenderBtn" style="cursor:default" title="Admin pengirim WA ditetapkan per wilayah">👤 Pengirim WA: -</button>
             <button class="btn-outline" onclick="exportBengkel()">⭳ Export Excel</button>
           </div>
           <div class="filter-row">
@@ -2643,7 +2643,9 @@ function orVehicleOf(b){
       || DB.vehicles.find(v=>(v.nopol||'').toUpperCase().replace(/\s+/g,'')===(b.nopol||'').toUpperCase().replace(/\s+/g,''));
 }
 const WA_COMPANY = 'PT.Dokar Putra Mandiri';
-function waSender(){ try{ return (localStorage.getItem('fleetops_wa_sender')||'').trim(); }catch(e){ return ''; } }
+// Admin pengirim WA tetap per wilayah (tidak bisa diganti dari browser)
+const WA_DEFAULT_SENDER = { jabodetabek:'Kila', jabanusul:'Weny', nonjawa:'Maya' };
+function waSender(){ return WA_DEFAULT_SENDER[REGION] || ''; }
 function updateWaSenderBtn(){ document.querySelectorAll('.wa-sender-btn').forEach(el=>{ el.textContent = `👤 Pengirim WA: ${waSender()||'-'}`; }); }
 let waPendingId = null;
 function openWaSender(pendingId){
@@ -2656,7 +2658,7 @@ function closeWaSender(){ document.getElementById('waSenderModalBg').classList.r
 function saveWaSender(){
   const n = document.getElementById('waSenderInput').value.trim();
   if(!n){ showToast('Isi nama pengirim terlebih dahulu.'); return; }
-  try{ localStorage.setItem('fleetops_wa_sender', n); }catch(e){}
+  try{ localStorage.setItem('fleetops_wa_sender_'+REGION, n); }catch(e){}
   updateWaSenderBtn();
   try{ renderTable(); }catch(e){}
   const pid = waPendingId; closeWaSender();
