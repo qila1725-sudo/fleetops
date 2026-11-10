@@ -875,7 +875,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
             <div class="spacer"></div>
             <button class="btn-outline" id="spExportBtn" onclick="exportSparepart()">⭳ Export Excel</button>
           </div>
-          <div class="small-note" id="spGudangHint" style="display:none;margin:0 0 10px;">Centang sparepart yang sudah <b>ready</b> di gudang. Gudang juga bisa menambah data pending; edit &amp; hapus hanya oleh admin maintenance.</div>
+          <div class="small-note" id="spGudangHint" style="display:none;margin:0 0 10px;">Centang sparepart yang sudah <b>ready</b> di gudang. Gudang bisa menambah, mengedit, dan menyelesaikan data pending; hapus hanya oleh admin maintenance.</div>
           <div class="filter-row">
             <div class="search-box">🔍 <input id="sp_search" oninput="debSparepart()" placeholder="Cari nopol, PT, mekanik, area, atau sparepart..."></div>
           </div>
@@ -3411,8 +3411,8 @@ function renderSparepart(){
         <label class="sp-chk"><input type="checkbox" ${it.ready?'checked':''} onchange="toggleSparepartReady('${it.id}', this.checked)"><span class="sp-nm"><span class="sp-name">${escH(it.name)}</span></span></label>
         <span class="sp-badge ${it.selesai?'selesai':(it.ready?'ready':'belum')}">${spStatusLabel(it)}</span>
         <span class="sp-meta">${it.selesai ? `Selesai • ${escH(it.selesaiBy||'-')} • ${spTimeLabel(it.selesaiAt)}` : (it.ready ? `${escH(it.readyBy||'-')} • ${spTimeLabel(it.readyAt)}` : 'Menunggu gudang')}</span>
-        ${canEdit && it.ready ? `<button class="sp-fin ${it.selesai?'undo':''}" onclick="toggleSparepartSelesai('${it.id}', ${it.selesai?'false':'true'})" title="${it.selesai?'Batalkan status selesai':'Tandai sudah dikerjakan / selesai'}">${it.selesai?'↩ Batal':'✔ Selesai'}</button>` : ''}
-        ${canEdit ? `<button class="edit-icon-btn" onclick="openSparepartModal({editId:'${it.id}'})" title="Edit">✎</button><button class="edit-icon-btn" style="color:var(--bad);border-color:var(--bad-line);" onclick="deleteSparepart('${it.id}')" title="Hapus">🗑</button>` : ''}
+        ${canAdd && it.ready ? `<button class="sp-fin ${it.selesai?'undo':''}" onclick="toggleSparepartSelesai('${it.id}', ${it.selesai?'false':'true'})" title="${it.selesai?'Batalkan status selesai':'Tandai sudah dikerjakan / selesai'}">${it.selesai?'↩ Batal':'✔ Selesai'}</button>` : ''}
+        ${canAdd ? `<button class="edit-icon-btn" onclick="openSparepartModal({editId:'${it.id}'})" title="Edit">✎</button>` : ''}${canEdit ? `<button class="edit-icon-btn" style="color:var(--bad);border-color:var(--bad-line);" onclick="deleteSparepart('${it.id}')" title="Hapus">🗑</button>` : ''}
       </div>`).join('');
     return `<div class="sp-card ${allDone?'all-ready':''}">
       <div class="sp-head">
@@ -3537,7 +3537,7 @@ async function deleteSparepartSelected(){
 }
 function spStatusLabel(it){ return it.selesai ? 'SELESAI' : (it.ready ? 'READY' : 'BELUM'); }
 async function toggleSparepartSelesai(id, on){
-  if(!isMaintenance()) return;
+  if(!(isMaintenance() || isGudang())) return;
   const it = DB.sparepart.find(x=>x.id===id); if(!it) return;
   if(on && !it.ready){ showToast('Sparepart harus berstatus READY dulu sebelum ditandai selesai.', true); return; }
   const prev = { selesai:it.selesai, selesaiBy:it.selesaiBy, selesaiAt:it.selesaiAt, selesaiCol:it.selesaiCol };
@@ -3602,7 +3602,6 @@ function spAddItemRow(val, ready){
 function openSparepartModal(opt){
   if(!(isMaintenance() || isGudang())){ showToast('Anda tidak punya akses menambah data pending sparepart.', true); return; }
   opt = opt || {};
-  if(opt.editId && !isMaintenance()){ showToast('Hanya admin maintenance yang bisa mengedit data pending sparepart.', true); return; }
   spFillLists();
   const edit = opt.editId ? DB.sparepart.find(x=>x.id===opt.editId) : null;
   document.getElementById('sp_edit_id').value = edit ? edit.id : '';
@@ -3624,7 +3623,6 @@ function closeSparepartModal(){ document.getElementById('spModalBg').classList.r
 async function saveSparepart(){
   if(!(isMaintenance() || isGudang())) return;
   const id = document.getElementById('sp_edit_id').value;
-  if(id && !isMaintenance()) return; // edit hanya maintenance; gudang hanya boleh menambah
   const nopol = document.getElementById('sp_nopol').value.trim().toUpperCase();
   const pt = document.getElementById('sp_pt').value.trim();
   const mekanik = document.getElementById('sp_mekanik').value.trim();
@@ -3744,7 +3742,7 @@ function renderAccountPage(){
   list.innerHTML = DB.accounts.map((a,i)=>{
     const kind = roleKind(a);
     const locked = String(a.username||'').trim().toUpperCase()==='DPM2026' || (currentUser && a.username===currentUser.username);
-    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':(kind==='gudang'?'Hanya Pending Sparepart (ceklis ready &amp; tambah)':'Hanya Keluar Masuk Bengkel')}</div></div>
+    return `<div class="acct-row"><div><b>${a.username}</b><div class="small-note">${kind==='maintenance'?'Akses semua menu':(kind==='gudang'?'Hanya Pending Sparepart (ceklis ready, tambah, edit &amp; selesaikan)':'Hanya Keluar Masuk Bengkel')}</div></div>
     <div style="display:flex;align-items:center;gap:8px;">
     <select class="filter-select" style="padding:5px 8px;font-size:11.5px;min-width:0;" ${locked?'disabled title="Akun ini tidak bisa diubah perannya"':''} onchange="changeAccountRole(${i}, this.value)"><option value="Maintenance" ${kind==='maintenance'?'selected':''}>Maintenance</option><option value="Staff" ${kind==='staff'?'selected':''}>Staff</option><option value="Gudang" ${kind==='gudang'?'selected':''}>Gudang</option></select><span class="pill ${a.active!==false?'on':'off'}">${a.active!==false?'Aktif':'Nonaktif'}</span>
     <button class="edit-icon-btn" style="width:auto;padding:5px 10px;font-size:11px;" onclick="toggleAccount(${i})">${a.active!==false?'Nonaktifkan':'Aktifkan'}</button></div></div>`;
