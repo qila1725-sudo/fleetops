@@ -574,9 +574,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="choice-head"><h1>Pilih Menu</h1><p>Pilih yang ingin kamu kerjakan</p></div>
     <div class="choice-grid">
       <button class="choice-card" onclick="openSpkWork()"><div class="ic">📝</div><h3>Mengerjakan SPK</h3><p>Buat, ubah, cetak, dan pantau Surat Perintah Kerja untuk tiap unit.</p></button>
-      <button class="choice-card green" onclick="openReminderFromSpk('jabodetabek')"><div class="ic">🚗</div><h3>Data Reminder Jabodetabek</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit wilayah Jabodetabek.</p></button>
-      <button class="choice-card green" onclick="openReminderFromSpk('jabanusul')"><div class="ic">🗺️</div><h3>Data Reminder Jabanusul</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit Jawa Tengah, Jawa Timur, Bali, Nusa Tenggara, dan Sulawesi.</p></button>
-      <button class="choice-card green" onclick="openReminderFromSpk('nonjawa')"><div class="ic">🏝️</div><h3>Data Reminder Non Jawa</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit seluruh Sumatera, Kalimantan, dan Batam.</p></button>
+      <button class="choice-card green" onclick="openReminderFromSpk('jabodetabek')"><div class="ic">🚗</div><h3>Data Reminder</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit Jabodetabek, Jabanusul, dan Non Jawa. Wilayah dipilih di dalam.</p></button>
     </div>
     <button class="choice-back" onclick="leaveSpk()">← Keluar</button>
   </div>
@@ -1382,7 +1380,7 @@ const toDbHistory = h => ({ vehicle_id:h.vehicleId, pt:h.pt, nopol:h.nopol, vehi
 
 const fromDbAccount = r => ({ id:r.id, username:r.username, password:r.password, role:r.role, active:r.active, region:r.region||'' });
 // Akun yang terkunci ke satu dashboard wilayah (kolom profiles.region). Akun ini tidak bisa membuka wilayah lain, SPK, backup, atau manajemen akun.
-function acctRegion(a){ const r=String((a&&a.region)||'').toLowerCase(); return (r==='jabodetabek'||r==='jabanusul'||r==='nonjawa') ? r : ''; }
+function acctRegion(a){ return ''; } // kunci wilayah per akun dilepas: semua akun bisa pindah wilayah
 const toDbAccount = a => ({ username:a.username, password:a.password, role:a.role, active:a.active });
 
 const fromDbBengkel = r => ({ id:r.id, vehicleId:r.vehicle_id, nopol:r.nopol, pt:r.pt, bengkel:r.bengkel, tglMasuk:r.tanggal_masuk, tglKeluar:r.tanggal_keluar, note:r.keterangan, hargaOR:r.harga_or, kwitansi:r.kwitansi, statusBayar:r.status_bayar, foto:parseFoto(r.foto), kwFiles:parseKwFiles(r.kwitansi_file), pic:r.pic||'', picPhone:r.pic_phone||'', picCol:('pic' in r) });
@@ -1792,14 +1790,7 @@ const REGION_LABEL = { jabodetabek:'Jabodetabek', jabanusul:'Jabanusul', nonjawa
 let UNLOCKED = new Set();
 const rpc = (fn, body) => sb('rpc/'+fn, { method:'POST', body });
 const rpcMsg = e => { const m = String(e && e.message || ''); const x = m.match(/"message"\s*:\s*"([^"]+)"/); return x ? x[1] : m.slice(0,160); };
-async function regionUnlock(r){
-  if(UNLOCKED.has(r)) return true;
-  let has = false;
-  try{ has = await rpc('region_has_password', { p_region:r }); }
-  catch(e){ console.warn('Proteksi kata sandi dashboard belum aktif:', e); showToast('Dashboard tidak dibuka: fitur kata sandi belum aktif di database. Jalankan kata-sandi-dashboard.sql di Supabase. ('+rpcMsg(e)+')', true); return false; }
-  if(!has) return await regionCreatePrompt(r);
-  return await regionPasswordPrompt(r);
-}
+async function regionUnlock(r){ return true; } // kata sandi dashboard dinonaktifkan
 function regionCreatePrompt(r){
   return new Promise(resolve=>{
     document.getElementById('regPassBg')?.remove();
@@ -1993,7 +1984,8 @@ function applyAccess(){
   ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
   const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
   const lockedReg = acctRegion(currentUser);
-  ['bkPanel','regPassPanel','acctMgmtPanel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = lockedReg ? 'none' : ''; });
+  ['bkPanel','acctMgmtPanel'].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display = lockedReg ? 'none' : ''; });
+  { const e=document.getElementById('regPassPanel'); if(e) e.style.display='none'; }
   const sw = document.getElementById('regionSw'); if(sw){ if(lockedReg) sw.value = lockedReg; sw.disabled = !!lockedReg; const box = sw.closest('.region-sw'); if(box) box.style.display = lockedReg ? 'none' : ''; }
   if(lockedReg && r) r.textContent = 'Dashboard ' + (REGION_LABEL[lockedReg]||lockedReg);
 }
