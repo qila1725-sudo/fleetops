@@ -747,7 +747,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div class="nav-item" data-page="reminder" onclick="goPage('reminder')"><span class="l"><span class="ic">🚗</span> Reminder / Data Kendaraan</span><span class="count" id="navReminderCount">0</span></div>
       <div class="nav-item" data-page="sparepart" onclick="goPage('sparepart')"><span class="l"><span class="ic">🔩</span> Pending Sparepart</span><span class="count" id="navSparepartCount">0</span></div>
       <div class="nav-item" data-page="histori" onclick="goPage('histori')"><span class="l"><span class="ic">🕘</span> Histori Service</span></div>
-      <div class="nav-item" data-page="bengkel" onclick="goPage('bengkel')"><span class="l"><span class="ic">🏭</span> Keluar Masuk Bengkel</span><span class="count" id="navBengkelCount">0</span></div>
       <div class="nav-item" data-page="kwitansi" onclick="goPage('kwitansi')"><span class="l"><span class="ic">🧾</span> Kwitansi Pengajuan</span><span class="count" id="navKwitansiCount">0</span></div>
       <div class="nav-item" data-page="akun" onclick="goPage('akun')"><span class="l"><span class="ic">⚙️</span> Pengaturan Akun</span></div>
 
@@ -2004,6 +2003,7 @@ function applyAccess(){
   const full = isMaintenance();
   const allowed = ROLE_PAGES[roleKind(currentUser)] || ['bengkel'];
   document.querySelectorAll('.sidebar .nav-item').forEach(n=>{ n.style.display = (full || allowed.includes(n.dataset.page)) ? '' : 'none'; });
+  { const nb=document.querySelector('.sidebar .nav-item[data-page="bengkel"]'); if(nb && roleKind(currentUser)!=='staff') nb.style.display='none'; } // Keluar Masuk Bengkel sudah ada di Klaim Accident; menu ini hanya tersisa untuk akun Staff
   ['topQuickjump','desktopNotifBtn','topBell'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display = full ? '' : 'none'; });
   { const hm=document.getElementById('navHomeMenu'); if(hm) hm.style.display = window._spkAcc ? '' : 'none'; }
   const r = document.getElementById('whoRole'); if(r) r.textContent = ({maintenance:'Maintenance', staff:'Staff', gudang:'Gudang'})[roleKind(currentUser)] || 'Staff';
