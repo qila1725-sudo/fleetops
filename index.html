@@ -2283,7 +2283,7 @@ function renderTable(){
       <td><div class="cell-primary">${fmtDate(v.lastdate)}</div><div class="cell-sub">${(v.lastkm||0).toLocaleString('id-ID')} KM</div></td>
       <td><div class="cell-primary">${(v.currentkm||0).toLocaleString('id-ID')} KM</div><div class="cell-sub">${kmLeftTxt}</div></td>
       <td>${v.interval||'-'} Hari</td>
-      <td><span class="status-badge ${s}">${statusLabel(s)}</span>${inWorkshopNow(v) ? '<br><span class="status-badge" style="background:#fff4e0;color:#b26a00;margin-top:4px;">🔧 Di Bengkel</span>' : ''}</td>
+      <td><span class="status-badge ${s}">${statusLabel(s)}</span></td>
       <td><div class="aksi-cell">
         ${sold ? `<span class="wa-btn" style="opacity:.4;cursor:not-allowed;" title="Unit sudah terjual — tidak dikirimi reminder">💬 WA Reminder</span>` : `<a class="wa-btn" href="javascript:void(0)" onclick="openWaVehicle('${v.id}')">${waBtnLabel(v,'💬 WA Reminder')}</a>`}
         <button class="update-btn" onclick="openUpdateServiceModal('${v.id}')">🔧 Update</button>
