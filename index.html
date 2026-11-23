@@ -599,7 +599,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <button class="btn-outline green" onclick="vehExport()">⬇ Export Excel</button>
       <button class="btn btn-primary small" onclick="vehOpenForm()">＋ Tambah Data</button>
     </div>
-    <div class="spk-card"><table class="spk-tbl"><thead id="vehHead"></thead><tbody id="vehBody"></tbody></table>
+    <div class="spk-card" style="overflow:auto;"><table class="spk-tbl"><thead id="vehHead"></thead><tbody id="vehBody"></tbody></table>
       <div id="vehEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.</div></div>
     <p class="small-note" id="vehNote" style="margin-top:10px;"></p>
   </div>
@@ -4000,15 +4000,16 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
   baru:    { label:'Mobil Baru',            cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['warna','Warna'],['noka','No. Rangka'],['nosin','No. Mesin'],['pt','PT / Customer'],['tgl','Tgl Masuk','date'],['ket','Keterangan']] },
-  polis:   { label:'Polis Asuransi Mobil',  cols:[['nopol','No. Polisi'],['nopolis','No. Polis'],['merk','Merk / Type'],['asuransi','Perusahaan Asuransi'],['jenis','Jenis Pertanggungan'],['mulai','Tgl Mulai','date'],['akhir','Tgl Berakhir','date'],['premi','Premi'],['ket','Keterangan']] },
+  polis:   { label:'Polis Asuransi Mobil',  cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] },
   standby: { label:'Unit Standby',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['lokasi','Lokasi'],['tgl','Tgl Standby','date'],['kondisi','Kondisi'],['ket','Keterangan']] },
   terjual: { label:'Unit Terjual',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['tgl','Tgl Terjual','date'],['pembeli','Pembeli'],['harga','Harga Jual'],['ket','Keterangan']] }
 };
 let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
+const vehData = T => T.cols.filter(c=>c[2]!=='skip');
 const vehNorm = v => String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]/g,'');
 async function openVehDash(){ spkShowOnly('vehScreen'); renderVeh(); await vehReload(); }
 async function vehReload(){
-  try{ const r = await sbGet('vehicle_items','select=*&order=created_at.desc'); VEH_ITEMS = r||[]; VEH_READY = true; }
+  try{ let all=[], off=0; for(;;){ const r = await sbGet('vehicle_items',`select=*&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; } VEH_ITEMS = all; VEH_READY = true; }
   catch(e){ VEH_READY = false; console.warn('Tabel vehicle_items belum ada:', e); }
   renderVeh();
 }
@@ -4022,16 +4023,18 @@ function renderVeh(){
   $id('vehHead').innerHTML = '<tr>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
   const q = vehNorm($id('vehSearch').value);
   const rows = vehList().filter(x=>!q || vehNorm(Object.values(x.data||{}).join(' ')).includes(q));
-  $id('vehBody').innerHTML = rows.map(x=>`<tr>${T.cols.map(c=>`<td>${vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
+  const SHOW = 300, shown = rows.slice(0,SHOW);
+  $id('vehBody').innerHTML = shown.map((x,ri)=>`<tr>${T.cols.map(c=>`<td>${c[2]==='skip'?(ri+1):vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
   $id('vehEmpty').style.display = rows.length ? 'none' : '';
-  $id('vehNote').innerHTML = VEH_READY ? 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
+  const more = rows.length>SHOW ? `Menampilkan ${SHOW} dari ${rows.length} data, gunakan kotak Cari untuk mempersempit. ` : '';
+  $id('vehNote').innerHTML = VEH_READY ? more + 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
 }
 function vehOpenForm(id){
   if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
   const T = VEH_TABS[VEH_TAB]; VEH_EDIT = id || null;
   const cur = id ? (VEH_ITEMS.find(x=>x.id===id)||{}).data||{} : {};
   $id('vehFormTitle').textContent = (id?'Ubah ':'Tambah ')+T.label;
-  $id('vehFormGrid').innerHTML = T.cols.map(c=>{
+  $id('vehFormGrid').innerHTML = vehData(T).map(c=>{
     const full = c[0]==='ket' ? ' class="full"' : '';
     const inp = c[0]==='ket' ? `<textarea id="vf_${c[0]}">${escH(cur[c[0]]||'')}</textarea>` : `<input id="vf_${c[0]}" type="${c[2]==='date'?'date':'text'}" value="${escH(cur[c[0]]||'')}">`;
     return `<div${full}><label>${c[1]}</label>${inp}</div>`;
@@ -4041,7 +4044,7 @@ function vehOpenForm(id){
 function vehCloseForm(){ $id('vehFormBg').classList.remove('show'); VEH_EDIT = null; }
 async function vehSave(){
   const T = VEH_TABS[VEH_TAB], d = {};
-  T.cols.forEach(c=>{ d[c[0]] = ($id('vf_'+c[0]).value||'').trim(); });
+  vehData(T).forEach(c=>{ d[c[0]] = ($id('vf_'+c[0]).value||'').trim(); });
   if(!d.nopol){ showToast('No. Polisi wajib diisi.', true); return; }
   try{
     if(VEH_EDIT){ const r = await sbUpdate('vehicle_items', VEH_EDIT, {data:d}); const i = VEH_ITEMS.findIndex(x=>x.id===VEH_EDIT); if(i>=0) VEH_ITEMS[i] = (r&&r[0])||{...VEH_ITEMS[i],data:d}; }
@@ -4062,8 +4065,8 @@ function vehTemplate(){
 }
 function vehExport(){
   if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB], list = vehList();
-  const rows = list.length ? list.map(x=>{ const o={}; T.cols.forEach(c=>o[c[1]]=(x.data||{})[c[0]]||''); return o; }) : [Object.fromEntries(T.cols.map(c=>[c[1],'']))];
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), T.label.slice(0,31));
+  const aoa = [T.cols.map(c=>c[1])]; list.forEach((x,i)=>aoa.push(T.cols.map(c=>c[2]==='skip'?i+1:((x.data||{})[c[0]]||''))));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), T.label.slice(0,31));
   XLSX.writeFile(wb, 'vehicle-'+VEH_TAB+'.xlsx');
 }
 function vehDate(v){
@@ -4081,13 +4084,13 @@ async function vehImport(evt){
     const T = VEH_TABS[VEH_TAB];
     const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
-    const hi = aoa.findIndex(r=>r.some(c=>vehNorm(c)==='nopolisi'||vehNorm(c)==='nopol'));
-    if(hi<0){ showToast('Kolom "No. Polisi" tidak ditemukan. Pakai Template Excel.', true); return; }
-    const idx = T.cols.map(c=>aoa[hi].findIndex(h=>vehNorm(h)===vehNorm(c[1])));
+    const keyN = [vehNorm(T.cols.find(c=>c[0]==='nopol')[1]),'nopolisi','nopol']; const hi = aoa.findIndex(r=>r.some(c=>keyN.includes(vehNorm(c))));
+    if(hi<0){ showToast('Kolom nomor polisi tidak ditemukan. Pakai Template Excel.', true); return; }
+    const idx = T.cols.map(c=>{ let n=c[3]||1, at=-1; aoa[hi].forEach((h,i)=>{ if(at<0 && vehNorm(h)===vehNorm(c[1]) && --n===0) at=i; }); return c[2]==='skip' ? -1 : at; });
     const seen = new Set(vehList().map(x=>vehNorm((x.data||{}).nopol)+'|'+vehNorm((x.data||{}).nopolis)));
     const out = []; let dup = 0;
     aoa.slice(hi+1).forEach(r=>{
-      const d = {}; T.cols.forEach((c,i)=>{ const v = idx[i]>=0 ? r[idx[i]] : ''; d[c[0]] = c[2]==='date' ? vehDate(v) : String(v==null?'':v).replace(/\s+/g,' ').trim(); });
+      const d = {}; T.cols.forEach((c,i)=>{ if(c[2]==='skip') return; const v = idx[i]>=0 ? r[idx[i]] : ''; d[c[0]] = c[2]==='date' ? vehDate(v) : String(v==null?'':v).replace(/\s+/g,' ').trim(); });
       if(!d.nopol) return;
       const key = vehNorm(d.nopol)+'|'+vehNorm(d.nopolis);
       if(seen.has(key)){ dup++; return; } seen.add(key);
