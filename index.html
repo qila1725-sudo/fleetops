@@ -4021,7 +4021,7 @@ const VEH_TABS = {
   baru:    { label:'Mobil Baru',            cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['warna','Warna'],['noka','No. Rangka'],['nosin','No. Mesin'],['pt','PT / Customer'],['tgl','Tgl Masuk','date'],['ket','Keterangan']] },
   polis:   { label:'Polis Asuransi Mobil',  cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] },
   standby: { label:'Unit Standby',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['lokasi','Lokasi'],['tgl','Tgl Standby','date'],['kondisi','Kondisi'],['ket','Keterangan']] },
-  terjual: { label:'Unit Terjual',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['tgl','Tgl Terjual','date'],['pembeli','Pembeli'],['harga','Harga Jual'],['ket','Keterangan']] }
+  terjual: { label:'Unit Terjual',          cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['nopolis2','Police no',null,2]] }
 };
 let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
 const vehData = T => T.cols.filter(c=>c[2]!=='skip');
