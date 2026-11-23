@@ -593,11 +593,20 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="spk-kpis" id="vehKpis"></div>
     <div class="sp-tabs" id="vehTabs" style="margin:0 0 14px;"></div>
     <div class="spk-tools">
-      <input id="vehSearch" placeholder="Cari..." oninput="renderVeh()">
+      <input id="vehSearch" placeholder="Cari..." oninput="vehSearchDebounced()">
       <button class="btn-outline" onclick="vehTemplate()">⬇ Template Excel</button>
       <label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" id="vehImportFile" accept=".xlsx,.xls,.csv" onchange="vehImport(event)"></label>
       <button class="btn-outline green" onclick="vehExport()">⬇ Export Excel</button>
       <button class="btn btn-primary small" onclick="vehOpenForm()">＋ Tambah Data</button>
+    </div>
+    <div class="spk-tools" style="margin-top:-4px;">
+      <select id="vehPageSize" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;">
+        <option value="100">100 baris</option><option value="300">300 baris</option><option value="1000">1.000 baris</option><option value="0" selected>Semua baris</option>
+      </select>
+      <span id="vehPager" style="display:flex;gap:6px;align-items:center;font-size:12px;color:#556;"></span>
+      <span style="flex:1"></span>
+      <button class="btn-danger small" id="vehDelSel" style="display:none" onclick="vehDeleteSelected()">🗑 Hapus Terpilih</button>
+      <button class="btn-danger small" onclick="vehDeleteAll()">🗑 Hapus Semua di Tab Ini</button>
     </div>
     <div class="spk-card" style="overflow:auto;"><table class="spk-tbl"><thead id="vehHead"></thead><tbody id="vehBody"></tbody></table>
       <div id="vehEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.</div></div>
@@ -4032,7 +4041,7 @@ async function vehReload(){
   catch(e){ VEH_READY = false; console.warn('Tabel vehicle_items belum ada:', e); }
   renderVeh();
 }
-function vehSetTab(t){ VEH_TAB = t; $id('vehSearch').value=''; renderVeh(); }
+function vehSetTab(t){ VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); }
 function vehList(k){ return VEH_ITEMS.filter(x=>x.kind===(k||VEH_TAB)); }
 function vehFmt(v,type){ if(!v) return '-'; if(type==='date'){ const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:escH(v); } return escH(v); }
 function renderVeh(){
@@ -4040,14 +4049,46 @@ function renderVeh(){
   if(VEH_LOADED){ vehBuildMaster(VEH_ITEMS); vehApplyMaster(); }
   $id('vehKpis').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<div class="k" style="cursor:pointer;${k===VEH_TAB?'outline:2px solid var(--brand);':''}" onclick="vehSetTab('${k}')"><div class="l">${t.label.toUpperCase()}</div><div class="v">${vehList(k).length}</div></div>`).join('');
   $id('vehTabs').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<button class="${k===VEH_TAB?'on':''}" onclick="vehSetTab('${k}')">${t.label}</button>`).join('');
-  $id('vehHead').innerHTML = '<tr>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
+  $id('vehHead').innerHTML = '<tr><th style="width:32px"><input type="checkbox" id="vehChkAll" onchange="vehSelAll(this.checked)" title="Pilih semua hasil"></th>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
   const q = vehNorm($id('vehSearch').value);
-  const rows = vehList().filter(x=>!q || vehNorm(Object.values(x.data||{}).join(' ')).includes(q));
-  const SHOW = 300, shown = rows.slice(0,SHOW);
-  $id('vehBody').innerHTML = shown.map((x,ri)=>`<tr>${T.cols.map(c=>`<td>${c[2]==='skip'?(ri+1):vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
+  const rows = vehList().filter(x=>{ if(!q) return true; if(x._s===undefined) x._s = vehNorm(Object.values(x.data||{}).join(' ')); return x._s.includes(q); });
+  VEH_VIEW = rows.map(x=>x.id);
+  const size = Number($id('vehPageSize').value)||0, pages = size ? Math.max(1,Math.ceil(rows.length/size)) : 1;
+  if(VEH_PAGE>=pages) VEH_PAGE = pages-1; if(VEH_PAGE<0) VEH_PAGE = 0;
+  const from = size ? VEH_PAGE*size : 0, shown = size ? rows.slice(from, from+size) : rows;
+  $id('vehBody').innerHTML = shown.map((x,ri)=>`<tr><td><input type="checkbox" ${VEH_SEL.has(x.id)?'checked':''} onchange="vehSelOne('${x.id}',this.checked)"></td>${T.cols.map(c=>`<td>${c[2]==='skip'?(from+ri+1):vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
   $id('vehEmpty').style.display = rows.length ? 'none' : '';
-  const more = rows.length>SHOW ? `Menampilkan ${SHOW} dari ${rows.length} data, gunakan kotak Cari untuk mempersempit. ` : '';
-  $id('vehNote').innerHTML = VEH_READY ? more + 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
+  $id('vehPager').innerHTML = !rows.length ? '' : (size && pages>1
+    ? `<button class="btn-outline small" ${VEH_PAGE<=0?'disabled':''} onclick="VEH_PAGE--;renderVeh()">‹</button> Halaman ${VEH_PAGE+1} / ${pages} · ${from+1}–${Math.min(from+size,rows.length)} dari ${rows.length.toLocaleString('id-ID')} <button class="btn-outline small" ${VEH_PAGE>=pages-1?'disabled':''} onclick="VEH_PAGE++;renderVeh()">›</button>`
+    : `Menampilkan semua ${rows.length.toLocaleString('id-ID')} data`);
+  vehUpdateSel();
+  $id('vehNote').innerHTML = VEH_READY ? 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
+}
+let VEH_SEL = new Set(), VEH_VIEW = [], VEH_PAGE = 0, _vehT = null;
+function vehSearchDebounced(){ clearTimeout(_vehT); VEH_PAGE = 0; _vehT = setTimeout(renderVeh, 250); }
+function vehUpdateSel(){
+  const n = VEH_SEL.size, b = $id('vehDelSel'); if(b){ b.style.display = n ? '' : 'none'; b.textContent = `🗑 Hapus Terpilih (${n.toLocaleString('id-ID')})`; }
+  const c = $id('vehChkAll'); if(c){ const inView = VEH_VIEW.length && VEH_VIEW.every(id=>VEH_SEL.has(id)); c.checked = !!inView; c.indeterminate = !inView && VEH_VIEW.some(id=>VEH_SEL.has(id)); }
+}
+function vehSelOne(id,on){ if(on) VEH_SEL.add(id); else VEH_SEL.delete(id); vehUpdateSel(); }
+function vehSelAll(on){ VEH_VIEW.forEach(id=>{ if(on) VEH_SEL.add(id); else VEH_SEL.delete(id); }); renderVeh(); }
+async function vehDeleteSelected(){
+  const ids = [...VEH_SEL].filter(id=>VEH_ITEMS.some(x=>x.id===id)); if(!ids.length) return;
+  if(!confirm(`Hapus ${ids.length.toLocaleString('id-ID')} data terpilih? Tindakan ini tidak bisa dibatalkan.`)) return;
+  try{
+    for(let i=0;i<ids.length;i+=100) await sbDeleteIds('vehicle_items', ids.slice(i,i+100));
+    const gone = new Set(ids); VEH_ITEMS = VEH_ITEMS.filter(x=>!gone.has(x.id)); VEH_SEL.clear(); renderVeh(); showToast(`${ids.length.toLocaleString('id-ID')} data dihapus.`);
+  }catch(e){ await vehReload(); showToast('Penghapusan terhenti: '+String(e.message||e).slice(0,120), true); }
+}
+async function vehDeleteAll(){
+  const T = VEH_TABS[VEH_TAB], n = vehList().length;
+  if(!n){ showToast('Tab ini sudah kosong.', true); return; }
+  const ans = prompt(`Ini akan menghapus SEMUA ${n.toLocaleString('id-ID')} data di tab "${T.label}" dan tidak bisa dibatalkan.\n\nKetik HAPUS untuk melanjutkan:`);
+  if((ans||'').trim().toUpperCase()!=='HAPUS'){ if(ans!==null) showToast('Dibatalkan: kata HAPUS tidak diketik.', true); return; }
+  try{
+    await sb(`vehicle_items?kind=eq.${VEH_TAB}`, {method:'DELETE', prefer:'return=minimal'});
+    VEH_ITEMS = VEH_ITEMS.filter(x=>x.kind!==VEH_TAB); VEH_SEL.clear(); renderVeh(); showToast(`Semua data di "${T.label}" dihapus.`);
+  }catch(e){ await vehReload(); showToast('Gagal menghapus: '+String(e.message||e).slice(0,120), true); }
 }
 function vehOpenForm(id){
   if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
@@ -4074,7 +4115,7 @@ async function vehSave(){
 }
 async function vehDelete(id){
   if(!confirm('Hapus data ini?')) return;
-  try{ await sbDeleteIds('vehicle_items',[id]); VEH_ITEMS = VEH_ITEMS.filter(x=>x.id!==id); renderVeh(); showToast('Data dihapus.'); }
+  try{ await sbDeleteIds('vehicle_items',[id]); VEH_ITEMS = VEH_ITEMS.filter(x=>x.id!==id); VEH_SEL.delete(id); renderVeh(); showToast('Data dihapus.'); }
   catch(e){ showToast('Gagal menghapus: '+String(e.message).slice(0,140), true); }
 }
 function vehXlsxOk(){ if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return false; } return true; }
