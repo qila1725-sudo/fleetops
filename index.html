@@ -1454,6 +1454,7 @@ async function loadAll(){
       console.warn('Tabel sparepart_pending belum tersedia — jalankan SQL tambahan untuk fitur Pending Sparepart.', e);
       DB.sparepart = [];
     }
+    try{ await vehMasterLoad(); }catch(e){ console.warn('Master data vehicle belum tersedia (tabel vehicle_items):', e); }
   }catch(e){
     console.error('Gagal memuat data dari Supabase:', e);
     dbOnline = false;
@@ -1461,6 +1462,24 @@ async function loadAll(){
     const box = document.getElementById('loginDebugBox');
     if(box){ box.style.display='block'; box.textContent = 'DEBUG — pesan error database:\n' + (e && e.message ? e.message : String(e)); }
   }
+}
+
+/* ===== Samakan Spesifikasi Kendaraan (Reminder) dengan Master Data Vehicle (tab Polis Asuransi Mobil): type, tahun, warna, dicocokkan lewat nopol ===== */
+let VEH_MASTER = {}, VEH_LOADED = false;
+const vehKey = n => String(n||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+function vehBuildMaster(items){ const m={}; (items||[]).forEach(x=>{ if(x.kind!=='polis') return; const d=x.data||{}, k=vehKey(d.nopol); if(k && !m[k]) m[k]=d; }); VEH_MASTER=m; }
+function vehApplyMaster(){
+  let n=0;
+  (DB.vehicles||[]).forEach(v=>{ const m=VEH_MASTER[vehKey(v.nopol)]; if(!m) return;
+    if(m.merk) v.type=m.merk; if(m.warna) v.color=m.warna;
+    if(m.tahun){ const y=Number(m.tahun); v.year = (isFinite(y)&&y>0) ? y : m.tahun; }
+    n++; });
+  return n;
+}
+async function vehMasterLoad(){
+  let all=[], off=0;
+  for(;;){ const r = await sbGet('vehicle_items',`select=kind,data&kind=eq.polis&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; }
+  vehBuildMaster(all); vehApplyMaster();
 }
 
 /* ================= UTIL ================= */
@@ -4009,7 +4028,7 @@ const vehData = T => T.cols.filter(c=>c[2]!=='skip');
 const vehNorm = v => String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]/g,'');
 async function openVehDash(){ spkShowOnly('vehScreen'); renderVeh(); await vehReload(); }
 async function vehReload(){
-  try{ let all=[], off=0; for(;;){ const r = await sbGet('vehicle_items',`select=*&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; } VEH_ITEMS = all; VEH_READY = true; }
+  try{ let all=[], off=0; for(;;){ const r = await sbGet('vehicle_items',`select=*&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; } VEH_ITEMS = all; VEH_READY = true; VEH_LOADED = true; }
   catch(e){ VEH_READY = false; console.warn('Tabel vehicle_items belum ada:', e); }
   renderVeh();
 }
@@ -4018,6 +4037,7 @@ function vehList(k){ return VEH_ITEMS.filter(x=>x.kind===(k||VEH_TAB)); }
 function vehFmt(v,type){ if(!v) return '-'; if(type==='date'){ const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:escH(v); } return escH(v); }
 function renderVeh(){
   const T = VEH_TABS[VEH_TAB];
+  if(VEH_LOADED){ vehBuildMaster(VEH_ITEMS); vehApplyMaster(); }
   $id('vehKpis').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<div class="k" style="cursor:pointer;${k===VEH_TAB?'outline:2px solid var(--brand);':''}" onclick="vehSetTab('${k}')"><div class="l">${t.label.toUpperCase()}</div><div class="v">${vehList(k).length}</div></div>`).join('');
   $id('vehTabs').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<button class="${k===VEH_TAB?'on':''}" onclick="vehSetTab('${k}')">${t.label}</button>`).join('');
   $id('vehHead').innerHTML = '<tr>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
