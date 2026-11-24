@@ -265,6 +265,7 @@
   .btn-green:hover{background:#106b34;}
 
   .table-wrap{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:auto;}
+  .veh-red td{color:#c62828 !important;font-weight:600;}
   .page .table-wrap{max-height:calc(100vh - 140px);} /* batang geser kiri-kanan selalu terlihat di bawah layar, header tabel tetap */
   .table-wrap::-webkit-scrollbar{height:14px;width:12px;} .table-wrap::-webkit-scrollbar-thumb{background:#aab4c5;border-radius:8px;border:3px solid #eef1f6;} .table-wrap::-webkit-scrollbar-track{background:#eef1f6;}
   table{border-collapse:collapse;width:100%;min-width:1280px;font-size:12.8px;}
@@ -4030,7 +4031,7 @@ const VEH_TABS = {
   baru:    { label:'Mobil Baru',            cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['warna','Warna'],['noka','No. Rangka'],['nosin','No. Mesin'],['pt','PT / Customer'],['tgl','Tgl Masuk','date'],['ket','Keterangan']] },
   polis:   { label:'Polis Asuransi Mobil',  cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] },
   standby: { label:'Unit Standby',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['lokasi','Lokasi'],['tgl','Tgl Standby','date'],['kondisi','Kondisi'],['ket','Keterangan']] },
-  terjual: { label:'Unit Terjual',          cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['nopolis2','Police no',null,2]] }
+  terjual: { label:'Unit Terjual',          red:true, cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['tgl','Police no','date',2],['pembeli','Pembeli'],['status','Status']] }
 };
 let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
 const vehData = T => T.cols.filter(c=>c[2]!=='skip');
@@ -4074,6 +4075,7 @@ function renderVeh(){
   const size = Number($id('vehPageSize').value)||0, pages = size ? Math.max(1,Math.ceil(rows.length/size)) : 1;
   if(VEH_PAGE>=pages) VEH_PAGE = pages-1; if(VEH_PAGE<0) VEH_PAGE = 0;
   const from = size ? VEH_PAGE*size : 0, shown = size ? rows.slice(from, from+size) : rows;
+  $id('vehBody').className = T.red ? 'veh-red' : '';
   $id('vehBody').innerHTML = shown.map((x,ri)=>`<tr><td><input type="checkbox" ${VEH_SEL.has(x.id)?'checked':''} onchange="vehSelOne('${x.id}',this.checked)"></td>${T.cols.map(c=>`<td>${c[2]==='skip'?(from+ri+1):vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
   $id('vehEmpty').style.display = rows.length ? 'none' : '';
   $id('vehEmpty').innerHTML = VEH_BUSY || !VEH_KLOAD[VEH_TAB] ? '⏳ Memuat data...' : 'Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.';
