@@ -4316,9 +4316,15 @@ function accBkStatus(){
   accBkCalc();
 }
 function accFillVeh(){
-  const v=(DB.vehicles||[]).find(x=>String(x.nopol||'').toUpperCase()===$id('acc_a_nopol').value.trim().toUpperCase()); if(!v) return;
-  const set=(i,t)=>{ const e=$id('acc_'+i); if(!e.value) e.value=t||''; };
-  set('a_pengemudi',v.user); set('p1_nopol',v.nopol); set('p1_jenis',accJenisGuess(accMerkFull(v))); set('p1_merk',accMerkFull(v)); set('p1_tahun',v.year);
+  const key=vehKey($id('acc_a_nopol').value); if(!key) return;
+  const v=(DB.vehicles||[]).find(x=>vehKey(x.nopol)===key), m=VEH_MASTER[key];
+  if(!v && !m) return;
+  const set=(i,t)=>{ const e=$id('acc_'+i); if(e && !e.value) e.value=t||''; };
+  if(v){ set('a_pengemudi',v.user); set('p1_nopol',v.nopol); set('p1_jenis',accJenisGuess(accMerkFull(v))); set('p1_merk',accMerkFull(v)); set('p1_tahun',v.year); }
+  if(m){ // tersambung ke Dashboard Vehicle > Polis Asuransi Mobil (dicocokkan lewat nopol)
+    set('s_nama',m.asuransi); set('s_polis',m.nopolis); set('p1_noka',m.noka); set('p1_nosin',m.nosin);
+    if(!v){ set('p1_nopol',m.nopol); set('p1_merk',m.merk); set('p1_jenis',accJenisGuess(m.merk)); set('p1_tahun',m.tahun); }
+  }
 }
 function accNextNo(){
   // Format: ACC-YYYY/MM-NNNNNN  (nomor urut berjalan per tahun, bulan mengikuti tanggal hari ini)
@@ -4328,7 +4334,7 @@ function accNextNo(){
 }
 function openAccForm(id, tabName){
   accBuild(); const x=id? ACC_LIST.find(a=>a.id===id):null; accEditId=x? x.id:null;
-  $id('accNopolList').innerHTML=(DB.vehicles||[]).map(v=>`<option value="${spkEsc(v.nopol)}">`).join('');
+  { const seen=new Set(), L=[]; (DB.vehicles||[]).forEach(v=>{ const k=vehKey(v.nopol); if(k&&!seen.has(k)){ seen.add(k); L.push(v.nopol); } }); Object.values(VEH_MASTER).forEach(m=>{ const k=vehKey(m.nopol); if(k&&!seen.has(k)){ seen.add(k); L.push(m.nopol); } }); $id('accNopolList').innerHTML=L.map(n=>`<option value="${spkEsc(n)}">`).join(''); }
   const d=x? x.d:{}, now=new Date();
   accIdsAll().forEach(n=>{ const e=$id('acc_'+n); if(e.tagName==='SELECT' && d[n] && ![...e.options].some(o=>o.value===d[n])) e.add(new Option(d[n],d[n])); e.value = d[n]!==undefined? d[n] : (e.tagName==='SELECT'? e.options[0].value : ''); });
   if(!x){ $id('acc_a_no').value=accNextNo(); $id('acc_a_tgl').value=spkToday(); $id('acc_a_jam').value=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'); accDay($id('acc_a_tgl')); }
