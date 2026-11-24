@@ -601,7 +601,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     </div>
     <div class="spk-tools" style="margin-top:-4px;">
       <select id="vehPageSize" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;">
-        <option value="100">100 baris</option><option value="300">300 baris</option><option value="1000">1.000 baris</option><option value="0" selected>Semua baris</option>
+        <option value="100" selected>100 baris</option><option value="300">300 baris</option><option value="1000">1.000 baris</option><option value="0">Semua baris (berat)</option>
       </select>
       <span id="vehPager" style="display:flex;gap:6px;align-items:center;font-size:12px;color:#556;"></span>
       <span style="flex:1"></span>
@@ -1463,7 +1463,7 @@ async function loadAll(){
       console.warn('Tabel sparepart_pending belum tersedia — jalankan SQL tambahan untuk fitur Pending Sparepart.', e);
       DB.sparepart = [];
     }
-    try{ await vehMasterLoad(); }catch(e){ console.warn('Master data vehicle belum tersedia (tabel vehicle_items):', e); }
+    vehMasterLoad().then(()=>{ try{ if(document.getElementById('app').style.display!=='none') renderAll(); }catch(_){} }).catch(e=>console.warn('Master data vehicle belum tersedia (tabel vehicle_items):', e));
   }catch(e){
     console.error('Gagal memuat data dari Supabase:', e);
     dbOnline = false;
@@ -1474,7 +1474,7 @@ async function loadAll(){
 }
 
 /* ===== Samakan Spesifikasi Kendaraan (Reminder) dengan Master Data Vehicle (tab Polis Asuransi Mobil): type, tahun, warna, dicocokkan lewat nopol ===== */
-let VEH_MASTER = {}, VEH_LOADED = false;
+let VEH_MASTER = {};
 const vehKey = n => String(n||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 function vehBuildMaster(items){ const m={}; (items||[]).forEach(x=>{ if(x.kind!=='polis') return; const d=x.data||{}, k=vehKey(d.nopol); if(k && !m[k]) m[k]=d; }); VEH_MASTER=m; }
 function vehApplyMaster(){
@@ -4035,19 +4035,37 @@ const VEH_TABS = {
 let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
 const vehData = T => T.cols.filter(c=>c[2]!=='skip');
 const vehNorm = v => String(v==null?'':v).toLowerCase().replace(/[^a-z0-9]/g,'');
-async function openVehDash(){ spkShowOnly('vehScreen'); renderVeh(); await vehReload(); }
-async function vehReload(){
-  try{ let all=[], off=0; for(;;){ const r = await sbGet('vehicle_items',`select=*&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; } VEH_ITEMS = all; VEH_READY = true; VEH_LOADED = true; }
-  catch(e){ VEH_READY = false; console.warn('Tabel vehicle_items belum ada:', e); }
-  renderVeh();
+let VEH_KLOAD = {}, VEH_COUNT = {}, VEH_BUSY = false;
+async function vehCount(kind){
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/vehicle_items?select=id&kind=eq.${kind}`, { method:'HEAD', headers:{ 'apikey':SUPABASE_ANON_KEY, 'Authorization':'Bearer '+(ACCESS_TOKEN||SUPABASE_ANON_KEY), 'Prefer':'count=exact', 'Range-Unit':'items', 'Range':'0-0' } });
+  if(!r.ok && r.status!==206) throw new Error('HTTP '+r.status);
+  const m = String(r.headers.get('content-range')||'').match(/\/(\d+)$/); return m ? Number(m[1]) : 0;
 }
-function vehSetTab(t){ VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); }
+async function vehLoadKind(k){
+  let all=[], off=0;
+  for(;;){ const r = await sbGet('vehicle_items',`select=*&kind=eq.${k}&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; }
+  VEH_ITEMS = VEH_ITEMS.filter(x=>x.kind!==k).concat(all); VEH_KLOAD[k] = true; VEH_COUNT[k] = all.length; VEH_READY = true;
+}
+async function vehEnsure(k){
+  if(VEH_KLOAD[k]) return;
+  VEH_BUSY = true; renderVeh();
+  try{ await vehLoadKind(k); }catch(e){ VEH_READY = false; console.warn('Tabel vehicle_items belum ada:', e); }
+  VEH_BUSY = false; renderVeh();
+}
+async function openVehDash(){
+  spkShowOnly('vehScreen'); renderVeh();
+  try{ const ks = Object.keys(VEH_TABS); const c = await Promise.all(ks.map(k=>vehCount(k).catch(()=>null))); ks.forEach((k,i)=>{ if(c[i]!==null) VEH_COUNT[k]=c[i]; }); renderVeh(); }catch(e){}
+  await vehEnsure(VEH_TAB);
+}
+async function vehReload(){ VEH_KLOAD = {}; await vehEnsure(VEH_TAB); try{ const ks=Object.keys(VEH_TABS); const c=await Promise.all(ks.map(k=>vehCount(k).catch(()=>null))); ks.forEach((k,i)=>{ if(c[i]!==null) VEH_COUNT[k]=c[i]; }); renderVeh(); }catch(e){} }
+function vehSetTab(t){ VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); vehEnsure(t); }
+const vehKpi = k => VEH_KLOAD[k] ? vehList(k).length : (VEH_COUNT[k]||0);
 function vehList(k){ return VEH_ITEMS.filter(x=>x.kind===(k||VEH_TAB)); }
 function vehFmt(v,type){ if(!v) return '-'; if(type==='date'){ const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:escH(v); } return escH(v); }
 function renderVeh(){
   const T = VEH_TABS[VEH_TAB];
-  if(VEH_LOADED){ vehBuildMaster(VEH_ITEMS); vehApplyMaster(); }
-  $id('vehKpis').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<div class="k" style="cursor:pointer;${k===VEH_TAB?'outline:2px solid var(--brand);':''}" onclick="vehSetTab('${k}')"><div class="l">${t.label.toUpperCase()}</div><div class="v">${vehList(k).length}</div></div>`).join('');
+  if(VEH_KLOAD.polis){ vehBuildMaster(VEH_ITEMS); vehApplyMaster(); }
+  $id('vehKpis').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<div class="k" style="cursor:pointer;${k===VEH_TAB?'outline:2px solid var(--brand);':''}" onclick="vehSetTab('${k}')"><div class="l">${t.label.toUpperCase()}</div><div class="v">${vehKpi(k).toLocaleString('id-ID')}</div></div>`).join('');
   $id('vehTabs').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<button class="${k===VEH_TAB?'on':''}" onclick="vehSetTab('${k}')">${t.label}</button>`).join('');
   $id('vehHead').innerHTML = '<tr><th style="width:32px"><input type="checkbox" id="vehChkAll" onchange="vehSelAll(this.checked)" title="Pilih semua hasil"></th>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
   const q = vehNorm($id('vehSearch').value);
@@ -4058,6 +4076,7 @@ function renderVeh(){
   const from = size ? VEH_PAGE*size : 0, shown = size ? rows.slice(from, from+size) : rows;
   $id('vehBody').innerHTML = shown.map((x,ri)=>`<tr><td><input type="checkbox" ${VEH_SEL.has(x.id)?'checked':''} onchange="vehSelOne('${x.id}',this.checked)"></td>${T.cols.map(c=>`<td>${c[2]==='skip'?(from+ri+1):vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
   $id('vehEmpty').style.display = rows.length ? 'none' : '';
+  $id('vehEmpty').innerHTML = VEH_BUSY || !VEH_KLOAD[VEH_TAB] ? '⏳ Memuat data...' : 'Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.';
   $id('vehPager').innerHTML = !rows.length ? '' : (size && pages>1
     ? `<button class="btn-outline small" ${VEH_PAGE<=0?'disabled':''} onclick="VEH_PAGE--;renderVeh()">‹</button> Halaman ${VEH_PAGE+1} / ${pages} · ${from+1}–${Math.min(from+size,rows.length)} dari ${rows.length.toLocaleString('id-ID')} <button class="btn-outline small" ${VEH_PAGE>=pages-1?'disabled':''} onclick="VEH_PAGE++;renderVeh()">›</button>`
     : `Menampilkan semua ${rows.length.toLocaleString('id-ID')} data`);
@@ -4141,6 +4160,7 @@ async function vehImport(evt){
   const file = evt.target.files[0]; evt.target.value=''; if(!file) return;
   if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
   if(!vehXlsxOk()) return;
+  if(!VEH_KLOAD[VEH_TAB]){ showToast('Tunggu data tab ini selesai dimuat dulu.', true); return; }
   try{
     const T = VEH_TABS[VEH_TAB];
     const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
