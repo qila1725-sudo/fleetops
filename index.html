@@ -1049,13 +1049,13 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div><label>Area</label><input id="v_area" list="vAreaList" autocomplete="off"><datalist id="vAreaList"></datalist></div>
       <div><label>Nama User / Driver</label><input id="v_user"></div>
       <div><label>Nomor Telepon (format 08xx / 62xx)</label><input id="v_phone"></div>
-      <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase"></div>
-      <div><label>Brand</label><input id="v_brand" list="vBrandList" placeholder="Contoh: Daihatsu"></div>
+      <div><label>Nomor Polisi</label><input id="v_nopol" style="text-transform:uppercase" oninput="vehFormFill()" onchange="vehFormFill(true)"></div>
+      <div><label>Brand</label><input id="v_brand" oninput="delete this.dataset.auto" list="vBrandList" placeholder="Contoh: Daihatsu"></div>
       <div><label>Model</label><input id="v_model" list="vModelList" placeholder="Contoh: Granmax"></div>
-      <div><label>Type / Varian</label><input id="v_type" list="vTypeList" placeholder="Contoh: 1.3 BV AC">
+      <div><label>Type / Varian</label><input id="v_type" oninput="delete this.dataset.auto" list="vTypeList" placeholder="Contoh: 1.3 BV AC">
         <datalist id="vBrandList"></datalist><datalist id="vModelList"></datalist><datalist id="vTypeList"></datalist></div>
-      <div><label>Warna</label><input id="v_color"></div>
-      <div><label>Tahun</label><input id="v_year" type="number"></div>
+      <div><label>Warna</label><input id="v_color" oninput="delete this.dataset.auto"></div>
+      <div><label>Tahun</label><input id="v_year" oninput="delete this.dataset.auto" type="number"></div>
       <div><label>Tanggal Terakhir Service</label><input id="v_lastdate" type="date" oninput="liveCalc()"></div>
       <div><label>KM Service (terakhir)</label><input id="v_lastkm" type="number" oninput="liveCalc()"></div>
       <div><label>KM Aktual Saat Ini</label><input id="v_currentkm" type="number"></div>
@@ -1490,6 +1490,24 @@ async function vehMasterLoad(){
   let all=[], off=0;
   for(;;){ const r = await sbGet('vehicle_items',`select=kind,data&kind=eq.polis&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; }
   vehBuildMaster(all); vehApplyMaster();
+}
+
+/* ===== Form Tambah Kendaraan: ketik nopol -> Type, Warna, Tahun terisi dari Dashboard Vehicle > Mobil Baru (cadangan: Polis Asuransi) ===== */
+let VEH_NEWMAP = null, _vehNewP = null;
+function vehBuildNew(items){ const m={}; (items||[]).forEach(x=>{ if(x.kind!=='baru') return; const d=x.data||{}, k=vehKey(d.nopol); if(k && !m[k]) m[k]=d; }); VEH_NEWMAP=m; }
+function vehNewLoad(){
+  if(VEH_NEWMAP) return Promise.resolve();
+  if(!_vehNewP) _vehNewP = (async()=>{ let all=[], off=0; for(;;){ const r = await sbGet('vehicle_items',`select=kind,data&kind=eq.baru&order=created_at.desc,id.desc&limit=1000&offset=${off}`); all=all.concat(r||[]); if(!r || r.length<1000) break; off+=1000; } vehBuildNew(all); })().catch(e=>{ _vehNewP=null; throw e; });
+  return _vehNewP;
+}
+async function vehFormFill(report){
+  const key = vehKey(document.getElementById('v_nopol').value); if(!key) return;
+  try{ await vehNewLoad(); }catch(e){ if(report) showToast('Data Mobil Baru tidak bisa dimuat: '+String(e.message||e).slice(0,100), true); }
+  const m = (VEH_NEWMAP||{})[key] || VEH_MASTER[key];
+  if(!m){ if(report) showToast('Nopol '+document.getElementById('v_nopol').value.trim()+' tidak ditemukan di Mobil Baru / Polis Asuransi, isi manual.', true); return; }
+  const put=(id,val)=>{ const e=document.getElementById(id); if(!e||!val) return; if(!e.value || e.dataset.auto==='1'){ e.value=val; e.dataset.auto='1'; } };
+  put('v_type', m.merk); put('v_color', m.warna); put('v_year', m.tahun);
+  put('v_brand', String(m.merk||'').trim().split(/\s+/)[0]);
 }
 
 /* ================= UTIL ================= */
@@ -2386,6 +2404,7 @@ function fillVAreaList(){
   const dl = document.getElementById('vAreaList'); if(dl) dl.innerHTML = list.sort((a,b)=>a.localeCompare(b,'id')).map(a=>`<option value="${String(a).replace(/"/g,'&quot;')}">`).join('');
 }
 function openVehicleModal(id){
+  try{ vehNewLoad().catch(()=>{}); ['v_type','v_color','v_year','v_brand'].forEach(i=>{ const e=document.getElementById(i); if(e) delete e.dataset.auto; }); }catch(_){}
   fillVAreaList();
   document.getElementById('vModalTitle').textContent = id? 'Edit / Update Kendaraan':'Tambah Kendaraan';
   const v = id? DB.vehicles.find(x=>x.id===id):null;
@@ -4028,7 +4047,7 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
-  baru:    { label:'Mobil Baru',            cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['warna','Warna'],['noka','No. Rangka'],['nosin','No. Mesin'],['pt','PT / Customer'],['tgl','Tgl Masuk','date'],['ket','Keterangan']] },
+  baru:    { label:'Mobil Baru',            cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date']] },
   polis:   { label:'Polis Asuransi Mobil',  cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] },
   standby: { label:'Unit Standby',          cols:[['nopol','No. Polisi'],['merk','Merk / Type'],['tahun','Tahun'],['lokasi','Lokasi'],['tgl','Tgl Standby','date'],['kondisi','Kondisi'],['ket','Keterangan']] },
   terjual: { label:'Unit Terjual',          red:true, cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['tgl','Police no','date',2],['pembeli','Pembeli'],['status','Status']] }
@@ -4066,6 +4085,7 @@ function vehFmt(v,type){ if(!v) return '-'; if(type==='date'){ const m=String(v)
 function renderVeh(){
   const T = VEH_TABS[VEH_TAB];
   if(VEH_KLOAD.polis){ vehBuildMaster(VEH_ITEMS); vehApplyMaster(); }
+  if(VEH_KLOAD.baru){ vehBuildNew(VEH_ITEMS); }
   $id('vehKpis').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<div class="k" style="cursor:pointer;${k===VEH_TAB?'outline:2px solid var(--brand);':''}" onclick="vehSetTab('${k}')"><div class="l">${t.label.toUpperCase()}</div><div class="v">${vehKpi(k).toLocaleString('id-ID')}</div></div>`).join('');
   $id('vehTabs').innerHTML = Object.entries(VEH_TABS).map(([k,t])=>`<button class="${k===VEH_TAB?'on':''}" onclick="vehSetTab('${k}')">${t.label}</button>`).join('');
   $id('vehHead').innerHTML = '<tr><th style="width:32px"><input type="checkbox" id="vehChkAll" onchange="vehSelAll(this.checked)" title="Pilih semua hasil"></th>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
@@ -4127,7 +4147,7 @@ function vehCloseForm(){ $id('vehFormBg').classList.remove('show'); VEH_EDIT = n
 async function vehSave(){
   const T = VEH_TABS[VEH_TAB], d = {};
   vehData(T).forEach(c=>{ d[c[0]] = ($id('vf_'+c[0]).value||'').trim(); });
-  if(!d.nopol){ showToast('No. Polisi wajib diisi.', true); return; }
+  if(!d.nopol && !(VEH_TAB==='baru' && d.noka)){ showToast(VEH_TAB==='baru' ? 'Isi No Polisi atau No Rangka.' : 'No. Polisi wajib diisi.', true); return; }
   try{
     if(VEH_EDIT){ const r = await sbUpdate('vehicle_items', VEH_EDIT, {data:d}); const i = VEH_ITEMS.findIndex(x=>x.id===VEH_EDIT); if(i>=0) VEH_ITEMS[i] = (r&&r[0])||{...VEH_ITEMS[i],data:d}; }
     else { const r = await sbInsert('vehicle_items', {kind:VEH_TAB, data:d}); VEH_ITEMS.unshift(r[0]); }
@@ -4170,12 +4190,13 @@ async function vehImport(evt){
     const keyN = [vehNorm(T.cols.find(c=>c[0]==='nopol')[1]),'nopolisi','nopol']; const hi = aoa.findIndex(r=>r.some(c=>keyN.includes(vehNorm(c))));
     if(hi<0){ showToast('Kolom nomor polisi tidak ditemukan. Pakai Template Excel.', true); return; }
     const idx = T.cols.map(c=>{ let n=c[3]||1, at=-1; aoa[hi].forEach((h,i)=>{ if(at<0 && vehNorm(h)===vehNorm(c[1]) && --n===0) at=i; }); return c[2]==='skip' ? -1 : at; });
-    const seen = new Set(vehList().map(x=>vehNorm((x.data||{}).nopol)+'|'+vehNorm((x.data||{}).nopolis)));
+    const rk = d=>(vehNorm(d.nopol)||('k'+vehNorm(d.noka)))+'|'+vehNorm(d.nopolis);
+    const seen = new Set(vehList().map(x=>rk(x.data||{})));
     const out = []; let dup = 0;
     aoa.slice(hi+1).forEach(r=>{
       const d = {}; T.cols.forEach((c,i)=>{ if(c[2]==='skip') return; const v = idx[i]>=0 ? r[idx[i]] : ''; d[c[0]] = c[2]==='date' ? vehDate(v) : String(v==null?'':v).replace(/\s+/g,' ').trim(); });
-      if(!d.nopol) return;
-      const key = vehNorm(d.nopol)+'|'+vehNorm(d.nopolis);
+      if(!d.nopol && !(VEH_TAB==='baru' && d.noka)) return;
+      const key = rk(d);
       if(seen.has(key)){ dup++; return; } seen.add(key);
       out.push({kind:VEH_TAB, data:d});
     });
