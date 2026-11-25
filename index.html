@@ -649,7 +649,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <p class="small-note" style="margin-top:10px;">Data SPK tersimpan di database dan bisa dibuka dari perangkat mana pun.</p>
     </div>
     <div id="wsPane" style="display:none">
-      <div class="spk-tools"><input id="wsSearch" placeholder="Cari kode, nama, kota..." oninput="renderWs()"><button class="btn-danger" id="wsDelSel" style="display:none" onclick="deleteWsSelected()">🗑 Hapus Terpilih (0)</button><label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" accept=".xlsx,.xls" onchange="importWs(event)"></label><button class="btn btn-primary small" onclick="openWsForm()">＋ Tambah Workshop</button></div>
+      <div class="spk-tools"><input id="wsSearch" placeholder="Cari kode, nama, kota..." oninput="renderWs()"><button class="btn-danger" id="wsDelSel" style="display:none" onclick="deleteWsSelected()">🗑 Hapus Terpilih (0)</button><label class="btn-outline green" style="margin:0;">⭱ Import Excel<input type="file" accept=".xlsx,.xls" onchange="importWs(event)"></label><button class="btn-outline green" onclick="exportWs()">⭳ Export Excel</button><button class="btn btn-primary small" onclick="openWsForm()">＋ Tambah Workshop</button></div>
       <div class="spk-card"><table class="spk-tbl"><thead><tr><th style="width:34px"><input type="checkbox" id="wsAll" title="Pilih semua" onchange="wsSelAll(this.checked)"></th><th>CODE</th><th>WORKSHOP NAME</th><th>CITY</th><th>PHONE</th><th>AKSI</th></tr></thead><tbody id="wsBody"></tbody></table>
       <div id="wsEmpty" style="display:none;padding:30px;text-align:center;color:#778;">Belum ada Workshop Parameter. Klik <b>Tambah Workshop</b>.</div></div>
     </div>
@@ -4496,6 +4496,17 @@ async function deleteWsSelected(){
   if(!confirm('Hapus '+ids.length+' workshop yang dipilih? Tindakan ini tidak bisa dibatalkan.')) return;
   try{ await sbDeleteIds('workshop',ids); WS_SEL.clear(); await paramReload(); showToast(ids.length+' workshop dihapus.'); }
   catch(e){ showToast('Gagal menghapus: '+e.message, true); }
+}
+function exportWs(){
+  if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return; }
+  const q=($id('wsSearch').value||'').toLowerCase();
+  const rows = WS_SEL.size ? WS_LIST.filter(a=>WS_SEL.has(a.id)) : WS_LIST.filter(a=>!q||[a.code,a.name,a.cn,a.cc].join(' ').toLowerCase().includes(q));
+  if(!rows.length){ showToast('Tidak ada data workshop untuk diexport.', true); return; }
+  const aoa=[['Kode','Vendor','Lokasi','Alamat Lengkap','Address 2','Phone','Fax','Kode Kota','PKS','PKS Dari','PKS Sampai']];
+  rows.forEach(a=>aoa.push([a.code,a.name,a.cn,a.a1,a.a2,a.ph,a.fx,a.cc,a.pks?'Ya':'Tidak',a.from,a.to]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa); ws['!cols']=[{wch:8},{wch:38},{wch:16},{wch:48},{wch:30},{wch:16},{wch:14},{wch:10},{wch:7},{wch:12},{wch:12}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Workshop'); XLSX.writeFile(wb, 'data-workshop.xlsx');
+  showToast(`${rows.length.toLocaleString('id-ID')} workshop diexport.`);
 }
 async function importWs(evt){
   const file=evt.target.files[0]; if(!file) return;
