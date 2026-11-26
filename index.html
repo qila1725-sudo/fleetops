@@ -4090,7 +4090,7 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
   baru:    { label:'Mobil Baru', owner:'', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date'],['dealer','Dealer']] },
-  stnk:    { label:'STNK', owner:'', icon:'📄', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['noka','No Rangka'],['nostnk','No STNK'],['stnk','Masa Berlaku STNK','date'],['ket','Keterangan']] },
+  stnk:    { label:'STNK', owner:'', icon:'📄', cols:[['_no','No','skip'],['nopol','Nopol'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','Rangka'],['nosin','Mesin'],['pajak','Tgl Pajak','date'],['stnk','Plate','date'],['company','Company'],['area','Area'],['pic','User/pic'],['hp','No HP/Telp']] },
   kir:     { label:'KIR', owner:'', icon:'📋', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['nokir','No KIR'],['kir','Masa Berlaku KIR','date'],['ket','Keterangan']] },
   lokasi:  { label:'BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['status','Status (Customer / Standby / Terjual)'],['pt','PT / Customer'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
   polis:   { label:'Polis Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date']] }
@@ -4169,7 +4169,7 @@ function vdBuild(){
   vehList('baru').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,tgl:d.tgl,stnk:d.stnk,pajak:d.pajak,kir:d.kir}); });
   const latestOf = (kind,f)=>{ const m=new Map(); vehList(kind).forEach(x=>{ const d=x.data||{}, k=vdKey(d.nopol); if(!k) return; const b=m.get(k); if(!b || String(d[f]||'')>=String(b[f]||'')) m.set(k,d); }); return m; };
   const getR = (k,d)=> rows.get(k) || (rows.set(k,{nopol:d.nopol}), rows.get(k));
-  latestOf('stnk','stnk').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk,noka:d.noka}); if(d.stnk) r.stnk=d.stnk; });
+  latestOf('stnk','bulan').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk,noka:d.noka,warna:d.warna,tahun:d.tahun,nosin:d.nosin,pt:d.company}); if(d.stnk) r.stnk=d.stnk; if(d.pajak) r.pajak=d.pajak; });
   latestOf('kir','kir').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk}); if(d.kir) r.kir=d.kir; });
   vehList('polis').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,stnk:d.stnk,asuransi:d.asuransi,nopolis:d.nopolis,akhir:d.akhir,pt:d.customer}); });
   const best = new Map();
@@ -4313,15 +4313,23 @@ async function vehDelete(id){
   catch(e){ showToast('Gagal menghapus: '+String(e.message).slice(0,140), true); }
 }
 function vehXlsxOk(){ if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return false; } return true; }
+function vehStnkSheet(rows){ // header 2 baris seperti Master_data_update_stnk.xlsx
+  const aoa = [['No','Nopol','Type','Warna','Tahun','Rangka','Mesin','Tgl Pajak','Plate','KETERANGAN','','',''],['','','','','','','','','','Company','Area','User/pic','No HP/Telp']];
+  (rows||[]).forEach((x,i)=>{ const d=x.data||{}; aoa.push([i+1,d.nopol||'',d.merk||'',d.warna||'',d.tahun||'',d.noka||'',d.nosin||'',d.pajak||'',d.stnk||'',d.company||'',d.area||'',d.pic||'',d.hp||'']); });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = [...Array(9).keys()].map(c=>({s:{r:0,c},e:{r:1,c}})).concat([{s:{r:0,c:9},e:{r:0,c:12}}]);
+  ws['!cols'] = [5,13,28,10,8,20,14,12,12,36,22,18,16].map(w=>({wch:w}));
+  return ws;
+}
 function vehTemplate(){
   if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB];
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([T.cols.map(c=>c[1])]), (vehPeriodOn()?vehPeriodLabel():T.label).slice(0,31));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, vehPeriodOn()?vehStnkSheet([]):XLSX.utils.aoa_to_sheet([T.cols.map(c=>c[1])]), (vehPeriodOn()?vehPeriodLabel():T.label).slice(0,31));
   XLSX.writeFile(wb, vehPeriodOn() ? `template-stnk-${VEH_BLN[VEH_STNK_MONTH-1]}-${VEH_STNK_YEAR}.xlsx` : 'template-'+VEH_TAB+'.xlsx');
 }
 function vehExport(){
   if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB], list = vehRoomList();
   const aoa = [T.cols.map(c=>c[1])]; list.forEach((x,i)=>aoa.push(T.cols.map(c=>c[2]==='skip'?i+1:((x.data||{})[c[0]]||''))));
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), (vehPeriodOn()?vehPeriodLabel():T.label).slice(0,31));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, vehPeriodOn()?vehStnkSheet(list):XLSX.utils.aoa_to_sheet(aoa), (vehPeriodOn()?vehPeriodLabel():T.label).slice(0,31));
   XLSX.writeFile(wb, vehPeriodOn() ? `vehicle-stnk-${VEH_BLN[VEH_STNK_MONTH-1]}-${VEH_STNK_YEAR}.xlsx` : 'vehicle-'+VEH_TAB+'.xlsx');
 }
 function vehDate(v){
@@ -4345,7 +4353,8 @@ async function vehImport(evt){
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
     const keyN = [vehNorm(T.cols.find(c=>c[0]==='nopol')[1]),'nopolisi','nopol']; const hi = aoa.findIndex(r=>r.some(c=>keyN.includes(vehNorm(c))));
     if(hi<0){ showToast('Kolom nomor polisi tidak ditemukan. Pakai Template Excel.', true); return; }
-    const idx = T.cols.map(c=>{ let n=c[3]||1, at=-1; aoa[hi].forEach((h,i)=>{ if(at<0 && vehNorm(h)===vehNorm(c[1]) && --n===0) at=i; }); return c[2]==='skip' ? -1 : at; });
+    const heads = [aoa[hi]].concat(PK ? [aoa[hi+1]||[]] : []);
+    const idx = T.cols.map(c=>{ let n=c[3]||1, at=-1; heads.forEach(hr=>{ if(at>=0) return; hr.forEach((h,i)=>{ if(at<0 && vehNorm(h)===vehNorm(c[1]) && --n===0) at=i; }); }); return c[2]==='skip' ? -1 : at; });
     const rk = T.keyFn || (d=>(vehNorm(d.nopol)||('k'+vehNorm(d.noka)))+'|'+vehNorm(d.nopolis));
     const REPL = VEH_TAB==='polis';
     const seen = new Set(vehRoomList().map(x=>REPL ? vehNorm((x.data||{}).nopol) : rk(x.data||{})));
