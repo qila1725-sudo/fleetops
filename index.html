@@ -4119,7 +4119,7 @@ function vehShowMode(m){
   const dash = m==='dash';
   $id('vehDashView').style.display = dash ? '' : 'none'; $id('vehRoomView').style.display = dash ? 'none' : '';
   $id('vehActsDash').style.display = dash ? '' : 'none'; $id('vehActsRoom').style.display = dash ? 'none' : '';
-  if(dash){ $id('vehTitle').textContent='🚙 Dashboard Vehicle Mobil'; $id('vehSub').textContent='Posisi seluruh unit, hanya bisa dilihat dan dicari. Data diisi lewat menu ⋮ di kanan atas.'; }
+  if(dash){ $id('vehTitle').textContent='🚙 Dashboard Vehicle Mobil'; $id('vehSub').textContent='Posisi seluruh unit, hanya bisa dilihat dan dicari. Data diisi lewat tombol ⋮ di bawah ini.'; }
   else { const T=VEH_ROOMDEF[VEH_ROOM]; $id('vehTitle').textContent=`${T.icon} ${T.label}`; $id('vehSub').textContent = T.owner ? 'By : '+T.owner+' · data ini tersambung ke Dashboard Vehicle' : 'Data ini tersambung ke Dashboard Vehicle'; }
   $id('vehMenuWrap').style.display = dash ? 'inline-block' : 'none'; vehMenuClose();
 }
@@ -4171,7 +4171,7 @@ function vdRender(rebuild){
   $id('vdPager').innerHTML = !rows.length ? '' : (size && pages>1
     ? `<button class="btn-outline small" ${VD_PAGE<=0?'disabled':''} onclick="VD_PAGE--;vdRender()">‹</button> Halaman ${VD_PAGE+1} / ${pages} · ${from+1}–${Math.min(from+size,rows.length)} dari ${rows.length.toLocaleString('id-ID')} <button class="btn-outline small" ${VD_PAGE>=pages-1?'disabled':''} onclick="VD_PAGE++;vdRender()">›</button>`
     : `Menampilkan semua ${rows.length.toLocaleString('id-ID')} unit`);
-  $id('vdNote').textContent = `${VD_ROWS.length.toLocaleString('id-ID')} unit · gabungan dari ruangan Legal, BAST, dan Polis Asuransi. Tampilan ini tidak bisa diubah.`;
+  $id('vdNote').textContent = `${VD_ROWS.length.toLocaleString('id-ID')} unit · gabungan dari ruangan Legal, BAST, dan Polis Asuransi. Tampilan ini tidak bisa diubah. Hanya unit dengan nopol asli yang tampil (versi 26-Nov-11.30).`;
 }
 async function vehReload(){ VEH_KLOAD = {}; await vehEnsure(VEH_TAB); try{ const ks=Object.keys(VEH_TABS); const c=await Promise.all(ks.map(k=>vehCount(k).catch(()=>null))); ks.forEach((k,i)=>{ if(c[i]!==null) VEH_COUNT[k]=c[i]; }); renderVeh(); }catch(e){} }
 function vehSetTab(t){ VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); vehEnsure(t); }
