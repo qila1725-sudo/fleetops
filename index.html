@@ -4082,7 +4082,7 @@ const VEH_TABS = {
   stnk:    { label:'STNK', owner:'', icon:'📄', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['noka','No Rangka'],['nostnk','No STNK'],['stnk','Masa Berlaku STNK','date'],['ket','Keterangan']] },
   kir:     { label:'KIR', owner:'', icon:'📋', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['nokir','No KIR'],['kir','Masa Berlaku KIR','date'],['ket','Keterangan']] },
   lokasi:  { label:'BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['status','Status (Customer / Standby / Terjual)'],['pt','PT / Customer'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
-  polis:   { label:'Polis Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] }
+  polis:   { label:'Polis Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date']] }
 };
 let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
 const vehData = T => T.cols.filter(c=>c[2]!=='skip');
