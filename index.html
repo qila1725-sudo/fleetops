@@ -4135,18 +4135,20 @@ function openVehRoom(room){
   VEH_TAB=k; VEH_PAGE=0; VEH_SEL.clear(); $id('vehSearch').value=''; vehShowMode('room'); renderVeh(); vehEnsure(k);
 }
 function vehBackToDash(){ vehShowMode('dash'); vdRender(true); }
+/* nopol sah = ada huruf dan angka, bukan tulisan seperti 'belum ada' */
+const vdKey = n => { const t=String(n||'').trim(); return (/[A-Za-z]/.test(t) && /\d/.test(t) && !/belum|blm|tidak|tanpa|n\/?a\b/i.test(t)) ? vehKey(t) : ''; };
 function vdBuild(){
   const rows = new Map();
-  const slot = d=>{ const k = vehKey(d.nopol); if(!k) return null; /* tanpa nopol tidak masuk dashboard */ if(!rows.has(k)) rows.set(k,{}); return rows.get(k); };
+  const slot = d=>{ const k = vdKey(d.nopol); if(!k) return null; /* tanpa nopol tidak masuk dashboard */ if(!rows.has(k)) rows.set(k,{}); return rows.get(k); };
   const fill = (r,o)=>{ Object.keys(o).forEach(f=>{ if(o[f] && !r[f]) r[f]=o[f]; }); };
   vehList('baru').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,tgl:d.tgl,stnk:d.stnk,pajak:d.pajak,kir:d.kir}); });
-  const latestOf = (kind,f)=>{ const m=new Map(); vehList(kind).forEach(x=>{ const d=x.data||{}, k=vehKey(d.nopol); if(!k) return; const b=m.get(k); if(!b || String(d[f]||'')>=String(b[f]||'')) m.set(k,d); }); return m; };
+  const latestOf = (kind,f)=>{ const m=new Map(); vehList(kind).forEach(x=>{ const d=x.data||{}, k=vdKey(d.nopol); if(!k) return; const b=m.get(k); if(!b || String(d[f]||'')>=String(b[f]||'')) m.set(k,d); }); return m; };
   const getR = (k,d)=> rows.get(k) || (rows.set(k,{nopol:d.nopol}), rows.get(k));
   latestOf('stnk','stnk').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk,noka:d.noka}); if(d.stnk) r.stnk=d.stnk; });
   latestOf('kir','kir').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk}); if(d.kir) r.kir=d.kir; });
   vehList('polis').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,stnk:d.stnk,asuransi:d.asuransi,nopolis:d.nopolis,akhir:d.akhir,pt:d.customer}); });
   const best = new Map();
-  vehList('lokasi').forEach(x=>{ const d=x.data||{}, k=vehKey(d.nopol); if(!k) return; const b=best.get(k); if(!b || String(d.tgl||'')>=String(b.tgl||'')) best.set(k,d); });
+  vehList('lokasi').forEach(x=>{ const d=x.data||{}, k=vdKey(d.nopol); if(!k) return; const b=best.get(k); if(!b || String(d.tgl||'')>=String(b.tgl||'')) best.set(k,d); });
   best.forEach((d,k)=>{ const r = rows.get(k) || (rows.set(k,{nopol:d.nopol}), rows.get(k)); r.lokasi=d.tujuan||''; r.nobast=d.nobast||''; r.status=d.status||''; r.tglpindah=d.tgl||''; if(d.pt) r.pt=d.pt; });
   return [...rows.values()].sort((a,b)=>String(b.tgl||'').localeCompare(String(a.tgl||'')) || String(a.nopol||'').localeCompare(String(b.nopol||'')));
 }
