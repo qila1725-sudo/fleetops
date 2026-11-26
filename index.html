@@ -582,7 +582,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
     <div class="choice-grid">
       <button class="choice-card" onclick="openSpkWork()"><div class="ic">📝</div><h3>Mengerjakan SPK</h3><p>Buat, ubah, cetak, dan pantau Surat Perintah Kerja untuk tiap unit.</p></button>
       <button class="choice-card green" onclick="openReminderFromSpk('jabodetabek')"><div class="ic">🚗</div><h3>Data Reminder</h3><p>Dashboard, jadwal service, sparepart, bengkel, dan kwitansi untuk unit Jabodetabek, Jabanusul, dan Non Jawa. Wilayah dipilih di dalam.</p></button>
-      <button class="choice-card green" onclick="openVehDash()"><div class="ic">🚙</div><h3>Dashboard Vehicle Mobil</h3><p>Posisi seluruh unit mobil (hanya lihat &amp; cari). Data diisi lewat ruangan: Mobil Baru, Lokasi &amp; BAST, Polis Asuransi.</p></button>
+      <button class="choice-card green" onclick="openVehDash()"><div class="ic">🚙</div><h3>Dashboard Vehicle Mobil</h3><p>Posisi seluruh unit mobil (hanya lihat &amp; cari). Data diisi lewat ruangan: Legal, BAST, Polis Asuransi.</p></button>
     </div>
     <button class="choice-back" onclick="leaveSpk()">← Keluar</button>
   </div>
@@ -595,10 +595,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <div id="vehMenuWrap" style="position:relative;display:inline-block;margin-top:8px;">
         <button class="btn-outline" id="vehMenuBtn" onclick="vehToggleMenu(event)" title="Ruangan data" style="font-size:28px;font-weight:700;line-height:1;padding:6px 18px;">⋮</button>
         <div id="vehMenu" style="display:none;position:absolute;left:0;top:calc(100% + 6px);min-width:320px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:6px;z-index:80;">
-          <div style="font-size:11px;font-weight:700;color:#778;padding:8px 12px 4px;letter-spacing:.4px;">RUANGAN DATA</div>
-          <button class="veh-mi" onclick="openVehRoom('baru')"><span>🆕</span><span><b>Mobil Baru</b><small>By : Team Legal</small></span></button>
-          <button class="veh-mi" onclick="openVehRoom('lokasi')"><span>🚚</span><span><b>Perubahan Lokasi Mobil dan BAST</b></span></button>
-          <button class="veh-mi" onclick="openVehRoom('polis')"><span>🛡️</span><span><b>Polis Mobil Asuransi</b></span></button>
+          <button class="veh-mi" onclick="openVehRoom('baru')"><span>🆕</span><span><b>Legal</b><small>Mobil Baru, STNK, KIR</small></span></button>
+          <button class="veh-mi" onclick="openVehRoom('lokasi')"><span>🚚</span><span><b>BAST</b><small>Perubahan lokasi: dipakai PT mana, standby, atau terjual</small></span></button>
+          <button class="veh-mi" onclick="openVehRoom('polis')"><span>🛡️</span><span><b>Polis Asuransi</b></span></button>
         </div>
       </div></div>
     <div class="acts" id="vehActsDash">
@@ -4079,9 +4078,9 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
-  baru:    { label:'Mobil Baru', owner:'Team Legal', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date']] },
-  lokasi:  { label:'Perubahan Lokasi Mobil dan BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['pt','PT / Customer'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
-  polis:   { label:'Polis Mobil Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] }
+  baru:    { label:'Legal', owner:'', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date'],['kir','KIR','date']] },
+  lokasi:  { label:'BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['status','Status (Customer / Standby / Terjual)'],['pt','PT / Customer'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
+  polis:   { label:'Polis Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date'],['customer','Customer'],['user','User'],['status','Status'],['ket','Description',null,2]] }
 };
 let VEH_TAB = 'baru', VEH_ITEMS = [], VEH_EDIT = null, VEH_READY = true;
 const vehData = T => T.cols.filter(c=>c[2]!=='skip');
@@ -4132,14 +4131,14 @@ function vdBuild(){
   const rows = new Map();
   const slot = d=>{ const k = vehKey(d.nopol) || (d.noka ? 'K'+vehKey(d.noka) : ''); if(!k) return null; if(!rows.has(k)) rows.set(k,{}); return rows.get(k); };
   const fill = (r,o)=>{ Object.keys(o).forEach(f=>{ if(o[f] && !r[f]) r[f]=o[f]; }); };
-  vehList('baru').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,tgl:d.tgl,stnk:d.stnk,pajak:d.pajak}); });
+  vehList('baru').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,tgl:d.tgl,stnk:d.stnk,pajak:d.pajak,kir:d.kir}); });
   vehList('polis').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,stnk:d.stnk,asuransi:d.asuransi,nopolis:d.nopolis,akhir:d.akhir,pt:d.customer}); });
   const best = new Map();
   vehList('lokasi').forEach(x=>{ const d=x.data||{}, k=vehKey(d.nopol); if(!k) return; const b=best.get(k); if(!b || String(d.tgl||'')>=String(b.tgl||'')) best.set(k,d); });
-  best.forEach((d,k)=>{ const r = rows.get(k) || (rows.set(k,{nopol:d.nopol}), rows.get(k)); r.lokasi=d.tujuan||''; r.nobast=d.nobast||''; if(d.pt) r.pt=d.pt; });
+  best.forEach((d,k)=>{ const r = rows.get(k) || (rows.set(k,{nopol:d.nopol}), rows.get(k)); r.lokasi=d.tujuan||''; r.nobast=d.nobast||''; r.status=d.status||''; r.tglpindah=d.tgl||''; if(d.pt) r.pt=d.pt; });
   return [...rows.values()].sort((a,b)=>String(b.tgl||'').localeCompare(String(a.tgl||'')) || String(a.nopol||'').localeCompare(String(b.nopol||'')));
 }
-const VD_COLS = [['No Polisi','nopol'],['Type','merk'],['Warna','warna'],['Tahun','tahun'],['No Rangka','noka'],['No Mesin','nosin'],['Tgl Masuk','tgl','date'],['STNK','stnk','date'],['Pajak','pajak','date'],['PT / Customer','pt'],['Lokasi Terakhir','lokasi'],['No BAST','nobast'],['Asuransi','asuransi'],['No Polis','nopolis'],['Polis Berakhir','akhir','exp']];
+const VD_COLS = [['No Polisi','nopol'],['Type','merk'],['Warna','warna'],['Tahun','tahun'],['No Rangka','noka'],['No Mesin','nosin'],['Tgl Masuk','tgl','date'],['STNK','stnk','date'],['Pajak','pajak','date'],['KIR','kir','date'],['PT / Customer','pt'],['Status','status'],['Tgl Status','tglpindah','date'],['Lokasi Terakhir','lokasi'],['No BAST','nobast'],['Asuransi','asuransi'],['No Polis','nopolis'],['Polis Berakhir','akhir','exp']];
 function vdSearchDeb(){ clearTimeout(_vdT); VD_PAGE=0; _vdT=setTimeout(()=>vdRender(), 250); }
 function vdRender(rebuild){
   if(rebuild) VD_ROWS = vdBuild();
@@ -4158,7 +4157,7 @@ function vdRender(rebuild){
   $id('vdPager').innerHTML = !rows.length ? '' : (size && pages>1
     ? `<button class="btn-outline small" ${VD_PAGE<=0?'disabled':''} onclick="VD_PAGE--;vdRender()">‹</button> Halaman ${VD_PAGE+1} / ${pages} · ${from+1}–${Math.min(from+size,rows.length)} dari ${rows.length.toLocaleString('id-ID')} <button class="btn-outline small" ${VD_PAGE>=pages-1?'disabled':''} onclick="VD_PAGE++;vdRender()">›</button>`
     : `Menampilkan semua ${rows.length.toLocaleString('id-ID')} unit`);
-  $id('vdNote').textContent = `${VD_ROWS.length.toLocaleString('id-ID')} unit · gabungan dari ruangan Mobil Baru, Polis Mobil Asuransi, dan Perubahan Lokasi Mobil dan BAST. Tampilan ini tidak bisa diubah.`;
+  $id('vdNote').textContent = `${VD_ROWS.length.toLocaleString('id-ID')} unit · gabungan dari ruangan Legal, BAST, dan Polis Asuransi. Tampilan ini tidak bisa diubah.`;
 }
 async function vehReload(){ VEH_KLOAD = {}; await vehEnsure(VEH_TAB); try{ const ks=Object.keys(VEH_TABS); const c=await Promise.all(ks.map(k=>vehCount(k).catch(()=>null))); ks.forEach((k,i)=>{ if(c[i]!==null) VEH_COUNT[k]=c[i]; }); renderVeh(); }catch(e){} }
 function vehSetTab(t){ VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); vehEnsure(t); }
