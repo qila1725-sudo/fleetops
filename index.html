@@ -591,17 +591,17 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
 <!-- DASHBOARD VEHICLE MOBIL -->
 <div id="vehScreen" style="display:none;min-height:100vh;background:var(--paper);">
   <div class="spk-top">
-    <div><h2 id="vehTitle">🚙 Dashboard Vehicle Mobil</h2><div class="sub" id="vehSub">Posisi seluruh unit, hanya bisa dilihat dan dicari</div></div>
-    <div class="acts" id="vehActsDash">
-      <div style="position:relative;">
-        <button class="btn-outline" id="vehMenuBtn" onclick="vehToggleMenu(event)" title="Ruangan data" style="font-size:20px;line-height:1;padding:4px 12px;">⋮</button>
-        <div id="vehMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:320px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:6px;z-index:80;">
+    <div><h2 id="vehTitle">🚙 Dashboard Vehicle Mobil</h2><div class="sub" id="vehSub">Posisi seluruh unit, hanya bisa dilihat dan dicari</div>
+      <div id="vehMenuWrap" style="position:relative;display:inline-block;margin-top:8px;">
+        <button class="btn-outline" id="vehMenuBtn" onclick="vehToggleMenu(event)" title="Ruangan data" style="font-size:28px;font-weight:700;line-height:1;padding:6px 18px;">⋮</button>
+        <div id="vehMenu" style="display:none;position:absolute;left:0;top:calc(100% + 6px);min-width:320px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:6px;z-index:80;">
           <div style="font-size:11px;font-weight:700;color:#778;padding:8px 12px 4px;letter-spacing:.4px;">RUANGAN DATA</div>
           <button class="veh-mi" onclick="openVehRoom('baru')"><span>🆕</span><span><b>Mobil Baru</b><small>By : Team Legal</small></span></button>
           <button class="veh-mi" onclick="openVehRoom('lokasi')"><span>🚚</span><span><b>Perubahan Lokasi Mobil dan BAST</b></span></button>
           <button class="veh-mi" onclick="openVehRoom('polis')"><span>🛡️</span><span><b>Polis Mobil Asuransi</b></span></button>
         </div>
-      </div>
+      </div></div>
+    <div class="acts" id="vehActsDash">
       <button class="btn-outline" onclick="backToSpkChoice()">← Pilihan</button>
     </div>
     <div class="acts" id="vehActsRoom" style="display:none;"><button class="btn-outline" onclick="vehBackToDash()">← Dashboard Vehicle</button></div>
@@ -4115,7 +4115,7 @@ function vehShowMode(m){
   $id('vehActsDash').style.display = dash ? '' : 'none'; $id('vehActsRoom').style.display = dash ? 'none' : '';
   if(dash){ $id('vehTitle').textContent='🚙 Dashboard Vehicle Mobil'; $id('vehSub').textContent='Posisi seluruh unit, hanya bisa dilihat dan dicari. Data diisi lewat menu ⋮ di kanan atas.'; }
   else { const T=VEH_TABS[VEH_TAB]; $id('vehTitle').textContent=`${T.icon} ${T.label}`; $id('vehSub').textContent = T.owner ? 'By : '+T.owner+' · data ini tersambung ke Dashboard Vehicle' : 'Data ini tersambung ke Dashboard Vehicle'; }
-  vehMenuClose();
+  $id('vehMenuWrap').style.display = dash ? 'inline-block' : 'none'; vehMenuClose();
 }
 function vehToggleMenu(e){ if(e) e.stopPropagation(); const m=$id('vehMenu'); m.style.display = m.style.display==='none' ? '' : 'none'; }
 function vehMenuClose(){ const m=$id('vehMenu'); if(m) m.style.display='none'; }
