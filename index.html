@@ -4081,7 +4081,7 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
-  baru:    { label:'Mobil Baru', owner:'', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date']] },
+  baru:    { label:'Mobil Baru', owner:'', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date'],['dealer','Dealer']] },
   stnk:    { label:'STNK', owner:'', icon:'📄', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['noka','No Rangka'],['nostnk','No STNK'],['stnk','Masa Berlaku STNK','date'],['ket','Keterangan']] },
   kir:     { label:'KIR', owner:'', icon:'📋', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['nokir','No KIR'],['kir','Masa Berlaku KIR','date'],['ket','Keterangan']] },
   lokasi:  { label:'BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['status','Status (Customer / Standby / Terjual)'],['pt','PT / Customer'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
@@ -4137,7 +4137,7 @@ function openVehRoom(room){
 function vehBackToDash(){ vehShowMode('dash'); vdRender(true); }
 function vdBuild(){
   const rows = new Map();
-  const slot = d=>{ const k = vehKey(d.nopol) || (d.noka ? 'K'+vehKey(d.noka) : ''); if(!k) return null; if(!rows.has(k)) rows.set(k,{}); return rows.get(k); };
+  const slot = d=>{ const k = vehKey(d.nopol); if(!k) return null; /* tanpa nopol tidak masuk dashboard */ if(!rows.has(k)) rows.set(k,{}); return rows.get(k); };
   const fill = (r,o)=>{ Object.keys(o).forEach(f=>{ if(o[f] && !r[f]) r[f]=o[f]; }); };
   vehList('baru').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,tgl:d.tgl,stnk:d.stnk,pajak:d.pajak,kir:d.kir}); });
   const latestOf = (kind,f)=>{ const m=new Map(); vehList(kind).forEach(x=>{ const d=x.data||{}, k=vehKey(d.nopol); if(!k) return; const b=m.get(k); if(!b || String(d[f]||'')>=String(b[f]||'')) m.set(k,d); }); return m; };
