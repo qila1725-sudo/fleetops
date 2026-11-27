@@ -268,7 +268,7 @@
   .veh-red td{color:#c62828 !important;font-weight:600;}
   .veh-mi{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;padding:10px 12px;border-radius:10px;cursor:pointer;font:inherit;color:inherit;}
   .veh-mi:hover{background:#eef3ff;} .veh-mi b{display:block;font-size:13px;} .veh-mi small{display:block;color:#778;font-size:11.5px;margin-top:2px;}
-  #vdHead th{position:sticky;top:0;z-index:2;background:#f7f8fb;} #vdTbl td{white-space:nowrap;}
+  #vdTbl{border-collapse:collapse;} #vdTbl th,#vdTbl td{border:1px solid #cfd6e4;padding:7px 10px;} #vdHead th{position:sticky;top:0;z-index:2;background:#e9eef7;} #vdTbl td{white-space:nowrap;} #vdBody tr:nth-child(even) td{background:#f8fafd;} #vdBody tr:hover td{background:#eaf1ff;}
   .vd-exp{color:#c62828;font-weight:700;} .vd-soon{color:#b26a00;font-weight:700;}
   .page .table-wrap{max-height:calc(100vh - 140px);} /* batang geser kiri-kanan selalu terlihat di bawah layar, header tabel tetap */
   .table-wrap::-webkit-scrollbar{height:14px;width:12px;} .table-wrap::-webkit-scrollbar-thumb{background:#aab4c5;border-radius:8px;border:3px solid #eef1f6;} .table-wrap::-webkit-scrollbar-track{background:#eef1f6;}
@@ -524,13 +524,6 @@
   .spk-act button:hover{border-color:var(--brand);color:var(--brand);}
   .spk-act button.del:hover{border-color:var(--bad);color:var(--bad);}
   @media(max-width:700px){.spk-top,.spk-body{padding-left:14px;padding-right:14px;}}
-.veh-period{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;padding:10px 12px;background:#fff;border:1px solid var(--line);border-radius:12px;}
-.veh-period .lbl{font-size:12px;font-weight:700;color:#556;margin-right:2px;}
-.veh-period select{padding:7px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;font-weight:600;}
-.veh-period .mchip{padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:#f6f8fb;cursor:pointer;font-size:12.5px;font-weight:600;color:#334;}
-.veh-period .mchip:hover{background:#eaf0fb;}
-.veh-period .mchip.on{background:#1d4ed8;border-color:#1d4ed8;color:#fff;}
-.veh-period .mchip small{opacity:.75;font-weight:500;margin-left:4px;}
 </style>
 </head>
 <body>
@@ -634,7 +627,6 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
   <div class="spk-body" id="vehRoomView" style="display:none;">
     <div class="spk-kpis" id="vehKpis" style="display:none;"></div>
     <div class="sp-tabs" id="vehTabs" style="display:none;"></div>
-    <div id="vehPeriod" class="veh-period" style="display:none;"></div>
     <div class="spk-tools">
       <input id="vehSearch" placeholder="Cari..." oninput="vehSearchDebounced()">
       <button class="btn-outline" onclick="vehTemplate()">⬇ Template Excel</button>
@@ -646,6 +638,9 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <select id="vehPageSize" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;">
         <option value="100" selected>100 baris</option><option value="300">300 baris</option><option value="1000">1.000 baris</option><option value="0">Semua baris (berat)</option>
       </select>
+      <span id="vehMonthBox" style="display:none;gap:6px;align-items:center;font-size:12px;color:#556;">Filter Tgl Pajak:
+        <select id="vehMonth" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;"><option value="">Semua Bulan</option><option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option><option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option><option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option></select>
+        <select id="vehYear" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;"><option value="">Semua Tahun</option></select></span>
       <span id="vehPager" style="display:flex;gap:6px;align-items:center;font-size:12px;color:#556;"></span>
       <span style="flex:1"></span>
       <button class="btn-danger small" id="vehDelSel" style="display:none" onclick="vehDeleteSelected()">🗑 Hapus Terpilih</button>
@@ -4090,7 +4085,7 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
   baru:    { label:'Mobil Baru', owner:'', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date'],['dealer','Dealer']] },
-  stnk:    { label:'STNK', owner:'', icon:'📄', cols:[['_no','No','skip'],['nopol','Nopol'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','Rangka'],['nosin','Mesin'],['pajak','Tgl Pajak','date'],['stnk','Plate','date'],['company','Company'],['area','Area'],['pic','User/pic'],['hp','No HP/Telp']] },
+  stnk:    { label:'STNK', owner:'', icon:'📄', monthField:'pajak', cols:[['_no','No','skip'],['nopol','Nopol'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','Rangka'],['nosin','Mesin'],['pajak','Tgl Pajak','date'],['plate','Plate'],['company','Company'],['area','Area'],['pic','User/pic'],['hp','No HP/Telp']], keyFn:d=>[d.nopol,d.pajak].map(x=>vehNorm(x)).join('|') },
   kir:     { label:'KIR', owner:'', icon:'📋', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['nokir','No KIR'],['kir','Masa Berlaku KIR','date'],['ket','Keterangan']] },
   lokasi:  { label:'BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['status','Status (Customer / Standby / Terjual)'],['pt','PT / Customer'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
   polis:   { label:'Polis Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date']] }
@@ -4118,23 +4113,6 @@ async function vehEnsure(k){
 /* --- tampilan utama (gabungan, hanya lihat) & ruangan --- */
 let VD_ROWS = [], VD_PAGE = 0, _vdT = null;
 const VEH_ROOMS = ['baru','stnk','kir','lokasi','polis'];
-/* --- Filter bulan khusus tab STNK: tiap bulan punya data sendiri (disimpan di data.bulan = 'YYYY-MM') --- */
-const VEH_BLN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-let VEH_STNK_YEAR = new Date().getFullYear(), VEH_STNK_MONTH = new Date().getMonth()+1;
-const vehPeriodOn = () => VEH_TAB==='stnk';
-const vehPeriodKey = () => VEH_STNK_YEAR+'-'+String(VEH_STNK_MONTH).padStart(2,'0');
-const vehPeriodLabel = () => VEH_BLN[VEH_STNK_MONTH-1]+' '+VEH_STNK_YEAR;
-function vehRoomList(){ const l = vehList(); return vehPeriodOn() ? l.filter(x=>String((x.data||{}).bulan||'')===vehPeriodKey()) : l; }
-function vehSetPeriod(y,m){ if(y) VEH_STNK_YEAR=Number(y); if(m) VEH_STNK_MONTH=Number(m); VEH_PAGE=0; VEH_SEL.clear(); renderVeh(); }
-function vehRenderPeriod(){
-  const box = $id('vehPeriod'); if(!box) return;
-  if(!vehPeriodOn()){ box.style.display='none'; return; }
-  const cnt = {}, years = new Set(); const cy = new Date().getFullYear(); for(let y=cy-2;y<=cy+2;y++) years.add(y); years.add(VEH_STNK_YEAR);
-  vehList('stnk').forEach(x=>{ const b=String((x.data||{}).bulan||''); if(/^\d{4}-\d{2}$/.test(b)){ cnt[b]=(cnt[b]||0)+1; years.add(Number(b.slice(0,4))); } });
-  box.style.display='';
-  box.innerHTML = '<span class="lbl">📅 Periode</span><select onchange="vehSetPeriod(this.value,0)">'+[...years].sort().map(y=>`<option value="${y}" ${y===VEH_STNK_YEAR?'selected':''}>${y}</option>`).join('')+'</select>'
-    + VEH_BLN.map((n,i)=>{ const k=VEH_STNK_YEAR+'-'+String(i+1).padStart(2,'0'), c=cnt[k]||0; return `<button class="mchip ${i+1===VEH_STNK_MONTH?'on':''}" onclick="vehSetPeriod(0,${i+1})">${n}${c?`<small>${c.toLocaleString('id-ID')}</small>`:''}</button>`; }).join('');
-}
 const VEH_ROOMDEF = { legal:{label:'Legal', icon:'⚖️', tabs:['baru','stnk','kir']}, bast:{label:'BAST', icon:'🚚', tabs:['lokasi']}, polis:{label:'Polis Asuransi', icon:'🛡️', tabs:['polis']} };
 let VEH_ROOM = 'legal';
 // Pembatasan siapa yang boleh mengedit tiap ruangan ditentukan belakangan; saat ini semua akun yang bisa membuka Dashboard Vehicle boleh.
@@ -4157,7 +4135,7 @@ async function openVehDash(){
 }
 function openVehRoom(room){
   VEH_ROOM=room; const k=VEH_ROOMDEF[room].tabs[0];
-  VEH_TAB=k; VEH_PAGE=0; VEH_SEL.clear(); $id('vehSearch').value=''; vehShowMode('room'); renderVeh(); vehEnsure(k);
+  $id('vehMonth').value=''; $id('vehYear').value=''; VEH_TAB=k; VEH_PAGE=0; VEH_SEL.clear(); $id('vehSearch').value=''; vehShowMode('room'); renderVeh(); vehEnsure(k);
 }
 function vehBackToDash(){ vehShowMode('dash'); vdRender(true); }
 /* nopol sah = ada huruf dan angka, bukan tulisan seperti 'belum ada' */
@@ -4169,7 +4147,7 @@ function vdBuild(){
   vehList('baru').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,tgl:d.tgl,stnk:d.stnk,pajak:d.pajak,kir:d.kir}); });
   const latestOf = (kind,f)=>{ const m=new Map(); vehList(kind).forEach(x=>{ const d=x.data||{}, k=vdKey(d.nopol); if(!k) return; const b=m.get(k); if(!b || String(d[f]||'')>=String(b[f]||'')) m.set(k,d); }); return m; };
   const getR = (k,d)=> rows.get(k) || (rows.set(k,{nopol:d.nopol}), rows.get(k));
-  latestOf('stnk','bulan').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk,noka:d.noka,warna:d.warna,tahun:d.tahun,nosin:d.nosin,pt:d.company}); if(d.stnk) r.stnk=d.stnk; if(d.pajak) r.pajak=d.pajak; });
+  latestOf('stnk','pajak').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin}); if(d.pajak) r.pajak=d.pajak; if(d.company) r.pt=r.pt||d.company; });
   latestOf('kir','kir').forEach((d,k)=>{ const r=getR(k,d); fill(r,{merk:d.merk}); if(d.kir) r.kir=d.kir; });
   vehList('polis').forEach(x=>{ const d=x.data||{}, r=slot(d); if(r) fill(r,{nopol:d.nopol,merk:d.merk,warna:d.warna,tahun:d.tahun,noka:d.noka,nosin:d.nosin,stnk:d.stnk,asuransi:d.asuransi,nopolis:d.nopolis,akhir:d.akhir,pt:d.customer}); });
   const best = new Map();
@@ -4188,7 +4166,7 @@ function vdRender(rebuild){
   if(VD_PAGE>=pages) VD_PAGE=pages-1; if(VD_PAGE<0) VD_PAGE=0;
   const from = size ? VD_PAGE*size : 0, shown = size ? rows.slice(from,from+size) : rows;
   const today = new Date().toISOString().slice(0,10), soon = new Date(Date.now()+30*864e5).toISOString().slice(0,10);
-  const cell = (r,c)=>{ const v=r[c[1]]; if(c[2]==='exp'){ if(!v) return '-'; const cls = v<today ? 'vd-exp' : (v<=soon ? 'vd-soon' : ''); return `<span class="${cls}">${vehFmt(v,'date')}</span>`; } return vehFmt(v,c[2]); };
+  const cell = (r,c)=>{ let v=r[c[1]]; if((c[2]==='date'||c[2]==='exp') && v && String(v) < '2000') v=''; if(c[2]==='exp'){ if(!v) return '-'; const cls = v<today ? 'vd-exp' : (v<=soon ? 'vd-soon' : ''); return `<span class="${cls}">${vehFmt(v,'date')}</span>`; } return vehFmt(v,c[2]); };
   $id('vdBody').innerHTML = shown.map((r,i)=>`<tr><td>${from+i+1}</td>${VD_COLS.map(c=>`<td>${cell(r,c)}</td>`).join('')}</tr>`).join('');
   const loading = !VEH_ROOMS.every(k=>VEH_KLOAD[k]);
   $id('vdEmpty').style.display = rows.length ? 'none' : '';
@@ -4199,20 +4177,35 @@ function vdRender(rebuild){
   $id('vdNote').textContent = `${VD_ROWS.length.toLocaleString('id-ID')} unit · gabungan dari ruangan Legal, BAST, dan Polis Asuransi. Tampilan ini tidak bisa diubah. Hanya unit dengan nopol asli yang tampil (versi 26-Nov-11.30).`;
 }
 async function vehReload(){ VEH_KLOAD = {}; await vehEnsure(VEH_TAB); try{ const ks=Object.keys(VEH_TABS); const c=await Promise.all(ks.map(k=>vehCount(k).catch(()=>null))); ks.forEach((k,i)=>{ if(c[i]!==null) VEH_COUNT[k]=c[i]; }); renderVeh(); }catch(e){} }
-function vehSetTab(t){ VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); vehEnsure(t); }
+function vehSetTab(t){ $id('vehMonth').value=''; $id('vehYear').value=''; VEH_TAB = t; VEH_PAGE = 0; VEH_SEL.clear(); $id('vehSearch').value=''; renderVeh(); vehEnsure(t); }
 const vehKpi = k => VEH_KLOAD[k] ? vehList(k).length : (VEH_COUNT[k]||0);
 function vehList(k){ return VEH_ITEMS.filter(x=>x.kind===(k||VEH_TAB)); }
 function vehFmt(v,type){ if(!v) return '-'; if(type==='date'){ const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:escH(v); } return escH(v); }
+function vehFiltered(){
+  const T = VEH_TABS[VEH_TAB], list = vehList();
+  if(!T.monthField) return list;
+  const m = $id('vehMonth').value, y = $id('vehYear').value; if(!m && !y) return list;
+  return list.filter(x=>{ const v = String((x.data||{})[T.monthField]||''); const mm = v.match(/^(\d{4})-(\d{2})/); if(!mm) return false; return (!y || mm[1]===y) && (!m || mm[2]===m); });
+}
+function vehSyncMonthBox(){
+  const T = VEH_TABS[VEH_TAB], box = $id('vehMonthBox'); box.style.display = T.monthField ? 'inline-flex' : 'none';
+  if(!T.monthField) return;
+  const ys = new Set(); vehList().forEach(x=>{ const mm = String((x.data||{})[T.monthField]||'').match(/^(\d{4})/); if(mm) ys.add(mm[1]); });
+  const sel = $id('vehYear'), cur = sel.value, arr = [...ys].sort().reverse();
+  const html = '<option value="">Semua Tahun</option>'+arr.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(sel.dataset.h!==html){ sel.innerHTML = html; sel.dataset.h = html; sel.value = arr.includes(cur) ? cur : ''; }
+}
 function renderVeh(){
   const T = VEH_TABS[VEH_TAB];
+  vehSyncMonthBox();
   if(VEH_KLOAD.polis){ vehBuildMaster(VEH_ITEMS); vehApplyMaster(); }
   if(VEH_KLOAD.baru){ vehBuildNew(VEH_ITEMS); }
-  const RT = VEH_ROOMDEF[VEH_ROOM].tabs; vehRenderPeriod();
+  const RT = VEH_ROOMDEF[VEH_ROOM].tabs;
   $id('vehTabs').style.display = RT.length>1 ? '' : 'none';
   $id('vehTabs').innerHTML = RT.map(k=>`<button class="${k===VEH_TAB?'on':''}" onclick="vehSetTab('${k}')">${VEH_TABS[k].label}${VEH_KLOAD[k]?' ('+vehKpi(k).toLocaleString('id-ID')+')':''}</button>`).join('');
   $id('vehHead').innerHTML = '<tr><th style="width:32px"><input type="checkbox" id="vehChkAll" onchange="vehSelAll(this.checked)" title="Pilih semua hasil"></th>'+T.cols.map(c=>`<th>${c[1].toUpperCase()}</th>`).join('')+'<th>AKSI</th></tr>';
   const q = vehNorm($id('vehSearch').value);
-  const rows = vehRoomList().filter(x=>{ if(!q) return true; if(x._s===undefined) x._s = vehNorm(Object.values(x.data||{}).join(' ')); return x._s.includes(q); });
+  const rows = vehFiltered().filter(x=>{ if(!q) return true; if(x._s===undefined) x._s = vehNorm(Object.values(x.data||{}).join(' ')); return x._s.includes(q); });
   VEH_VIEW = rows.map(x=>x.id);
   const size = Number($id('vehPageSize').value)||0, pages = size ? Math.max(1,Math.ceil(rows.length/size)) : 1;
   if(VEH_PAGE>=pages) VEH_PAGE = pages-1; if(VEH_PAGE<0) VEH_PAGE = 0;
@@ -4220,12 +4213,12 @@ function renderVeh(){
   $id('vehBody').className = T.red ? 'veh-red' : '';
   $id('vehBody').innerHTML = shown.map((x,ri)=>`<tr><td><input type="checkbox" ${VEH_SEL.has(x.id)?'checked':''} onchange="vehSelOne('${x.id}',this.checked)"></td>${T.cols.map(c=>`<td>${c[2]==='skip'?(from+ri+1):vehFmt((x.data||{})[c[0]],c[2])}</td>`).join('')}<td style="white-space:nowrap"><button class="btn-outline small" onclick="vehOpenForm('${x.id}')">Ubah</button> <button class="btn-danger small" onclick="vehDelete('${x.id}')">Hapus</button></td></tr>`).join('');
   $id('vehEmpty').style.display = rows.length ? 'none' : '';
-  $id('vehEmpty').innerHTML = VEH_BUSY || !VEH_KLOAD[VEH_TAB] ? '⏳ Memuat data...' : (vehPeriodOn() ? 'Belum ada data STNK untuk <b>'+vehPeriodLabel()+'</b>. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.' : 'Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.');
+  $id('vehEmpty').innerHTML = VEH_BUSY || !VEH_KLOAD[VEH_TAB] ? '⏳ Memuat data...' : 'Belum ada data. Klik <b>Tambah Data</b> atau <b>Import Excel</b>.';
   $id('vehPager').innerHTML = !rows.length ? '' : (size && pages>1
     ? `<button class="btn-outline small" ${VEH_PAGE<=0?'disabled':''} onclick="VEH_PAGE--;renderVeh()">‹</button> Halaman ${VEH_PAGE+1} / ${pages} · ${from+1}–${Math.min(from+size,rows.length)} dari ${rows.length.toLocaleString('id-ID')} <button class="btn-outline small" ${VEH_PAGE>=pages-1?'disabled':''} onclick="VEH_PAGE++;renderVeh()">›</button>`
     : `Menampilkan semua ${rows.length.toLocaleString('id-ID')} data`);
   vehUpdateSel();
-  $id('vehNote').innerHTML = VEH_READY ? (VEH_TAB==='stnk' ? `<b>Periode ${vehPeriodLabel()}:</b> tabel, template, import, dan export hanya untuk bulan ini. Ganti bulan lewat filter di atas. ` : '') + (VEH_TAB==='polis' ? '<b>Perpanjangan polis:</b> import atau tambah data dengan No. Polisi yang sama akan <b>menimpa</b> polis lama dengan yang baru. ' : '') + 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
+  $id('vehNote').innerHTML = VEH_READY ? (VEH_TAB==='polis' ? '<b>Perpanjangan polis:</b> import atau tambah data dengan No. Polisi yang sama akan <b>menimpa</b> polis lama dengan yang baru. ' : '') + 'Data tersimpan di database dan bisa dibuka dari perangkat mana pun.' : '<b style="color:var(--bad)">Tabel database belum dibuat.</b> Jalankan file <b>dashboard-vehicle.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.';
 }
 let VEH_SEL = new Set(), VEH_VIEW = [], VEH_PAGE = 0, _vehT = null;
 function vehSearchDebounced(){ clearTimeout(_vehT); VEH_PAGE = 0; _vehT = setTimeout(renderVeh, 250); }
@@ -4246,18 +4239,19 @@ async function vehDeleteSelected(){
 }
 async function vehDeleteAll(){
   if(!vehCanEdit(VEH_TAB)) return;
-  const T = VEH_TABS[VEH_TAB], lst = vehRoomList(), n = lst.length, perBulan = vehPeriodOn();
-  if(!n){ showToast(perBulan ? 'Bulan '+vehPeriodLabel()+' sudah kosong.' : 'Tab ini sudah kosong.', true); return; }
-  const ans = prompt(perBulan ? `Ini akan menghapus ${n.toLocaleString('id-ID')} data STNK bulan ${vehPeriodLabel()} saja (bulan lain tidak disentuh) dan tidak bisa dibatalkan.\n\nKetik HAPUS untuk melanjutkan:` : `Ini akan menghapus SEMUA ${n.toLocaleString('id-ID')} data di tab "${T.label}" dan tidak bisa dibatalkan.\n\nKetik HAPUS untuk melanjutkan:`);
+  const T = VEH_TABS[VEH_TAB], flt = vehFiltered(), part = flt.length !== vehList().length, n = flt.length;
+  if(!n){ showToast(part ? 'Tidak ada data pada filter ini.' : 'Tab ini sudah kosong.', true); return; }
+  if(part){
+    if(!confirm(`Hapus ${n.toLocaleString('id-ID')} data yang tampil pada filter bulan/tahun ini? Tidak bisa dibatalkan.`)) return;
+    try{ const ids = flt.map(x=>x.id); for(let i=0;i<ids.length;i+=100) await sbDeleteIds('vehicle_items', ids.slice(i,i+100)); const gone = new Set(ids); VEH_ITEMS = VEH_ITEMS.filter(x=>!gone.has(x.id)); VEH_SEL.clear(); renderVeh(); showToast(`${n.toLocaleString('id-ID')} data dihapus.`); }
+    catch(e){ await vehReload(); showToast('Penghapusan terhenti: '+String(e.message||e).slice(0,120), true); }
+    return;
+  }
+  const ans = prompt(`Ini akan menghapus SEMUA ${n.toLocaleString('id-ID')} data di tab "${T.label}" dan tidak bisa dibatalkan.\n\nKetik HAPUS untuk melanjutkan:`);
   if((ans||'').trim().toUpperCase()!=='HAPUS'){ if(ans!==null) showToast('Dibatalkan: kata HAPUS tidak diketik.', true); return; }
   try{
-    if(perBulan){
-      const ids = lst.map(x=>x.id); for(let i=0;i<ids.length;i+=100) await sbDeleteIds('vehicle_items', ids.slice(i,i+100));
-      const gone = new Set(ids); VEH_ITEMS = VEH_ITEMS.filter(x=>!gone.has(x.id)); VEH_SEL.clear(); renderVeh(); showToast(`Data STNK ${vehPeriodLabel()} dihapus.`);
-    } else {
-      await sb(`vehicle_items?kind=eq.${VEH_TAB}`, {method:'DELETE', prefer:'return=minimal'});
-      VEH_ITEMS = VEH_ITEMS.filter(x=>x.kind!==VEH_TAB); VEH_SEL.clear(); renderVeh(); showToast(`Semua data di "${T.label}" dihapus.`);
-    }
+    await sb(`vehicle_items?kind=eq.${VEH_TAB}`, {method:'DELETE', prefer:'return=minimal'});
+    VEH_ITEMS = VEH_ITEMS.filter(x=>x.kind!==VEH_TAB); VEH_SEL.clear(); renderVeh(); showToast(`Semua data di "${T.label}" dihapus.`);
   }catch(e){ await vehReload(); showToast('Gagal menghapus: '+String(e.message||e).slice(0,120), true); }
 }
 function vehOpenForm(id){
@@ -4265,7 +4259,7 @@ function vehOpenForm(id){
   if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
   const T = VEH_TABS[VEH_TAB]; VEH_EDIT = id || null;
   const cur = id ? (VEH_ITEMS.find(x=>x.id===id)||{}).data||{} : {};
-  $id('vehFormTitle').textContent = (id?'Ubah ':'Tambah ')+T.label+(vehPeriodOn()&&!id?' — '+vehPeriodLabel():'');
+  $id('vehFormTitle').textContent = (id?'Ubah ':'Tambah ')+T.label;
   $id('vehFormGrid').innerHTML = vehData(T).map(c=>{
     const full = c[0]==='ket' ? ' class="full"' : '';
     const inp = c[0]==='ket' ? `<textarea id="vf_${c[0]}">${escH(cur[c[0]]||'')}</textarea>` : `<input id="vf_${c[0]}" type="${c[2]==='date'?'date':'text'}" value="${escH(cur[c[0]]||'')}">`;
@@ -4288,7 +4282,6 @@ async function vehSave(){
   if(!vehCanEdit(VEH_TAB)){ showToast('Ruangan ini hanya bisa diubah oleh timnya.', true); return; }
   const T = VEH_TABS[VEH_TAB], d = {};
   vehData(T).forEach(c=>{ d[c[0]] = ($id('vf_'+c[0]).value||'').trim(); });
-  if(VEH_TAB==='stnk'){ const oldB = VEH_EDIT ? String(((VEH_ITEMS.find(x=>x.id===VEH_EDIT)||{}).data||{}).bulan||'') : ''; d.bulan = oldB || vehPeriodKey(); }
   if(!d.nopol && !(VEH_TAB==='baru' && d.noka)){ showToast(VEH_TAB==='baru' ? 'Isi No Polisi atau No Rangka.' : 'No. Polisi wajib diisi.', true); return; }
   if(!VEH_EDIT && VEH_TAB==='polis'){
     const old = vehFindByNopol(d.nopol);
@@ -4313,24 +4306,16 @@ async function vehDelete(id){
   catch(e){ showToast('Gagal menghapus: '+String(e.message).slice(0,140), true); }
 }
 function vehXlsxOk(){ if(typeof XLSX==='undefined'){ showToast('Library Excel belum termuat, cek koneksi internet.', true); return false; } return true; }
-function vehStnkSheet(rows){ // header 2 baris seperti Master_data_update_stnk.xlsx
-  const aoa = [['No','Nopol','Type','Warna','Tahun','Rangka','Mesin','Tgl Pajak','Plate','KETERANGAN','','',''],['','','','','','','','','','Company','Area','User/pic','No HP/Telp']];
-  (rows||[]).forEach((x,i)=>{ const d=x.data||{}; aoa.push([i+1,d.nopol||'',d.merk||'',d.warna||'',d.tahun||'',d.noka||'',d.nosin||'',d.pajak||'',d.stnk||'',d.company||'',d.area||'',d.pic||'',d.hp||'']); });
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!merges'] = [...Array(9).keys()].map(c=>({s:{r:0,c},e:{r:1,c}})).concat([{s:{r:0,c:9},e:{r:0,c:12}}]);
-  ws['!cols'] = [5,13,28,10,8,20,14,12,12,36,22,18,16].map(w=>({wch:w}));
-  return ws;
-}
 function vehTemplate(){
   if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB];
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, vehPeriodOn()?vehStnkSheet([]):XLSX.utils.aoa_to_sheet([T.cols.map(c=>c[1])]), (vehPeriodOn()?vehPeriodLabel():T.label).slice(0,31));
-  XLSX.writeFile(wb, vehPeriodOn() ? `template-stnk-${VEH_BLN[VEH_STNK_MONTH-1]}-${VEH_STNK_YEAR}.xlsx` : 'template-'+VEH_TAB+'.xlsx');
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([T.cols.map(c=>c[1])]), T.label.slice(0,31));
+  XLSX.writeFile(wb, 'template-'+VEH_TAB+'.xlsx');
 }
 function vehExport(){
-  if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB], list = vehRoomList();
+  if(!vehXlsxOk()) return; const T = VEH_TABS[VEH_TAB], list = vehFiltered();
   const aoa = [T.cols.map(c=>c[1])]; list.forEach((x,i)=>aoa.push(T.cols.map(c=>c[2]==='skip'?i+1:((x.data||{})[c[0]]||''))));
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, vehPeriodOn()?vehStnkSheet(list):XLSX.utils.aoa_to_sheet(aoa), (vehPeriodOn()?vehPeriodLabel():T.label).slice(0,31));
-  XLSX.writeFile(wb, vehPeriodOn() ? `vehicle-stnk-${VEH_BLN[VEH_STNK_MONTH-1]}-${VEH_STNK_YEAR}.xlsx` : 'vehicle-'+VEH_TAB+'.xlsx');
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), T.label.slice(0,31));
+  XLSX.writeFile(wb, 'vehicle-'+VEH_TAB+'.xlsx');
 }
 function vehDate(v){
   if(v==null||v==='') return '';
@@ -4345,25 +4330,24 @@ async function vehImport(evt){
   if(!VEH_READY){ showToast('Jalankan dashboard-vehicle.sql di Supabase dulu.', true); return; }
   if(!vehXlsxOk()) return;
   if(!VEH_KLOAD[VEH_TAB]){ showToast('Tunggu data tab ini selesai dimuat dulu.', true); return; }
-  if(vehPeriodOn() && !confirm(`Data dari file ini akan dimasukkan ke bulan ${vehPeriodLabel()}.\n\nSudah benar bulannya?`)) return;
   try{
     const T = VEH_TABS[VEH_TAB];
-    const PK = vehPeriodOn() ? vehPeriodKey() : '';
     const wb = XLSX.read(await file.arrayBuffer(), {type:'array'});
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
     const keyN = [vehNorm(T.cols.find(c=>c[0]==='nopol')[1]),'nopolisi','nopol']; const hi = aoa.findIndex(r=>r.some(c=>keyN.includes(vehNorm(c))));
     if(hi<0){ showToast('Kolom nomor polisi tidak ditemukan. Pakai Template Excel.', true); return; }
-    const heads = [aoa[hi]].concat(PK ? [aoa[hi+1]||[]] : []);
-    const idx = T.cols.map(c=>{ let n=c[3]||1, at=-1; heads.forEach(hr=>{ if(at>=0) return; hr.forEach((h,i)=>{ if(at<0 && vehNorm(h)===vehNorm(c[1]) && --n===0) at=i; }); }); return c[2]==='skip' ? -1 : at; });
+    let hdr = aoa[hi], start = hi+1;
+    const sub = aoa[hi+1] || [], names = new Set(T.cols.map(c=>vehNorm(c[1])));
+    if(sub.filter(c=>names.has(vehNorm(c))).length>=2){ hdr = hdr.map((h,i)=> names.has(vehNorm(sub[i])) ? sub[i] : h); start = hi+2; }
+    const idx = T.cols.map(c=>{ let n=c[3]||1, at=-1; hdr.forEach((h,i)=>{ if(at<0 && vehNorm(h)===vehNorm(c[1]) && --n===0) at=i; }); return c[2]==='skip' ? -1 : at; });
     const rk = T.keyFn || (d=>(vehNorm(d.nopol)||('k'+vehNorm(d.noka)))+'|'+vehNorm(d.nopolis));
     const REPL = VEH_TAB==='polis';
-    const seen = new Set(vehRoomList().map(x=>REPL ? vehNorm((x.data||{}).nopol) : rk(x.data||{})));
+    const seen = new Set(vehList().map(x=>REPL ? vehNorm((x.data||{}).nopol) : rk(x.data||{})));
     const byNopol = new Map(); if(REPL) vehList().forEach(x=>{ const k=vehNorm((x.data||{}).nopol); if(k && !byNopol.has(k)) byNopol.set(k,x); });
     const out = [], pend = new Map(), upd = new Map(); let dup = 0, same = 0;
-    aoa.slice(hi+1).forEach(r=>{
+    aoa.slice(start).forEach(r=>{
       const d = {}; T.cols.forEach((c,i)=>{ if(c[2]==='skip') return; const v = idx[i]>=0 ? r[idx[i]] : ''; d[c[0]] = c[2]==='date' ? vehDate(v) : String(v==null?'':v).replace(/\s+/g,' ').trim(); });
       if(!d.nopol && !(VEH_TAB==='baru' && d.noka)) return;
-      if(PK) d.bulan = PK;
       if(REPL){
         const k = vehNorm(d.nopol), old = byNopol.get(k);
         if(old){ const base = upd.has(old.id) ? upd.get(old.id).data : old.data; upd.set(old.id, {item:old, data:vehMerge(base,d)}); }
@@ -4382,7 +4366,7 @@ async function vehImport(evt){
     if(changes.length){ showToast(`Memperbarui ${changes.length.toLocaleString('id-ID')} polis...`); n = await vehApplyUpdates(changes); }
     for(let i=0;i<out.length;i+=200){ const r = await sbInsert('vehicle_items', out.slice(i,i+200)); VEH_ITEMS = [...r, ...VEH_ITEMS]; }
     renderVeh();
-    showToast(REPL ? `Import selesai: ${out.length} polis baru, ${n} polis ditimpa (perpanjangan)${same?`, ${same} tidak berubah`:''}.` : `Import selesai${PK?' ('+vehPeriodLabel()+')':''}: ${out.length} data masuk${dup?`, ${dup} duplikat dilewati`:''}.`);
+    showToast(REPL ? `Import selesai: ${out.length} polis baru, ${n} polis ditimpa (perpanjangan)${same?`, ${same} tidak berubah`:''}.` : `Import selesai: ${out.length} data masuk${dup?`, ${dup} duplikat dilewati`:''}.`);
   }catch(e){ showToast(/check constraint|vehicle_items_kind/i.test(String(e.message||e)) ? 'Ruangan ini belum aktif di database. Jalankan dashboard-vehicle-lokasi.sql di Supabase.' : 'Import gagal: '+String(e.message||e).slice(0,140), true); }
 }
 function backToSpkChoice(){ spkShowOnly('spkChoiceScreen'); }
