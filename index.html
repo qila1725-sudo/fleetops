@@ -640,7 +640,7 @@ const SUPABASE_ANON_KEY = "PASTE_SUPABASE_ANON_KEY_DISINI";</div>
       <select id="vehPageSize" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;">
         <option value="100" selected>100 baris</option><option value="300">300 baris</option><option value="1000">1.000 baris</option><option value="0">Semua baris (berat)</option>
       </select>
-      <span id="vehMonthBox" style="display:none;gap:6px;align-items:center;font-size:12px;color:#556;">Filter Tgl Pajak:
+      <span id="vehMonthBox" style="display:none;gap:6px;align-items:center;font-size:12px;color:#556;"><span id="vehMonthLbl">Filter:</span>
         <select id="vehMonth" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;"><option value="">Semua Bulan</option><option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option><option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option><option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option></select>
         <select id="vehYear" onchange="VEH_PAGE=0;renderVeh()" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff;"><option value="">Semua Tahun</option></select></span>
       <span id="vehPager" style="display:flex;gap:6px;align-items:center;font-size:12px;color:#556;"></span>
@@ -4086,9 +4086,9 @@ function leaveSpk(){ UNLOCKED.clear(); ACCESS_TOKEN=null; REFRESH_TOKEN=null; wi
 
 /* ================= DASHBOARD VEHICLE MOBIL ================= */
 const VEH_TABS = {
-  baru:    { label:'Mobil Baru', owner:'', icon:'🆕', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date'],['dealer','Dealer']] },
-  stnk:    { label:'STNK', owner:'', icon:'📄', monthField:'pajak', cols:[['_no','No','skip'],['nopol','Nopol'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','Rangka'],['nosin','Mesin'],['pajak','Tgl Pajak','date'],['plate','Plate'],['company','Company'],['area','Area'],['pic','User/pic'],['hp','No HP/Telp']], keyFn:d=>[d.nopol,d.pajak].map(x=>vehNorm(x)).join('|') },
-  kir:     { label:'KIR', owner:'', icon:'📋', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['nokir','No KIR'],['kir','Masa Berlaku KIR','date'],['ket','Keterangan']] },
+  baru:    { label:'Mobil Baru', owner:'', icon:'🆕', monthField:'tgl', monthLabel:'Tanggal Masuk', cols:[['_no','No','skip'],['tgl','Tanggal Masuk','date'],['nopol','No Polisi'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','No Rangka'],['nosin','No Mesin'],['stnk','STNK','date'],['pajak','Pajak','date'],['dealer','Dealer']] },
+  stnk:    { label:'STNK', owner:'', icon:'📄', monthField:'pajak', monthLabel:'Tgl Pajak', cols:[['_no','No','skip'],['nopol','Nopol'],['merk','Type'],['warna','Warna'],['tahun','Tahun'],['noka','Rangka'],['nosin','Mesin'],['pajak','Tgl Pajak','date'],['plate','Plate'],['company','Company'],['area','Area'],['pic','User/pic'],['hp','No HP/Telp']], keyFn:d=>[d.nopol,d.pajak].map(x=>vehNorm(x)).join('|') },
+  kir:     { label:'KIR', owner:'', icon:'📋', monthField:'kir', monthLabel:'Masa Berlaku KIR', cols:[['_no','No','skip'],['nopol','No Polisi'],['merk','Type'],['nokir','No KIR'],['kir','Masa Berlaku KIR','date'],['ket','Keterangan']] },
   lokasi:  { label:'BAST', owner:'', icon:'🚚', cols:[['_no','No','skip'],['tgl','Tanggal','date'],['nopol','No Polisi'],['status','Status (Customer / Standby / Terjual)'],['pt','PT / Customer'],['asal','Lokasi Asal'],['tujuan','Lokasi Tujuan'],['nobast','No BAST'],['tglbast','Tgl BAST','date'],['pic','PIC Penerima'],['ket','Keterangan']], keyFn:d=>[d.nopol,d.tgl,d.tujuan,d.nobast].map(x=>vehNorm(x)).join('|') },
   polis:   { label:'Polis Asuransi', owner:'', icon:'🛡️', cols:[['_no','No','skip'],['nopol','License No'],['merk','Description'],['warna','Color'],['tahun','Year'],['noka','Chassis'],['nosin','Engine'],['stnk','STNK','date'],['asuransi','Insurance'],['nopolis','Police no'],['mulai','Beginning','date'],['akhir','Ending','date']] }
 };
@@ -4190,7 +4190,7 @@ function vehFiltered(){
   return list.filter(x=>{ const v = String((x.data||{})[T.monthField]||''); const mm = v.match(/^(\d{4})-(\d{2})/); if(!mm) return false; return (!y || mm[1]===y) && (!m || mm[2]===m); });
 }
 function vehSyncMonthBox(){
-  const T = VEH_TABS[VEH_TAB], box = $id('vehMonthBox'); box.style.display = T.monthField ? 'inline-flex' : 'none';
+  const T = VEH_TABS[VEH_TAB], box = $id('vehMonthBox'); box.style.display = T.monthField ? 'inline-flex' : 'none'; $id('vehMonthLbl').textContent = 'Filter '+(T.monthLabel||'')+':';
   if(!T.monthField) return;
   const ys = new Set(); vehList().forEach(x=>{ const mm = String((x.data||{})[T.monthField]||'').match(/^(\d{4})/); if(mm) ys.add(mm[1]); });
   const sel = $id('vehYear'), cur = sel.value, arr = [...ys].sort().reverse();
